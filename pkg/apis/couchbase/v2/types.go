@@ -288,6 +288,21 @@ type CouchbaseBackupSpec struct {
 	// +kubebuilder:default="720h"
 	BackupRetention *metav1.Duration `json:"backupRetention,omitempty"`
 
+	// Worm enables Write Once Read Many protection for backups written to a cloud
+	// object store.  When set, every repository the Operator creates has WORM
+	// enabled, and each backup in it is locked against deletion for
+	// `couchbasebackups.spec.worm.compliancePeriod`.  Requires
+	// `couchbasebackups.spec.objectStore.uri` or `couchbasebackups.spec.s3bucket`,
+	// and a bucket that already has versioning and object locking enabled.
+	// Cannot be used with `couchbasebackups.spec.snapshotBackup`.
+	// Enabling or disabling this starts a new repository, and therefore takes a
+	// full backup, on the next scheduled run.  WORM cannot be changed for a
+	// repository that already exists, and locking incremental backups to a full
+	// backup that can still be deleted would protect nothing.
+	// +optional
+	// +couchbase:version:minimum=8.5.0
+	Worm *CouchbaseBackupWorm `json:"worm,omitempty"`
+
 	// Number of hours to hold script logs for, everything older will be deleted.  More info:
 	// https://golang.org/pkg/time/#ParseDuration
 	// +kubebuilder:default="168h"
@@ -363,6 +378,26 @@ type CouchbaseBackupSpec struct {
 	// guarantee. Scheduling and retention behave the same as an archive based backup.
 	// +optional
 	SnapshotBackup *CouchbaseSnapshotBackupSpec `json:"snapshotBackup,omitempty"`
+}
+
+// CouchbaseBackupWorm configures Write Once Read Many protection for the backup
+// repositories the Operator creates.
+type CouchbaseBackupWorm struct {
+	// CompliancePeriod is how long each backup is locked against deletion for.
+	// Must be a whole number of days, between 72h (3 days) and 876600h (36525
+	// days, 100 years).  This period is fixed when a repository is created: it
+	// cannot be shortened or cancelled once backups have been written under it,
+	// and removing `couchbasebackups.spec.worm` does not unlock them.  More info:
+	// https://golang.org/pkg/time/#ParseDuration
+	CompliancePeriod metav1.Duration `json:"compliancePeriod"`
+
+	// DeleteObjectVersions causes backup retention to delete every version of an
+	// object when it removes an expired repository.  Object locking requires
+	// bucket versioning, so without this the old versions of everything the
+	// backup process rewrote are left behind and never reclaimed.
+	// This field defaults to `true`.
+	// +kubebuilder:default=true
+	DeleteObjectVersions *bool `json:"deleteObjectVersions,omitempty"`
 }
 
 // +kubebuilder:validation:Enum=none;resume;purge
@@ -662,6 +697,34 @@ type BackupStatus struct {
 
 	// Incremental backups inside the repository.
 	Incrementals []string `json:"incrementals,omitempty"`
+
+	// Worm reports the WORM state of the repository.  Absent both for a
+	// repository without WORM and for one whose state could not be read, as
+	// reporting a repository as unprotected when that is merely unknown would be
+	// worse than saying nothing.
+	// +optional
+	Worm *BackupWormStatus `json:"worm,omitempty"`
+}
+
+// BackupWormStatus reports the WORM state of a backup repository.
+type BackupWormStatus struct {
+	// CompliancePeriod is the repository's WORM compliance period, the length of
+	// time each backup in it is locked against deletion for.
+	// +optional
+	CompliancePeriod *metav1.Duration `json:"compliancePeriod,omitempty"`
+
+	// ValidUntil is when the repository's WORM validity period expires.  Backups
+	// added to the repository after this time would not be WORM protected.  The
+	// Operator starts a new repository on every full backup, so a repository it
+	// has moved on from is expected to pass this time.
+	// +optional
+	ValidUntil *metav1.Time `json:"validUntil,omitempty"`
+
+	// LockedUntil is when the compliance period of the last backup in this
+	// repository expires, and therefore the earliest that backup retention can
+	// remove the repository.
+	// +optional
+	LockedUntil *metav1.Time `json:"lockedUntil,omitempty"`
 }
 
 // CouchbaseSnapshotBackupRun records one CSI VolumeSnapshot based backup attempt. This is

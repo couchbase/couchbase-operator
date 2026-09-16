@@ -2882,6 +2882,97 @@ func TestValidationCreateCouchbaseBackup(t *testing.T) {
 			mutations:  patchMap{"backup0": jsonpatch.NewPatchSet().Replace("/spec/s3bucket", "s3://hello/beans")},
 			shouldFail: false,
 		},
+		{
+			// WORM relies on object locking, so it is meaningless on a volume.
+			name: "TestValidateBackupWormNeedsACloudStore",
+			mutations: patchMap{
+				"backup0": jsonpatch.NewPatchSet().
+					Add("/spec/worm", couchbasev2.CouchbaseBackupWorm{
+						CompliancePeriod: metav1.Duration{Duration: 30 * 24 * time.Hour},
+					}),
+			},
+			shouldFail: true,
+		},
+		{
+			// The ordinary case. backupRetention defaults to 720h, which is
+			// exactly the compliance period asked for here.
+			name: "TestValidateBackupWorm",
+			mutations: patchMap{
+				"backup0": jsonpatch.NewPatchSet().
+					Add("/spec/objectStore", couchbasev2.ObjectStoreSpec{
+						URI:    "s3://blah",
+						Secret: "test-example-s3",
+					}).
+					Add("/spec/worm", couchbasev2.CouchbaseBackupWorm{
+						CompliancePeriod: metav1.Duration{Duration: 30 * 24 * time.Hour},
+					}),
+			},
+			shouldFail: false,
+		},
+		{
+			// cbbackupmgr will not accept a period shorter than three days.
+			name: "TestValidateBackupWormPeriodTooShort",
+			mutations: patchMap{
+				"backup0": jsonpatch.NewPatchSet().
+					Add("/spec/objectStore", couchbasev2.ObjectStoreSpec{
+						URI:    "s3://blah",
+						Secret: "test-example-s3",
+					}).
+					Add("/spec/worm", couchbasev2.CouchbaseBackupWorm{
+						CompliancePeriod: metav1.Duration{Duration: 48 * time.Hour},
+					}),
+			},
+			shouldFail: true,
+		},
+		{
+			// cbbackupmgr counts days, so a part day cannot be expressed.
+			name: "TestValidateBackupWormPeriodNotWholeDays",
+			mutations: patchMap{
+				"backup0": jsonpatch.NewPatchSet().
+					Add("/spec/objectStore", couchbasev2.ObjectStoreSpec{
+						URI:    "s3://blah",
+						Secret: "test-example-s3",
+					}).
+					Add("/spec/worm", couchbasev2.CouchbaseBackupWorm{
+						CompliancePeriod: metav1.Duration{Duration: 100 * time.Hour},
+					}),
+			},
+			shouldFail: true,
+		},
+		{
+			// A repository cannot be removed while it holds locked backups, so a
+			// shorter retention would leave the cleanup failing forever.
+			name: "TestValidateBackupWormOutlivesRetention",
+			mutations: patchMap{
+				"backup0": jsonpatch.NewPatchSet().
+					Add("/spec/objectStore", couchbasev2.ObjectStoreSpec{
+						URI:    "s3://blah",
+						Secret: "test-example-s3",
+					}).
+					Add("/spec/backupRetention", "240h").
+					Add("/spec/worm", couchbasev2.CouchbaseBackupWorm{
+						CompliancePeriod: metav1.Duration{Duration: 30 * 24 * time.Hour},
+					}),
+			},
+			shouldFail: true,
+		},
+		{
+			// Merging rewrites backup files, which is what WORM prevents.
+			name: "TestValidateBackupWormPeriodicMerge",
+			mutations: patchMap{
+				"backup0": jsonpatch.NewPatchSet().
+					Add("/spec/objectStore", couchbasev2.ObjectStoreSpec{
+						URI:    "s3://blah",
+						Secret: "test-example-s3",
+					}).
+					Replace("/spec/strategy", couchbasev2.PeriodicMerge).
+					Add("/spec/merge", couchbasev2.CouchbaseBackupSchedule{Schedule: "*/7 * * * *"}).
+					Add("/spec/worm", couchbasev2.CouchbaseBackupWorm{
+						CompliancePeriod: metav1.Duration{Duration: 30 * 24 * time.Hour},
+					}),
+			},
+			shouldFail: true,
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})

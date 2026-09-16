@@ -106,6 +106,10 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbasebackuprestores-status-backups-incrementals,incrementals>>:
     - ""
     <<couchbasebackuprestores-status-backups-name,name>>: ""
+    <<couchbasebackuprestores-status-backups-worm,worm>>:
+      <<couchbasebackuprestores-status-backups-worm-complianceperiod,compliancePeriod>>: ""
+      <<couchbasebackuprestores-status-backups-worm-lockeduntil,lockedUntil>>: ""
+      <<couchbasebackuprestores-status-backups-worm-validuntil,validUntil>>: ""
   <<couchbasebackuprestores-status-completed,completed>>: false
   <<couchbasebackuprestores-status-conditions,conditions>>:
   - <<couchbasebackuprestores-status-conditions-lasttransitiontime,lastTransitionTime>>: ""
@@ -1300,6 +1304,59 @@ Incremental backups inside the repository.
 ==== Description
 
 Name of the repository.
+
+=== couchbasebackuprestores.status.backups.worm
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Worm reports the WORM state of the repository.
+Absent both for a
+repository without WORM and for one whose state could not be read, as
+reporting a repository as unprotected when that is merely unknown would be
+worse than saying nothing.
+This field is available in Couchbase Server 8.5.0 and later.
+
+=== couchbasebackuprestores.status.backups.worm.compliancePeriod
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+CompliancePeriod is the repository's WORM compliance period, the length of
+time each backup in it is locked against deletion for.
+
+=== couchbasebackuprestores.status.backups.worm.lockedUntil
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+LockedUntil is when the compliance period of the last backup in this
+repository expires, and therefore the earliest that backup retention can
+remove the repository.
+
+=== couchbasebackuprestores.status.backups.worm.validUntil
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+ValidUntil is when the repository's WORM validity period expires.
+Backups
+added to the repository after this time would not be WORM protected.
+The
+Operator starts a new repository on every full backup, so a repository it
+has moved on from is expected to pass this time.
 
 === couchbasebackuprestores.status.completed
 

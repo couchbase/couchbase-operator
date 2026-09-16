@@ -412,6 +412,123 @@ func MustWaitForBackup(t *testing.T, k8s *types.Cluster, backup *couchbasev2.Cou
 	}
 }
 
+// WaitForBackupWormProtection waits until the repository a backup is writing to
+// reports WORM protection in the resource status.
+//
+// A backup whose repository is not WORM still completes normally, so the
+// completion event alone does not tell you that WORM took effect.  This is the
+// only check that does.
+func WaitForBackupWormProtection(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		current, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(k8s.Namespace).Get(context.Background(), backup.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		if current.Status.Repo == "" {
+			return fmt.Errorf("backup %s has not reported a repository yet", backup.Name)
+		}
+
+		for i := range current.Status.Backups {
+			repo := &current.Status.Backups[i]
+
+			if repo.Name != current.Status.Repo {
+				continue
+			}
+
+			if repo.Worm == nil {
+				return fmt.Errorf("repository %s reports no WORM protection, either WORM did not "+
+					"take effect or cbbackupmgr did not report it", repo.Name)
+			}
+
+			return nil
+		}
+
+		return fmt.Errorf("repository %s is not in the status backup list yet", current.Status.Repo)
+	})
+}
+
+func MustWaitForBackupWormProtection(t *testing.T, k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, timeout time.Duration) {
+	if err := WaitForBackupWormProtection(k8s, backup, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+// MustGetBackupRepository returns the repository a backup is currently writing to.
+func MustGetBackupRepository(t *testing.T, k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup) string {
+	current, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(k8s.Namespace).Get(context.Background(), backup.Name, metav1.GetOptions{})
+	if err != nil {
+		Die(t, err)
+	}
+
+	if current.Status.Repo == "" {
+		Die(t, fmt.Errorf("backup %s has not reported a repository", backup.Name))
+	}
+
+	return current.Status.Repo
+}
+
+// MustGetBackupRepositoryStatus returns the reported status of one of a backup's
+// repositories, whether or not it is the one currently being written to.
+func MustGetBackupRepositoryStatus(t *testing.T, k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, repoName string) *couchbasev2.BackupStatus {
+	current, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(k8s.Namespace).Get(context.Background(), backup.Name, metav1.GetOptions{})
+	if err != nil {
+		Die(t, err)
+	}
+
+	for i := range current.Status.Backups {
+		if current.Status.Backups[i].Name == repoName {
+			return &current.Status.Backups[i]
+		}
+	}
+
+	Die(t, fmt.Errorf("backup %s does not report a repository named %s", backup.Name, repoName))
+
+	return nil
+}
+
+// WaitForBackupRepositoryRotation waits until a backup writes to a repository
+// other than the one given, and returns that new repository's status.
+//
+// WORM cannot be turned on or off for a repository that already exists, so
+// changing it starts a new one. The new repository is empty, which is what makes
+// its first backup a full one even on an incremental run.
+func WaitForBackupRepositoryRotation(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, previousRepo string, timeout time.Duration) (*couchbasev2.BackupStatus, error) {
+	var rotated *couchbasev2.BackupStatus
+
+	err := retryutil.RetryFor(timeout, func() error {
+		current, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(k8s.Namespace).Get(context.Background(), backup.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		if current.Status.Repo == "" || current.Status.Repo == previousRepo {
+			return fmt.Errorf("backup %s is still writing to repository %q", backup.Name, previousRepo)
+		}
+
+		for i := range current.Status.Backups {
+			if current.Status.Backups[i].Name == current.Status.Repo {
+				rotated = &current.Status.Backups[i]
+
+				return nil
+			}
+		}
+
+		return fmt.Errorf("repository %s is not in the status backup list yet", current.Status.Repo)
+	})
+
+	return rotated, err
+}
+
+func MustWaitForBackupRepositoryRotation(t *testing.T, k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, previousRepo string, timeout time.Duration) *couchbasev2.BackupStatus {
+	rotated, err := WaitForBackupRepositoryRotation(k8s, backup, previousRepo, timeout)
+	if err != nil {
+		Die(t, err)
+	}
+
+	return rotated
+}
+
 func WaitForCronjob(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, name string, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
 		listOptions := metav1.ListOptions{}

@@ -20,6 +20,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	cbcluster "github.com/couchbase/couchbase-operator/pkg/cluster"
@@ -3524,6 +3525,8 @@ func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBac
 		errs = append(errs, fmt.Errorf("spec.additionalOperatorBackupArgs cannot contain --force-delete-lockfile"))
 	}
 
+	errs = append(errs, checkConstraintsBackupWorm(backup)...)
+
 	errs = append(errs, checkConstraintsEnvVarsBackup(backup)...)
 
 	if errs != nil {
@@ -3531,6 +3534,58 @@ func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBac
 	}
 
 	return nil
+}
+
+const (
+	// wormMinimumCompliancePeriod is the shortest WORM compliance period
+	// cbbackupmgr accepts, 3 days.
+	wormMinimumCompliancePeriod = 3 * 24 * time.Hour
+
+	// wormMaximumCompliancePeriod is the longest, 36525 days or 100 years.
+	wormMaximumCompliancePeriod = 36525 * 24 * time.Hour
+)
+
+// checkConstraintsBackupWorm checks the WORM configuration of a backup.
+//
+// WORM is fixed when a repository is created, and a compliance period cannot be
+// shortened or cancelled once backups have been written under it, so a mistake
+// here is expensive and permanent.  These are therefore rejected at admission
+// rather than left to fail, or to silently do nothing, at backup time.
+func checkConstraintsBackupWorm(backup *couchbasev2.CouchbaseBackup) []error {
+	if backup.Spec.Worm == nil {
+		return nil
+	}
+
+	var errs []error
+
+	if !backup.HasCloudStore() {
+		errs = append(errs, fmt.Errorf("spec.worm requires spec.objectStore.uri or spec.s3bucket, WORM is only available on cloud object storage"))
+	}
+
+	if backup.Spec.Strategy == couchbasev2.PeriodicMerge {
+		errs = append(errs, fmt.Errorf("spec.strategy cannot be periodicMerge with spec.worm, merging rewrites backup files which WORM prevents"))
+	}
+
+	period := backup.Spec.Worm.CompliancePeriod.Duration
+
+	if period%(24*time.Hour) != 0 || period < wormMinimumCompliancePeriod || period > wormMaximumCompliancePeriod {
+		errs = append(errs, fmt.Errorf("spec.worm.compliancePeriod %s must be a whole number of days between %s and %s",
+			period, wormMinimumCompliancePeriod, wormMaximumCompliancePeriod))
+	}
+
+	// A repository cannot be removed while it holds locked backups.  Without this
+	// the cleanup would fail on every run once the retention period passed, and
+	// the archive would grow without bound with nothing to signal why.
+	if backup.Spec.BackupRetention != nil && backup.Spec.BackupRetention.Duration < period {
+		errs = append(errs, fmt.Errorf("spec.backupRetention %s must be at least spec.worm.compliancePeriod %s, WORM prevents repositories being deleted before their compliance period expires",
+			backup.Spec.BackupRetention.Duration, period))
+	}
+
+	if strings.Contains(backup.Spec.AdditionalOperatorBackupArgs, "--worm") {
+		errs = append(errs, fmt.Errorf("spec.additionalOperatorBackupArgs cannot contain --worm, use spec.worm"))
+	}
+
+	return errs
 }
 
 func checkConstraintsEnvVarsBackup(backup *couchbasev2.CouchbaseBackup) []error {
@@ -5559,6 +5614,12 @@ func checkConstraintsSnapshotBackup(v *types.Validator, backup *couchbasev2.Couc
 
 	if len(backup.Name) > maxSnapshotBackupNameLength {
 		errs = append(errs, fmt.Errorf("backup name %q cannot be longer than %d characters when using spec.snapshotBackup", backup.Name, maxSnapshotBackupNameLength))
+	}
+
+	// WORM is a property of a cbbackupmgr repository in a cloud object store, which a
+	// snapshot backup never writes, so accepting it here would silently protect nothing.
+	if backup.Spec.Worm != nil {
+		errs = append(errs, fmt.Errorf("spec.worm cannot be used with spec.snapshotBackup, WORM only applies to backups written to a cloud object store"))
 	}
 
 	if errs != nil {

@@ -1194,6 +1194,14 @@ func (c *Cluster) generateBackupArgs(backup *couchbasev2.CouchbaseBackup, full b
 		args = append(args, "--threads", strconv.Itoa(backup.Spec.Threads))
 	}
 
+	if backup.Spec.Worm != nil {
+		args = append(args, "--worm", strconv.Itoa(backup.Spec.Worm.ComplianceDays()))
+
+		if backup.Spec.Worm.ShouldDeleteObjectVersions() {
+			args = append(args, "--delete-obj-versions")
+		}
+	}
+
 	// These will all be set, to something due to defaulting, so the dereference is safe.
 	disableFlags := map[string]*bool{
 		"--disable-bucket-config":     backup.Spec.Services.BucketConfig,
@@ -1960,6 +1968,8 @@ func (c *Cluster) reconcileBackup() error {
 		if c.unreconcilable.IsSkipped(couchbasev2.BackupCRDResourceKind, req.name) {
 			continue
 		}
+
+		c.publishBackupWormMetrics(req.backup)
 		// Requested resource doesn't exist (as best we know...), so create it.
 		if !current.contains(req) {
 			if err := c.createBackupResource(req); err != nil {
@@ -2005,6 +2015,26 @@ func (c *Cluster) cleanupUnusedBackupResources(current backupResourcesList) erro
 	}
 
 	return nil
+}
+
+// publishBackupWormMetrics reports when each of a backup's repositories stops
+// applying WORM protection to what is written to it.
+func (c *Cluster) publishBackupWormMetrics(backup *couchbasev2.CouchbaseBackup) {
+	if backup == nil {
+		return
+	}
+
+	for i := range backup.Status.Backups {
+		repo := &backup.Status.Backups[i]
+
+		if repo.Worm == nil || repo.Worm.ValidUntil == nil {
+			continue
+		}
+
+		metrics.BackupWormValidUntilMetric.WithLabelValues(
+			c.addOptionalLabelValues([]string{c.cluster.Namespace, backup.Name, repo.Name})...,
+		).Set(float64(repo.Worm.ValidUntil.Unix()))
+	}
 }
 
 func (c *Cluster) reconcileBackupRestore() error {

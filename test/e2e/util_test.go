@@ -563,6 +563,10 @@ func registerTests() {
 		framework.NewTestDef(TestUnreconcilableStaysSkippedAcrossCycles).WithTags(TagSuiteP0, TagFeatureReconcile),
 		framework.NewTestDef(TestUnreconcilableCausesNoGitOpsChurn).WithTags(TagSuiteP0, TagFeatureReconcile),
 		framework.NewTestDef(TestUnreconcilableXDCRReplicationDependencyMissing).WithTags(TagSuiteP0, TagFeatureReconcile),
+		framework.NewTestDef(TestBackupAndRestoreWormS3).WithTags(TagSuiteP0, TagFeatureBackup),
+		framework.NewTestDef(TestBackupAndRestoreWormGCP).WithTags(TagSuiteP0, TagFeatureBackup),
+		framework.NewTestDef(TestDisablingWormStartsANewRepositoryS3).WithTags(TagSuiteP0, TagFeatureBackup),
+		framework.NewTestDef(TestDisablingWormStartsANewRepositoryGCP).WithTags(TagSuiteP0, TagFeatureBackup),
 
 		// Old P0s now P1s
 		framework.NewTestDef(TestBucketContinuousBackup).WithTags(TagSuiteP1, TagFeatureBackup, TagFeatureReconcile),

@@ -1768,6 +1768,14 @@ func (r CouchbaseBackupRestore) HasCloudStore() bool {
 	return r.Spec.S3Bucket != "" || (r.Spec.ObjectStore != nil && r.Spec.ObjectStore.URI != "")
 }
 
+func (w *CouchbaseBackupWorm) ComplianceDays() int {
+	return int(w.CompliancePeriod.Duration.Hours() / 24)
+}
+
+func (w *CouchbaseBackupWorm) ShouldDeleteObjectVersions() bool {
+	return w.DeleteObjectVersions == nil || *w.DeleteObjectVersions
+}
+
 func (c *CouchbaseCluster) IsMigrationCluster() bool {
 	return c.Spec.Migration != nil && len(c.Spec.Migration.UnmanagedClusterHost) != 0
 }

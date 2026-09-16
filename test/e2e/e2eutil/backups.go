@@ -103,6 +103,9 @@ type Backup struct {
 	// retention is the length of time to retain backups for.
 	retention time.Duration
 
+	// worm is the WORM compliance period to lock each backup for.
+	worm time.Duration
+
 	// size is the backup volume size.
 	size *resource.Quantity
 
@@ -230,6 +233,37 @@ func (b *Backup) WithObjStoreSecret(secret *v1.Secret) *Backup {
 // WithRetention allows backup retention to be set.
 func (b *Backup) WithRetention(duration time.Duration) *Backup {
 	b.retention = duration
+	return b
+}
+
+// MustDisableBackupWorm removes WORM from a backup that already has it.
+//
+// The backups already written stay locked, WORM cannot be taken off a repository
+// that exists, so this only governs where later backups go.
+func MustDisableBackupWorm(t *testing.T, k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, timeout time.Duration) {
+	err := retryutil.RetryFor(timeout, func() error {
+		current, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(k8s.Namespace).Get(context.Background(), backup.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		current.Spec.Worm = nil
+
+		_, err = k8s.CRClient.CouchbaseV2().CouchbaseBackups(k8s.Namespace).Update(context.Background(), current, metav1.UpdateOptions{})
+
+		return err
+	})
+	if err != nil {
+		Die(t, err)
+	}
+}
+
+// WithWorm enables WORM protection, locking every backup in the repositories
+// this backup creates against deletion for the given compliance period.  The
+// bucket must already have versioning and object locking enabled, and the
+// retention period must be at least as long as the compliance period.
+func (b *Backup) WithWorm(compliancePeriod time.Duration) *Backup {
+	b.worm = compliancePeriod
 	return b
 }
 
@@ -377,6 +411,12 @@ func (b *Backup) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbasev
 	if b.retention != 0 {
 		backup.Spec.BackupRetention = &metav1.Duration{
 			Duration: b.retention,
+		}
+	}
+
+	if b.worm != 0 {
+		backup.Spec.Worm = &couchbasev2.CouchbaseBackupWorm{
+			CompliancePeriod: metav1.Duration{Duration: b.worm},
 		}
 	}
 

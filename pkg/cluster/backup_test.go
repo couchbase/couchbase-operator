@@ -15,12 +15,15 @@ import (
 	"reflect"
 	"sort"
 	"testing"
+	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/metrics"
 	"github.com/couchbase/couchbase-operator/pkg/unreconcilable"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -376,5 +379,179 @@ func TestUpdateBackupPVCAddsMissingLabel(t *testing.T) {
 
 	if actions := kubeClient.Actions(); len(actions) != 0 {
 		t.Errorf("expected no updates once the label is there, got %v", actions)
+	}
+}
+
+// wormBackupFixture builds a backup with everything generateBackupArgs
+// dereferences already set, so a test only has to supply the WORM settings.
+func wormBackupFixture(worm *couchbasev2.CouchbaseBackupWorm) *couchbasev2.CouchbaseBackup {
+	enabled := true
+
+	return &couchbasev2.CouchbaseBackup{
+		Spec: couchbasev2.CouchbaseBackupSpec{
+			BackupRetention: &metav1.Duration{Duration: 720 * time.Hour},
+			LogRetention:    &metav1.Duration{Duration: 168 * time.Hour},
+			Worm:            worm,
+			Services: couchbasev2.CouchbaseBackupServiceFilter{
+				BucketConfig:     &enabled,
+				Views:            &enabled,
+				GSIndexes:        &enabled,
+				FTSIndexes:       &enabled,
+				FTSAliases:       &enabled,
+				Data:             &enabled,
+				Analytics:        &enabled,
+				Eventing:         &enabled,
+				ClusterAnalytics: &enabled,
+				BucketQuery:      &enabled,
+				ClusterQuery:     &enabled,
+				Users:            &enabled,
+			},
+		},
+	}
+}
+
+func argIndex(args []string, flag string) int {
+	for i, arg := range args {
+		if arg == flag {
+			return i
+		}
+	}
+
+	return -1
+}
+
+func TestGenerateBackupArgsWorm(t *testing.T) {
+	deleteVersions := true
+	keepVersions := false
+
+	testcases := []struct {
+		name                 string
+		worm                 *couchbasev2.CouchbaseBackupWorm
+		full                 bool
+		expectedPeriod       string
+		expectDeleteVersions bool
+	}{
+		{
+			name: "no worm leaves the arguments untouched",
+			full: true,
+		},
+		{
+			name: "compliance period is passed in whole days",
+			worm: &couchbasev2.CouchbaseBackupWorm{
+				CompliancePeriod: metav1.Duration{Duration: 30 * 24 * time.Hour},
+			},
+			full:                 true,
+			expectedPeriod:       "30",
+			expectDeleteVersions: true,
+		},
+		{
+			name: "incremental backups are told about worm too",
+			worm: &couchbasev2.CouchbaseBackupWorm{
+				CompliancePeriod: metav1.Duration{Duration: 7 * 24 * time.Hour},
+			},
+			full:                 false,
+			expectedPeriod:       "7",
+			expectDeleteVersions: true,
+		},
+		{
+			name: "deleting object versions can be turned off",
+			worm: &couchbasev2.CouchbaseBackupWorm{
+				CompliancePeriod:     metav1.Duration{Duration: 3 * 24 * time.Hour},
+				DeleteObjectVersions: &keepVersions,
+			},
+			full:                 true,
+			expectedPeriod:       "3",
+			expectDeleteVersions: false,
+		},
+		{
+			name: "deleting object versions can be asked for explicitly",
+			worm: &couchbasev2.CouchbaseBackupWorm{
+				CompliancePeriod:     metav1.Duration{Duration: 3 * 24 * time.Hour},
+				DeleteObjectVersions: &deleteVersions,
+			},
+			full:                 true,
+			expectedPeriod:       "3",
+			expectDeleteVersions: true,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			c := &Cluster{
+				cluster: &couchbasev2.CouchbaseCluster{
+					ObjectMeta: metav1.ObjectMeta{Name: "cows"},
+				},
+			}
+
+			args := c.generateBackupArgs(wormBackupFixture(testcase.worm), testcase.full)
+
+			index := argIndex(args, "--worm")
+
+			switch {
+			case testcase.expectedPeriod == "" && index != -1:
+				t.Errorf("expected no --worm argument but found one in %v", args)
+			case testcase.expectedPeriod != "" && index == -1:
+				t.Errorf("expected --worm argument but found none in %v", args)
+			case testcase.expectedPeriod != "" && args[index+1] != testcase.expectedPeriod:
+				t.Errorf("expected --worm %s but got %s", testcase.expectedPeriod, args[index+1])
+			}
+
+			hasDeleteVersions := argIndex(args, "--delete-obj-versions") != -1
+			if hasDeleteVersions != testcase.expectDeleteVersions {
+				t.Errorf("expected --delete-obj-versions present=%v but got %v in %v",
+					testcase.expectDeleteVersions, hasDeleteVersions, args)
+			}
+		})
+	}
+}
+
+func TestPublishBackupWormMetrics(t *testing.T) {
+	// The metrics are zero valued until this runs, and this is the only test in
+	// the package that needs them, so registering here is safe.
+	metrics.InitMetrics()
+
+	validUntil := metav1.NewTime(time.Date(2030, 1, 2, 3, 4, 5, 0, time.UTC))
+
+	c := &Cluster{
+		cluster: &couchbasev2.CouchbaseCluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "cows", Namespace: "field"},
+		},
+	}
+
+	backup := &couchbasev2.CouchbaseBackup{
+		ObjectMeta: metav1.ObjectMeta{Name: "nightly"},
+		Status: couchbasev2.CouchbaseBackupStatus{
+			Backups: []couchbasev2.BackupStatus{
+				{Name: "not-worm"},
+				{Name: "worm-without-validity", Worm: &couchbasev2.BackupWormStatus{}},
+				{Name: "worm", Worm: &couchbasev2.BackupWormStatus{ValidUntil: &validUntil}},
+			},
+		},
+	}
+
+	// A backup that has been deleted leaves a nil resource behind, and reconcile
+	// must not fall over on it.
+	c.publishBackupWormMetrics(nil)
+
+	c.publishBackupWormMetrics(backup)
+
+	value := func(repo string) float64 {
+		labels := c.addOptionalLabelValues([]string{"field", "nightly", repo})
+
+		return testutil.ToFloat64(metrics.BackupWormValidUntilMetric.WithLabelValues(labels...))
+	}
+
+	if got, expected := value("worm"), float64(validUntil.Unix()); got != expected {
+		t.Errorf("expected worm validity %v but got %v", expected, got)
+	}
+
+	// Reading an unset series reports zero, so these check nothing was recorded
+	// for a repository whose WORM state is absent or incomplete.
+	if got := value("not-worm"); got != 0 {
+		t.Errorf("expected nothing recorded for a non-WORM repository but got %v", got)
+	}
+
+	if got := value("worm-without-validity"); got != 0 {
+		t.Errorf("expected nothing recorded without a validity period but got %v", got)
 	}
 }

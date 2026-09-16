@@ -626,6 +626,216 @@ func TestBackupAndRestoreGCP(t *testing.T) {
 	testBackupAndRestore(t, cloud.CloudProviderGCP, true)
 }
 
+// wormCompliancePeriod is the shortest period cbbackupmgr accepts, so the objects
+// these tests lock become deletable as soon as they possibly can.
+const wormCompliancePeriod = 3 * 24 * time.Hour
+
+// wormMinimumServerVersion is the first release whose cbbackupmgr can write WORM
+// backups.
+const wormMinimumServerVersion = "8.5.0"
+
+// testBackupAndRestoreWorm backs up to immutable storage and then restores from
+// it, which is the whole point of the feature: a backup nobody can delete is only
+// worth having if it still restores.
+func testBackupAndRestoreWorm(t *testing.T, providerType cloud.ProviderType) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// MustNewProvider checks this provider's credentials are present.  WORM then
+	// needs a newer server than backups in general do.
+	provider := MustNewProvider(t, kubernetes, providerType)
+
+	framework.Requires(t, kubernetes).AtLeastVersion(wormMinimumServerVersion)
+
+	// The bucket is pre-provisioned rather than made per run.  Immutability means
+	// a run cannot delete what it writes: its objects stay locked for the whole
+	// compliance period, three days at the shortest, and nobody can remove them
+	// before that.  A bucket per run would just be litter for somebody to prune by
+	// hand later, so one long lived bucket is pruned once instead.
+	//
+	// Sharing it between runs is safe.  Each run writes repositories named after
+	// its own cluster, and backup retention only removes repositories whose name
+	// starts with that cluster's, so runs cannot delete each other's backups.
+	var wormBucket string
+
+	switch providerType {
+	case cloud.CloudProviderGCP:
+		framework.Requires(t, kubernetes).HasGCPWormBucket()
+
+		wormBucket = f.GCPWormBucket
+	default:
+		framework.Requires(t, kubernetes).HasS3WormBucket()
+
+		wormBucket = f.S3WormBucket
+	}
+
+	t.Logf("writing WORM backups to %s", provider.PrefixBucket(wormBucket))
+
+	objStoreSecret, err := provider.CreateSecret(kubernetes)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	framework.Requires(t, kubernetes).StaticCluster()
+
+	clusterSize := constants.Size2
+	numOfDocs := f.DocsCount
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
+
+	// insert docs to backup
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
+
+	// Retention has to outlive the compliance period, or the repository could never
+	// be removed and the operator rejects the resource.
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).
+		ToObjStore(provider.PrefixBucket(wormBucket)).
+		WithObjStoreSecret(objStoreSecret).
+		WithWorm(wormCompliancePeriod).
+		WithRetention(2*wormCompliancePeriod).
+		MustCreate(t, kubernetes)
+
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 15*time.Minute)
+
+	// The completion event says the data is backed up, not that it is locked.  A
+	// backup whose repository is not WORM completes just the same, so the status is
+	// the only thing that shows WORM actually took effect.
+	e2eutil.MustWaitForBackupWormProtection(t, kubernetes, backup, 2*time.Minute)
+
+	// Throw the data away, so the restore has to be what brings it back.
+	e2eutil.MustDeleteBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.GetName(), 2*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+
+	bucket = e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 5*time.Minute)
+
+	restore := e2eutil.NewRestore(backup).
+		FromObjStore(provider.PrefixBucket(wormBucket)).
+		WithObjStoreSecret(objStoreSecret).
+		MustCreate(t, kubernetes)
+
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
+}
+
+func TestBackupAndRestoreWormS3(t *testing.T) {
+	testBackupAndRestoreWorm(t, cloud.CloudProviderAWS)
+}
+
+func TestBackupAndRestoreWormGCP(t *testing.T) {
+	testBackupAndRestoreWorm(t, cloud.CloudProviderGCP)
+}
+
+// testDisablingWormStartsANewRepository checks that turning WORM off part way
+// through makes the next incremental run start a new repository and take a full
+// backup into it.
+func testDisablingWormStartsANewRepository(t *testing.T, providerType cloud.ProviderType) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	provider := MustNewProvider(t, kubernetes, providerType)
+
+	framework.Requires(t, kubernetes).AtLeastVersion(wormMinimumServerVersion)
+
+	var wormBucket string
+
+	switch providerType {
+	case cloud.CloudProviderGCP:
+		framework.Requires(t, kubernetes).HasGCPWormBucket()
+
+		wormBucket = f.GCPWormBucket
+	default:
+		framework.Requires(t, kubernetes).HasS3WormBucket()
+
+		wormBucket = f.S3WormBucket
+	}
+
+	objStoreSecret, err := provider.CreateSecret(kubernetes)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	framework.Requires(t, kubernetes).StaticCluster()
+
+	clusterSize := constants.Size2
+	numOfDocs := f.DocsCount
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
+
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
+
+	// Incrementals run repeatedly rather than once, so whichever slot falls after
+	// WORM is turned off is the one that rotates. A single scheduled run would
+	// have to be raced against the full backup finishing.
+	backup := e2eutil.NewIncrementalBackup(
+		e2eutil.DefaultSchedule(), e2eutil.ScheduleXWithYIntervalInZ(6, 5, 5*time.Minute)).
+		ToObjStore(provider.PrefixBucket(wormBucket)).
+		WithObjStoreSecret(objStoreSecret).
+		WithWorm(wormCompliancePeriod).
+		WithRetention(2*wormCompliancePeriod).
+		MustCreate(t, kubernetes)
+
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
+
+	// The full backup, into a repository with WORM enabled.
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 15*time.Minute)
+	e2eutil.MustWaitForBackupWormProtection(t, kubernetes, backup, 2*time.Minute)
+
+	wormRepo := e2eutil.MustGetBackupRepository(t, kubernetes, backup)
+
+	t.Logf("WORM repository is %s, disabling WORM", wormRepo)
+
+	e2eutil.MustDisableBackupWorm(t, kubernetes, backup, time.Minute)
+
+	// The next incremental run should refuse to continue into the WORM repository
+	// and start a fresh one instead.
+	rotated := e2eutil.MustWaitForBackupRepositoryRotation(t, kubernetes, backup, wormRepo, 20*time.Minute)
+
+	if rotated.Full == "" {
+		t.Errorf("repository %s holds no full backup, an incremental run that starts a new "+
+			"repository has to take one", rotated.Name)
+	}
+
+	if rotated.Worm != nil {
+		t.Errorf("repository %s reports WORM protection %+v, it was created after WORM was "+
+			"turned off", rotated.Name, rotated.Worm)
+	}
+
+	// The backups written before the change stay where they were, and stay locked.
+	// Turning WORM off cannot unlock what is already under a compliance period.
+	previous := e2eutil.MustGetBackupRepositoryStatus(t, kubernetes, backup, wormRepo)
+
+	if previous.Worm == nil {
+		t.Errorf("repository %s no longer reports WORM protection, turning WORM off must not "+
+			"change the repositories already written", wormRepo)
+	}
+}
+
+func TestDisablingWormStartsANewRepositoryS3(t *testing.T) {
+	testDisablingWormStartsANewRepository(t, cloud.CloudProviderAWS)
+}
+
+func TestDisablingWormStartsANewRepositoryGCP(t *testing.T) {
+	testDisablingWormStartsANewRepository(t, cloud.CloudProviderGCP)
+}
+
 // Test that CouchbaseBackup Status fields update when the initial backup job is created
 // Archive, Repo, RepoList, LastRun, Running will be updated once the job is started
 // LastSuccess, RepoList and Duration fields will be updated once the job is finished.

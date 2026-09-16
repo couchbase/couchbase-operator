@@ -1562,6 +1562,178 @@ func TestCheckConstraintXDCRRemoteClusterAuthMethod(t *testing.T) {
 	}
 }
 
+func TestCheckConstraintsBackupWorm(t *testing.T) {
+	days := func(count int) *couchbasev2.CouchbaseBackupWorm {
+		return &couchbasev2.CouchbaseBackupWorm{
+			CompliancePeriod: metav1.Duration{Duration: time.Duration(count) * 24 * time.Hour},
+		}
+	}
+
+	hours := func(count int) *metav1.Duration {
+		return &metav1.Duration{Duration: time.Duration(count) * time.Hour}
+	}
+
+	testcases := []struct {
+		name            string
+		cloudStore      bool
+		strategy        couchbasev2.Strategy
+		worm            *couchbasev2.CouchbaseBackupWorm
+		backupRetention *metav1.Duration
+		additionalArgs  string
+		expectedErr     string
+	}{
+		{
+			name:            "no worm is not checked at all",
+			strategy:        couchbasev2.FullIncremental,
+			backupRetention: hours(24),
+		},
+		{
+			name:            "worm on a cloud store with longer retention is valid",
+			cloudStore:      true,
+			strategy:        couchbasev2.FullIncremental,
+			worm:            days(30),
+			backupRetention: hours(24 * 60),
+		},
+		{
+			name:            "retention equal to the compliance period is valid",
+			cloudStore:      true,
+			strategy:        couchbasev2.FullIncremental,
+			worm:            days(30),
+			backupRetention: hours(24 * 30),
+		},
+		{
+			name:            "worm without a cloud store",
+			strategy:        couchbasev2.FullIncremental,
+			worm:            days(30),
+			backupRetention: hours(24 * 60),
+			expectedErr:     "WORM is only available on cloud object storage",
+		},
+		{
+			name:            "compliance period below the minimum",
+			cloudStore:      true,
+			strategy:        couchbasev2.FullIncremental,
+			worm:            days(2),
+			backupRetention: hours(24 * 60),
+			expectedErr:     "must be a whole number of days",
+		},
+		{
+			name:            "compliance period above the maximum",
+			cloudStore:      true,
+			strategy:        couchbasev2.FullIncremental,
+			worm:            days(36526),
+			backupRetention: hours(24 * 40000),
+			expectedErr:     "must be a whole number of days",
+		},
+		{
+			name:       "compliance period that is not a whole number of days",
+			cloudStore: true,
+			strategy:   couchbasev2.FullIncremental,
+			worm: &couchbasev2.CouchbaseBackupWorm{
+				CompliancePeriod: metav1.Duration{Duration: 100 * time.Hour},
+			},
+			backupRetention: hours(24 * 60),
+			expectedErr:     "must be a whole number of days",
+		},
+		{
+			name:            "retention shorter than the compliance period",
+			cloudStore:      true,
+			strategy:        couchbasev2.FullIncremental,
+			worm:            days(30),
+			backupRetention: hours(24 * 10),
+			expectedErr:     "must be at least spec.worm.compliancePeriod",
+		},
+		{
+			name:            "periodic merge cannot be used with worm",
+			cloudStore:      true,
+			strategy:        couchbasev2.PeriodicMerge,
+			worm:            days(30),
+			backupRetention: hours(24 * 60),
+			expectedErr:     "merging rewrites backup files",
+		},
+		{
+			name:            "worm cannot be smuggled in through additional arguments",
+			cloudStore:      true,
+			strategy:        couchbasev2.FullIncremental,
+			worm:            days(30),
+			backupRetention: hours(24 * 60),
+			additionalArgs:  "--worm 1",
+			expectedErr:     "cannot contain --worm",
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			backup := &couchbasev2.CouchbaseBackup{
+				Spec: couchbasev2.CouchbaseBackupSpec{
+					Strategy:                     testcase.strategy,
+					Worm:                         testcase.worm,
+					BackupRetention:              testcase.backupRetention,
+					AdditionalOperatorBackupArgs: testcase.additionalArgs,
+				},
+			}
+
+			if testcase.cloudStore {
+				backup.Spec.ObjectStore = &couchbasev2.ObjectStoreSpec{URI: "s3://bucket"}
+			}
+
+			errs := checkConstraintsBackupWorm(backup)
+
+			var joined string
+			for _, err := range errs {
+				joined += err.Error() + "\n"
+			}
+
+			if testcase.expectedErr == "" {
+				if len(errs) != 0 {
+					t.Errorf("expected no error but got: %s", joined)
+				}
+			} else if !strings.Contains(joined, testcase.expectedErr) {
+				t.Errorf("expected error containing %q but got %q", testcase.expectedErr, joined)
+			}
+		})
+	}
+}
+
+// TestCheckConstraintsSnapshotBackupRejectsWorm checks spec.worm is refused on a snapshot
+// backup, which never writes a cbbackupmgr repository WORM could protect.
+func TestCheckConstraintsSnapshotBackupRejectsWorm(t *testing.T) {
+	client := k8sfake.NewSimpleClientset()
+
+	discovery := client.Discovery().(*discoveryfake.FakeDiscovery)
+	for _, groupVersion := range []string{"snapshot.storage.k8s.io/v1", "groupsnapshot.storage.k8s.io/v1beta1"} {
+		discovery.Resources = append(discovery.Resources, &metav1.APIResourceList{GroupVersion: groupVersion})
+	}
+
+	v := types.New(client, couchbasefake.NewSimpleClientset(), &types.ValidatorOptions{})
+
+	backup := &couchbasev2.CouchbaseBackup{
+		ObjectMeta: metav1.ObjectMeta{Name: "snap-backup"},
+		Spec: couchbasev2.CouchbaseBackupSpec{
+			Strategy: couchbasev2.FullIncremental,
+			SnapshotBackup: &couchbasev2.CouchbaseSnapshotBackupSpec{
+				Schedule:                "0 2 * * *",
+				VolumeSnapshotClassName: "csi-snapclass",
+				MaxSkew:                 metav1.Duration{Duration: 10 * time.Second},
+				ReadyTimeout:            metav1.Duration{Duration: 2 * time.Hour},
+			},
+			Worm: &couchbasev2.CouchbaseBackupWorm{
+				CompliancePeriod: metav1.Duration{Duration: 30 * 24 * time.Hour},
+			},
+		},
+	}
+
+	err := CheckConstraintsBackup(v, backup)
+	if err == nil || !strings.Contains(err.Error(), "spec.worm cannot be used with spec.snapshotBackup") {
+		t.Errorf("expected spec.worm to be rejected with spec.snapshotBackup, got %v", err)
+	}
+
+	backup.Spec.Worm = nil
+
+	if err := CheckConstraintsBackup(v, backup); err != nil {
+		t.Errorf("expected the same snapshot backup without spec.worm to be valid, got %v", err)
+	}
+}
+
 // TestCheckConstraintsSnapshotBackup checks the admission rules for a backup that uses
 // spec.snapshotBackup. None of these backups set archive settings like the full and
 // incremental schedules or size, so they also show those archive checks are skipped.

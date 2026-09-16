@@ -447,6 +447,17 @@ var (
 	// optionalLabels: cluster_uuid, cluster_name
 	// nolint:godot
 	RebalancesFailedTotalMetric = prometheus.CounterVec{}
+	// BackupWormValidUntilMetric
+	// name: backup_worm_valid_until_timestamp_seconds
+	// type: gauge
+	// help: Unix time at which a backup repository stops applying WORM protection to new backups
+	// unit: seconds
+	// added: 2.9.0
+	// stability: committed
+	// labels: namespace, backup, repo
+	// optionalLabels: cluster_uuid, cluster_name
+	// nolint:godot
+	BackupWormValidUntilMetric = prometheus.GaugeVec{}
 
 	// ManualInterventionRequiredMetric
 	// name: cluster_manual_intervention
@@ -745,6 +756,12 @@ func initMetrics() {
 		Namespace: MetricNamespace,
 		Subsystem: MetricSubsystem,
 	}, addOptionalLabels([]string{"name"}))
+	BackupWormValidUntilMetric = *prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name:      "backup_worm_valid_until_timestamp_seconds",
+		Help:      "Unix time at which a backup repository stops applying WORM protection to new backups",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, addOptionalLabels([]string{"namespace", "backup", "repo"}))
 
 	ManualInterventionRequiredMetric = *prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name:      "cluster_manual_intervention",
@@ -787,6 +804,7 @@ func initMetrics() {
 		RebalanceTimeSecondsMetric,
 		RebalancesTotalMetric,
 		RebalancesFailedTotalMetric,
+		BackupWormValidUntilMetric,
 		ManualInterventionRequiredMetric,
 	)
 }

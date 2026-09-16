@@ -59,6 +59,11 @@ type Framework struct {
 	S3AccessKey     string
 	S3SecretID      string
 	S3SessionToken  string
+	// WORM buckets are provisioned outside the suite rather than made per run.
+	// Immutability means a run cannot delete what it writes, so a bucket created
+	// per run would have to be pruned by hand once its locks expire.
+	S3WormBucket  string
+	GCPWormBucket string
 	// Tests which may require a KMS Key
 	KmsKeyURL string
 	// Azure Access

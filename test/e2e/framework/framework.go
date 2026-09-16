@@ -408,6 +408,10 @@ func configure() (err error) {
 		"Compression mode to use.  Either 'off', 'passive' or 'active'.")
 	flag.StringVar(&params.AZAccountName, "az-account-name", "", "Azure account name")
 	flag.StringVar(&params.AZAccountKey, "az-account-key", "", "Azure account key")
+	flag.StringVar(&params.S3WormBucket, "s3-worm-bucket", "",
+		"S3 bucket with Object Lock already enabled, used by the WORM tests")
+	flag.StringVar(&params.GCPWormBucket, "gcp-worm-bucket", "",
+		"GCS bucket with object retention already enabled, used by the WORM tests")
 	flag.StringVar(&params.GCPClientID, "gcp-client-id", "", "GCP Client ID")
 	flag.StringVar(&params.GCPClientSecret, "gcp-client-secret", "", "GCP Client Secret")
 	flag.StringVar(&params.GCPRefreshToken, "gcp-refresh-token", "", "GCP Refresh Token")
@@ -1359,6 +1363,29 @@ func (r *TestRequirement) HasKmsKey() *TestRequirement {
 func (r *TestRequirement) HasAzureParameters() *TestRequirement {
 	if Global.AZAccountName == "" || Global.AZAccountKey == "" {
 		r.t.Skip("Azure Config parameters are not provided")
+	}
+
+	return r
+}
+
+// HasS3WormBucket skips a test when no pre-provisioned WORM bucket has been named.
+//
+// The bucket is not made per run: immutability means a run cannot delete what it
+// writes, so each one would leave a bucket behind to be pruned by hand once its
+// locks expire.
+func (r *TestRequirement) HasS3WormBucket() *TestRequirement {
+	if Global.S3WormBucket == "" {
+		r.t.Skip("no S3 WORM bucket provided, set --s3-worm-bucket")
+	}
+
+	return r
+}
+
+// HasGCPWormBucket skips a test when no pre-provisioned WORM bucket has been
+// named.  See HasS3WormBucket for why one is not created per run.
+func (r *TestRequirement) HasGCPWormBucket() *TestRequirement {
+	if Global.GCPWormBucket == "" {
+		r.t.Skip("no GCS WORM bucket provided, set --gcp-worm-bucket")
 	}
 
 	return r
