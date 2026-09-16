@@ -40,6 +40,10 @@ func recordBucketRef(tracker *unreconcilable.Tracker, kind, bucketName, crName s
 	tracker.SetBucketRef(bucketName, unreconcilable.Ref{Kind: kind, Name: crName})
 }
 
+// continuousBackupMinVersion is the first Couchbase Server release with per bucket continuous
+// backup, and so the first with the backup service roles the feature reads and writes.
+const continuousBackupMinVersion = "8.1.0"
+
 type SupportedFeature int
 
 const (
@@ -579,7 +583,7 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 	supportedFeatures[SupportedFileBasedRebalance] = c.SupportsVersionFeatures("8.1.0")
 
 	// Per bucket continuous backup is available in 8.1.0+, and only for magma buckets.
-	supportedFeatures[SupportedContinuousBackup] = c.SupportsVersionFeatures("8.1.0")
+	supportedFeatures[SupportedContinuousBackup] = c.SupportsVersionFeatures(continuousBackupMinVersion)
 
 	allBuckets := []couchbaseutil.Bucket{}
 
@@ -1045,6 +1049,12 @@ func (c *Cluster) grantBackupServiceCredentialRoles(buckets []couchbaseutil.Buck
 		return nil, nil
 	}
 
+	// The roles endpoint only exists where continuous backup does, and older servers answer 404,
+	// which would fail every reconcile of a cluster that has buckets.
+	if !c.SupportsVersionFeatures(continuousBackupMinVersion) {
+		return nil, nil
+	}
+
 	actual := &couchbaseutil.ServiceRoles{}
 	if err := couchbaseutil.GetBackupServiceRoles(actual).On(c.api, c.readyMembers()); err != nil {
 		return nil, err
@@ -1092,6 +1102,10 @@ func (c *Cluster) grantBackupServiceCredentialRoles(buckets []couchbaseutil.Buck
 // credentials nothing reads.
 func (c *Cluster) revokeBackupServiceCredentialRoles(granted map[string]bool, buckets []couchbaseutil.Bucket) error {
 	if !c.cluster.Spec.Security.RBAC.Managed {
+		return nil
+	}
+
+	if !c.SupportsVersionFeatures(continuousBackupMinVersion) {
 		return nil
 	}
 
