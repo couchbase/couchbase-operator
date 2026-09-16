@@ -259,17 +259,14 @@ func (c *Cluster) selectCandidatesByNodesOrder(candidates couchbaseutil.MemberSe
 		}
 	}
 
-	// If the orchestrator is not specified in the upgrade order, but it is in the candidates list, move it to the end of the list to upgrade last.
+	// Hold the orchestrator back so that it can be upgraded last.
 	var orchestrator couchbaseutil.Member
 
 	clusterInfo := &couchbaseutil.TerseClusterInfo{}
 	if err := couchbaseutil.GetTerseClusterInfo(clusterInfo).On(c.api, c.readyMembers()); err != nil {
 		c.log.Error(err, "failed to get cluster info", "cluster", c.namespacedName())
 	} else {
-		orchestratorName := clusterInfo.Orchestrator
-		if !finalCandidates.Contains(orchestratorName) {
-			candidates, orchestrator = separateCandidatesAndOrchestrator(candidates, orchestratorName)
-		}
+		candidates, orchestrator = separateCandidatesAndOrchestrator(candidates, clusterInfo.Orchestrator)
 	}
 
 	// Go through the rest in alphabetical order
@@ -282,7 +279,7 @@ func (c *Cluster) selectCandidatesByNodesOrder(candidates couchbaseutil.MemberSe
 		}
 	}
 
-	if orchestrator != nil {
+	if orchestrator != nil && !finalCandidates.Contains(orchestrator.Name()) {
 		finalCandidates = append(finalCandidates, orchestrator)
 	}
 
