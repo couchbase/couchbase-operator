@@ -61,6 +61,8 @@ func CheckConstraints(v *types.Validator, resource runtime.Object) ([]string, er
 		return []string{}, validationv2.CheckConstraintsBackup(v, t)
 	case *couchbasev2.CouchbaseBackupRestore:
 		return []string{}, validationv2.CheckConstraintsBackupRestore(v, t)
+	case *couchbasev2.CouchbaseSnapshotBackupRestore:
+		return []string{}, validationv2.CheckConstraintsSnapshotBackupRestore(v, t)
 	case *couchbasev2.CouchbaseCollection:
 		return validationv2.CheckConstraintsCollection(v, t)
 	case *couchbasev2.CouchbaseCollectionGroup:

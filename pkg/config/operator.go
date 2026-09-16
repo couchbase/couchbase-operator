@@ -410,6 +410,7 @@ func (o *generateOperatorOptions) getOperatorRole() runtime.Object {
 			},
 			Resources: []string{
 				couchbasev2.BackupRestoreCRDResourcePlural,
+				couchbasev2.SnapshotBackupRestoreCRDResourcePlural,
 			},
 			Verbs: []string{
 				"get",    // used by the operator for Validation
@@ -425,14 +426,47 @@ func (o *generateOperatorOptions) getOperatorRole() runtime.Object {
 			},
 			Resources: []string{
 				couchbasev2.AutoscalerCRDResourcePlural,
+				couchbasev2.SnapshotBackupRunCRDResourcePlural,
 			},
 			Verbs: []string{
 				"get",    // used to get specific resource
 				"list",   // used by the operator for caching
 				"watch",  // used by the operator for caching
 				"create", // used by the operator to create resources
-				"update", // used by the operator to update scale size
+				"update", // used by the operator to change autoscaler size or backup run progress
 				"delete", // used to cleanup unused resources
+			},
+		},
+		{
+			APIGroups: []string{
+				"snapshot.storage.k8s.io",
+			},
+			Resources: []string{
+				"volumesnapshotclasses",
+				"volumegroupsnapshotclasses",
+				"volumesnapshotcontents",
+				"volumegroupsnapshotcontents",
+			},
+			Verbs: []string{
+				"get",   // used by the operator to check it exists and is ready to use
+				"list",  // used by the operator for caching
+				"watch", // used by the operator for caching
+			},
+		},
+		{
+			APIGroups: []string{
+				"snapshot.storage.k8s.io",
+			},
+			Resources: []string{
+				"volumesnapshots",
+				"volumegroupsnapshots",
+			},
+			Verbs: []string{
+				"get",    // used by the operator to poll snapshot readiness
+				"list",   // used by the operator for caching
+				"watch",  // used by the operator for caching
+				"create", // used by the operator to capture a backup run
+				"delete", // used by the operator to remove a snapshot directly when needed
 			},
 		},
 		{
@@ -459,6 +493,8 @@ func (o *generateOperatorOptions) getOperatorRole() runtime.Object {
 				fmt.Sprintf("%s/status", couchbasev2.BackupCRDResourcePlural),
 				fmt.Sprintf("%s/status", couchbasev2.BackupRestoreCRDResourcePlural),
 				fmt.Sprintf("%s/status", couchbasev2.AutoscalerCRDResourcePlural),
+				fmt.Sprintf("%s/status", couchbasev2.SnapshotBackupRunCRDResourcePlural),
+				fmt.Sprintf("%s/status", couchbasev2.SnapshotBackupRestoreCRDResourcePlural),
 			},
 			Verbs: []string{
 				"get",    // used by the operator to read back status

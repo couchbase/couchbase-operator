@@ -3729,6 +3729,53 @@ func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.Couc
 	return nil
 }
 
+// CheckConstraintsSnapshotBackupRestore validates a CouchbaseSnapshotBackupRestore. This is a
+// skeleton, only checks that need nothing but the object's own spec are implemented here.
+// Checks that need to look up other cluster state are not implemented yet, each left as a comment.
+//
+//   - Whether the target CouchbaseCluster exists at all, and whether it is running or
+//     hibernated, determines which of the three restore behaviours applies (reject,
+//     fill and wake the cluster up, or destructive rollback).
+//   - Whether the VolumeSnapshot and VolumeGroupSnapshot CRDs are installed on the
+//     cluster at all cannot be checked yet.
+//   - Whether the referenced run's recorded buckets/scopes/collections are all covered by
+//     existing CRs is not checked yet.
+func CheckConstraintsSnapshotBackupRestore(v *types.Validator, restore *couchbasev2.CouchbaseSnapshotBackupRestore) error {
+	checks := []func(*types.Validator, *couchbasev2.CouchbaseSnapshotBackupRestore) error{
+		checkConstraintSnapshotBackupRestoreNameLength,
+	}
+
+	var errs []error
+
+	for _, check := range checks {
+		if err := check(v, restore); err != nil {
+			var composite *errors.CompositeError
+
+			if ok := goerrors.As(err, &composite); ok {
+				errs = append(errs, composite.Errors...)
+				continue
+			}
+
+			errs = append(errs, err)
+		}
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func checkConstraintSnapshotBackupRestoreNameLength(_ *types.Validator, restore *couchbasev2.CouchbaseSnapshotBackupRestore) error {
+	const maxLabelValueLength = 63
+	if len(restore.Name) > maxLabelValueLength {
+		return fmt.Errorf("snapshot backup restore name %q cannot be longer than %d characters", restore.Name, maxLabelValueLength)
+	}
+
+	return nil
+}
+
 func checkConstraintRestoreAdditionalArgs(v *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
 	if strings.Contains(restore.Spec.AdditionalOperatorRestoreArgs, "--force-delete-lockfile") {
 		return fmt.Errorf("spec.additionalOperatorRestoreArgs cannot contain --force-delete-lockfile")

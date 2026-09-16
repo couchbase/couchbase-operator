@@ -15,4 +15,6 @@
 ** xref:resource/couchbaserolebinding.adoc[CouchbaseRoleBinding Resource]
 ** xref:resource/couchbasescopegroup.adoc[CouchbaseScopeGroup Resource]
 ** xref:resource/couchbasescope.adoc[CouchbaseScope Resource]
+** xref:resource/couchbasesnapshotbackuprestore.adoc[CouchbaseSnapshotBackupRestore Resource]
+** xref:resource/couchbasesnapshotbackuprun.adoc[CouchbaseSnapshotBackupRun Resource]
 ** xref:resource/couchbaseuser.adoc[CouchbaseUser Resource]

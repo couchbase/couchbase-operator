@@ -1,0 +1,229 @@
+// THIS FILE IS AUTO-GENERATED - DO NOT EDIT
+= CouchbaseSnapshotBackupRestore Resource
+include::partial$autogen-reference-aliases.adoc[tags=couchbasesnapshotbackuprestore]
+:resource-name-singular: couchbasesnapshotbackuprestore
+:resource-name-plural: couchbasesnapshotbackuprestores
+:resource-name-kind: CouchbaseSnapshotBackupRestore
+
+CouchbaseSnapshotBackupRestore represents a single CSI VolumeSnapshot based restore request
+and its progress.
+It names a source CouchbaseSnapshotBackupRun and a target
+CouchbaseCluster.
+The target must already exist as a CR before a restore can act on it,
+if it is running, the restore replaces its data (a destructive rollback).
+If it is
+hibernated with no pods, the restore fills its volumes and starts it up.
+If no
+CouchbaseCluster with that name exists at all, the request is rejected until one is
+created.
+
+The following is an example resource, depicting the overall structure and any defaults (consult the field reference for valid values for "empty" values, such as empty strings etc.):
+
+[source,yaml,subs="+macros"]
+----
+<<couchbasesnapshotbackuprestores-apiversion,apiVersion>>: v2
+<<couchbasesnapshotbackuprestores-kind,kind>>: CouchbaseSnapshotBackupRestore
+<<couchbasesnapshotbackuprestores-metadata,metadata>>:
+  <<couchbasesnapshotbackuprestores-metadata-name,name>>: ""
+<<couchbasesnapshotbackuprestores-spec,spec>>:
+  <<couchbasesnapshotbackuprestores-spec-backupname,backupName>>: ""
+  <<couchbasesnapshotbackuprestores-spec-runname,runName>>: ""
+  <<couchbasesnapshotbackuprestores-spec-target,target>>:
+    <<couchbasesnapshotbackuprestores-spec-target-acknowledgebucketgap,acknowledgeBucketGap>>: false
+    <<couchbasesnapshotbackuprestores-spec-target-acknowledgedataloss,acknowledgeDataLoss>>: false
+    <<couchbasesnapshotbackuprestores-spec-target-name,name>>: ""
+    <<couchbasesnapshotbackuprestores-spec-target-serversecretname,serverSecretName>>: ""
+<<couchbasesnapshotbackuprestores-status,status>>:
+  <<couchbasesnapshotbackuprestores-status-completiontime,completionTime>>: ""
+  <<couchbasesnapshotbackuprestores-status-failurereason,failureReason>>: ""
+  <<couchbasesnapshotbackuprestores-status-phase,phase>>: Validating
+  <<couchbasesnapshotbackuprestores-status-starttime,startTime>>: ""
+----
+
+== couchbasesnapshotbackuprestores.apiVersion
+
+=== Constraints
+
+*Type*: `string`
+
+=== Description
+
+APIVersion defines the versioned schema of this representation of an object.
+Servers should convert recognized schemas to the latest internal value, and
+may reject unrecognized values.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources.
+
+== couchbasesnapshotbackuprestores.kind
+
+=== Constraints
+
+*Type*: `string`
+
+=== Description
+
+Kind is a string value representing the REST resource this object represents.
+Servers may infer this from the endpoint the client submits requests to.
+Cannot be updated.
+In CamelCase.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds.
+
+include::partial$autogen-reference-metadata.adoc[tags=**;!*;couchbasesnapshotbackuprestore]
+
+== couchbasesnapshotbackuprestores.spec
+
+=== Constraints
+
+*Required*
+
+*Type*: `object`
+
+=== Description
+
+CouchbaseSnapshotBackupRestoreSpec names what to restore, and where to.
+
+=== couchbasesnapshotbackuprestores.spec.backupName
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+BackupName is the CouchbaseBackup that scheduled the run to restore from.
+
+=== couchbasesnapshotbackuprestores.spec.runName
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+RunName is the specific CouchbaseSnapshotBackupRun to restore.
+This field is
+required and must always be set explicitly.
+
+=== couchbasesnapshotbackuprestores.spec.target
+
+==== Constraints
+
+*Required*
+
+*Type*: `object`
+
+==== Description
+
+Target describes the cluster to restore into.
+
+=== couchbasesnapshotbackuprestores.spec.target.acknowledgeBucketGap
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+AcknowledgeBucketGap must be true when the run's recorded buckets, scopes, or
+collections are not all covered by CRs that will exist at restore time.
+Without
+this acknowledgement, ordinary bucket reconciliation would delete that data again
+immediately after the restore completes.
+
+=== couchbasesnapshotbackuprestores.spec.target.acknowledgeDataLoss
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+AcknowledgeDataLoss must be true when the target already exists and is running.
+Restoring into a running cluster deletes its current pods and volumes first, this
+is irreversible.
+
+=== couchbasesnapshotbackuprestores.spec.target.name
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Name is the target CouchbaseCluster's name.
+If no CouchbaseCluster with this name
+exists yet, the request is rejected, create the target first, hibernated and with
+zero pods, before restoring into it.
+
+=== couchbasesnapshotbackuprestores.spec.target.serverSecretName
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+ServerSecretName is the TLS certificate secret for the target cluster.
+Required
+only when the target is a new, differently named cluster, since the restored data
+won't already have a certificate valid for it.
+
+== couchbasesnapshotbackuprestores.status
+
+=== Constraints
+
+*Type*: `object`
+
+=== Description
+
+CouchbaseSnapshotBackupRestoreStatus reports restore progress and outcome.
+
+=== couchbasesnapshotbackuprestores.status.completionTime
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+CompletionTime is when this restore attempt reached a terminal phase, Complete or
+Failed.
+
+=== couchbasesnapshotbackuprestores.status.failureReason
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+FailureReason explains why Phase is Failed, when it is.
+
+=== couchbasesnapshotbackuprestores.status.phase
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `Validating`
+
+*Enumerations*: `Validating, Destroying, Provisioning, Remapping, WaitingForCluster, Complete, Failed`
+
+==== Description
+
+Phase is the restore's current state.
+
+=== couchbasesnapshotbackuprestores.status.startTime
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+StartTime is when this restore attempt began.

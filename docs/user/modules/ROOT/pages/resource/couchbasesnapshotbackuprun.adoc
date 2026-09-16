@@ -1,0 +1,325 @@
+// THIS FILE IS AUTO-GENERATED - DO NOT EDIT
+= CouchbaseSnapshotBackupRun Resource
+include::partial$autogen-reference-aliases.adoc[tags=couchbasesnapshotbackuprun]
+:resource-name-singular: couchbasesnapshotbackuprun
+:resource-name-plural: couchbasesnapshotbackupruns
+:resource-name-kind: CouchbaseSnapshotBackupRun
+
+CouchbaseSnapshotBackupRun records one CSI VolumeSnapshot based backup attempt.
+This is
+the authoritative record of what a specific backup actually contains, created by the
+operator when a snapshot backup run starts and never authored directly by a user.
+
+The following is an example resource, depicting the overall structure and any defaults (consult the field reference for valid values for "empty" values, such as empty strings etc.):
+
+[source,yaml,subs="+macros"]
+----
+<<couchbasesnapshotbackupruns-apiversion,apiVersion>>: v2
+<<couchbasesnapshotbackupruns-kind,kind>>: CouchbaseSnapshotBackupRun
+<<couchbasesnapshotbackupruns-metadata,metadata>>:
+  <<couchbasesnapshotbackupruns-metadata-name,name>>: ""
+<<couchbasesnapshotbackupruns-spec,spec>>:
+  <<couchbasesnapshotbackupruns-spec-adminsecretname,adminSecretName>>: ""
+  <<couchbasesnapshotbackupruns-spec-buckets,buckets>>:
+  - ""
+  <<couchbasesnapshotbackupruns-spec-clusterspec,clusterSpec>>:
+  <<couchbasesnapshotbackupruns-spec-clusteruuid,clusterUUID>>: ""
+  <<couchbasesnapshotbackupruns-spec-collections,collections>>:
+  - ""
+  <<couchbasesnapshotbackupruns-spec-nodecount,nodeCount>>: 0
+  <<couchbasesnapshotbackupruns-spec-scopes,scopes>>:
+  - ""
+  <<couchbasesnapshotbackupruns-spec-serverversion,serverVersion>>: ""
+  <<couchbasesnapshotbackupruns-spec-sourcebackup,sourceBackup>>: ""
+<<couchbasesnapshotbackupruns-status,status>>:
+  <<couchbasesnapshotbackupruns-status-endtime,endTime>>: ""
+  <<couchbasesnapshotbackupruns-status-groupsnapshot,groupSnapshot>>: false
+  <<couchbasesnapshotbackupruns-status-measuredskew,measuredSkew>>: ""
+  <<couchbasesnapshotbackupruns-status-phase,phase>>: InProgress
+  <<couchbasesnapshotbackupruns-status-snapshots,snapshots>>:
+  - <<couchbasesnapshotbackupruns-status-snapshots-member,member>>: ""
+    <<couchbasesnapshotbackupruns-status-snapshots-snapshotname,snapshotName>>: ""
+    <<couchbasesnapshotbackupruns-status-snapshots-volumename,volumeName>>: ""
+  <<couchbasesnapshotbackupruns-status-starttime,startTime>>: ""
+----
+
+== couchbasesnapshotbackupruns.apiVersion
+
+=== Constraints
+
+*Type*: `string`
+
+=== Description
+
+APIVersion defines the versioned schema of this representation of an object.
+Servers should convert recognized schemas to the latest internal value, and
+may reject unrecognized values.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources.
+
+== couchbasesnapshotbackupruns.kind
+
+=== Constraints
+
+*Type*: `string`
+
+=== Description
+
+Kind is a string value representing the REST resource this object represents.
+Servers may infer this from the endpoint the client submits requests to.
+Cannot be updated.
+In CamelCase.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds.
+
+include::partial$autogen-reference-metadata.adoc[tags=**;!*;couchbasesnapshotbackuprun]
+
+== couchbasesnapshotbackupruns.spec
+
+=== Constraints
+
+*Required*
+
+*Type*: `object`
+
+=== Description
+
+CouchbaseSnapshotBackupRunSpec records the facts captured at the moment the run
+started, which backup schedule produced it, what the source cluster looked like, and
+what credential and CR state the captured data expects on restore.
+
+=== couchbasesnapshotbackupruns.spec.adminSecretName
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+AdminSecretName names the Secret holding the administrative credentials the
+captured data expects to authenticate with.
+
+=== couchbasesnapshotbackupruns.spec.buckets
+
+==== Constraints
+
+*Type*: `[]string`
+
+==== Description
+
+Buckets, Scopes and Collections record the names that existed at capture time, so
+a restore can detect one with no matching CR and require acknowledgement before
+proceeding, rather than silently losing it to ordinary reconciliation right after
+restore completes.
+Buckets is the set of bucket names captured in this run.
+
+=== couchbasesnapshotbackupruns.spec.clusterSpec
+
+==== Constraints
+
+*Required*
+
+*Type*: `object`
+
+==== Description
+
+ClusterSpec is the source cluster's specification as captured at run time, so a
+new cluster can be provisioned on restore without reconstructing topology by hand.
+This is stored as raw JSON, not the typed spec, so it doesn't have to pass today's
+validation rules.
+
+=== couchbasesnapshotbackupruns.spec.clusterUUID
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+ClusterUUID is the source cluster's identity at capture time, recorded for audit
+and for the credential continuity behaviour used when restoring to a different
+cluster.
+
+=== couchbasesnapshotbackupruns.spec.collections
+
+==== Constraints
+
+*Type*: `[]string`
+
+==== Description
+
+Collections is the set of collection names captured in this run.
+
+=== couchbasesnapshotbackupruns.spec.nodeCount
+
+==== Constraints
+
+*Required*
+
+*Type*: `integer`
+
+==== Description
+
+NodeCount is the number of members captured in this run.
+
+=== couchbasesnapshotbackupruns.spec.scopes
+
+==== Constraints
+
+*Type*: `[]string`
+
+==== Description
+
+Scopes is the set of scope names captured in this run.
+
+=== couchbasesnapshotbackupruns.spec.serverVersion
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+ServerVersion is the Couchbase Server version running on the source cluster at
+capture time, checked for compatibility with a restore target before any
+destructive action is taken.
+
+=== couchbasesnapshotbackupruns.spec.sourceBackup
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+SourceBackup names the CouchbaseBackup that produced this run, for listing
+purposes only.
+This is not an ownership relationship, a run must survive
+deletion of the schedule that created it.
+
+== couchbasesnapshotbackupruns.status
+
+=== Constraints
+
+*Type*: `object`
+
+=== Description
+
+CouchbaseSnapshotBackupRunStatus records the outcome of the capture attempt, whether it
+succeeded, what was actually captured, and how it was captured.
+
+=== couchbasesnapshotbackupruns.status.endTime
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+EndTime is when this run's capture attempt finished, used together with StartTime to
+compute MeasuredSkew.
+
+=== couchbasesnapshotbackupruns.status.groupSnapshot
+
+==== Constraints
+
+*Required*
+
+*Type*: `boolean`
+
+==== Description
+
+GroupSnapshot records whether this run was captured as a single
+VolumeGroupSnapshot or as concurrent individual VolumeSnapshots, as evidence of
+the capture mechanism actually used.
+
+=== couchbasesnapshotbackupruns.status.measuredSkew
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+MeasuredSkew is the actual gap observed between the first and last snapshot
+taken in this run, checked against CouchbaseBackup.spec.snapshotBackup.maxSkew.
+
+=== couchbasesnapshotbackupruns.status.phase
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `InProgress`
+
+*Enumerations*: `InProgress, Complete, Invalid`
+
+==== Description
+
+Phase is the run's current state.
+
+=== couchbasesnapshotbackupruns.status.snapshots
+
+==== Constraints
+
+*Type*: `[]object`
+
+==== Description
+
+Snapshots is the full list of every volume snapshot taken as part of the run, one
+entry per volume.
+A restore reads this list directly to know exactly which snapshot
+to restore each volume from.
+
+=== couchbasesnapshotbackupruns.status.snapshots.member
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Member is the name of the pod/member this volume belonged to.
+
+=== couchbasesnapshotbackupruns.status.snapshots.snapshotName
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+SnapshotName is the VolumeSnapshot object holding the capture.
+
+=== couchbasesnapshotbackupruns.status.snapshots.volumeName
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+VolumeName is the PVC name this snapshot was taken from.
+
+=== couchbasesnapshotbackupruns.status.startTime
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+StartTime is when this run's capture attempt began, used together with EndTime to
+compute MeasuredSkew.

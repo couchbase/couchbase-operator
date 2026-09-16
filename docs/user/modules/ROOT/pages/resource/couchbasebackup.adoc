@@ -80,6 +80,10 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbasebackups-spec-services-users,users>>: false
     <<couchbasebackups-spec-services-views,views>>: True
   <<couchbasebackups-spec-size,size>>: 20Gi
+  <<couchbasebackups-spec-snapshotbackup,snapshotBackup>>:
+    <<couchbasebackups-spec-snapshotbackup-maxskew,maxSkew>>: 10s
+    <<couchbasebackups-spec-snapshotbackup-volumegroupsnapshotclassname,volumeGroupSnapshotClassName>>: ""
+    <<couchbasebackups-spec-snapshotbackup-volumesnapshotclassname,volumeSnapshotClassName>>: ""
   <<couchbasebackups-spec-storageclassname,storageClassName>>: ""
   <<couchbasebackups-spec-strategy,strategy>>: full_incremental
   <<couchbasebackups-spec-successfuljobshistorylimit,successfulJobsHistoryLimit>>: 3
@@ -970,6 +974,68 @@ Size allows the specification of a backup persistent volume, when using
 volume based backup.
 More info:
 https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+
+=== couchbasebackups.spec.snapshotBackup
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+SnapshotBackup, if set, switches this backup from the default archive based approach
+(streaming data out through a pod running cbbackupmgr) to a CSI VolumeSnapshot based
+approach, which captures each member's underlying persistent volumes directly.
+This
+is faster to take and restore for large datasets, at the cost of a weaker consistency
+guarantee.
+Scheduling and retention behave the same as an archive based backup.
+
+=== couchbasebackups.spec.snapshotBackup.maxSkew
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `10s`
+
+==== Description
+
+MaxSkew is the maximum acceptable gap between the first snapshot taken in a run and
+the last one, measured across every volume of every member (not grouped or averaged
+per node).
+If the time between the earliest and latest snapshot exceeds this, the
+volumes were not captured close enough together to be trusted as one consistent set,
+and the run is marked invalid and discarded.
+
+=== couchbasebackups.spec.snapshotBackup.volumeGroupSnapshotClassName
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+VolumeGroupSnapshotClassName is the VolumeGroupSnapshotClass used to capture a
+member's volumes as a single group snapshot, when the driver supports it.
+This is
+used opportunistically and is never required, most CSI drivers, including all three
+major public clouds as of this writing, do not implement it.
+
+=== couchbasebackups.spec.snapshotBackup.volumeSnapshotClassName
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+VolumeSnapshotClassName is the VolumeSnapshotClass used to capture each member's
+volumes individually.
+This is the universally available path, used whenever the
+driver does not support VolumeGroupSnapshot.
 
 === couchbasebackups.spec.storageClassName
 

@@ -355,6 +355,14 @@ type CouchbaseBackupSpec struct {
 	// These can be used to configure cbbackupmgr behavior via environment variables.
 	// +optional
 	Env []v1.EnvVar `json:"env,omitempty"`
+
+	// SnapshotBackup, if set, switches this backup from the default archive based approach
+	// (streaming data out through a pod running cbbackupmgr) to a CSI VolumeSnapshot based
+	// approach, which captures each member's underlying persistent volumes directly. This
+	// is faster to take and restore for large datasets, at the cost of a weaker consistency
+	// guarantee. Scheduling and retention behave the same as an archive based backup.
+	// +optional
+	SnapshotBackup *CouchbaseSnapshotBackupSpec `json:"snapshotBackup,omitempty"`
 }
 
 // +kubebuilder:validation:Enum=none;resume;purge
@@ -490,6 +498,33 @@ type CouchbaseBackupAutoScaling struct {
 	IncrementPercent int `json:"incrementPercent,omitempty"`
 }
 
+// CouchbaseSnapshotBackupSpec configures CSI VolumeSnapshot based backup, which
+// VolumeSnapshotClass to capture with, and how much timing spread across a run's snapshots
+// is tolerated before that run is discarded. It carries only what differs from the
+// archive based configuration above, scheduling and retention are shared with the rest of
+// CouchbaseBackupSpec.
+type CouchbaseSnapshotBackupSpec struct {
+	// VolumeSnapshotClassName is the VolumeSnapshotClass used to capture each member's
+	// volumes individually. This is the universally available path, used whenever the
+	// driver does not support VolumeGroupSnapshot.
+	VolumeSnapshotClassName string `json:"volumeSnapshotClassName"`
+
+	// VolumeGroupSnapshotClassName is the VolumeGroupSnapshotClass used to capture a
+	// member's volumes as a single group snapshot, when the driver supports it. This is
+	// used opportunistically and is never required, most CSI drivers, including all three
+	// major public clouds as of this writing, do not implement it.
+	// +optional
+	VolumeGroupSnapshotClassName *string `json:"volumeGroupSnapshotClassName,omitempty"`
+
+	// MaxSkew is the maximum acceptable gap between the first snapshot taken in a run and
+	// the last one, measured across every volume of every member (not grouped or averaged
+	// per node). If the time between the earliest and latest snapshot exceeds this, the
+	// volumes were not captured close enough together to be trusted as one consistent set,
+	// and the run is marked invalid and discarded.
+	// +kubebuilder:default="10s"
+	MaxSkew metav1.Duration `json:"maxSkew,omitempty"`
+}
+
 // CouchbaseBackupStatus provides status notifications about the Couchbase backup
 // including when the last backup occurred, whether is succeeded or not, the run
 // time of the backup and the size of the backup.
@@ -599,6 +634,244 @@ type BackupStatus struct {
 
 	// Incremental backups inside the repository.
 	Incrementals []string `json:"incrementals,omitempty"`
+}
+
+// CouchbaseSnapshotBackupRun records one CSI VolumeSnapshot based backup attempt. This is
+// the authoritative record of what a specific backup actually contains, created by the
+// operator when a snapshot backup run starts and never authored directly by a user.
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:categories=all;couchbase
+// +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:resource:shortName=cbsnapbackuprun
+// +kubebuilder:printcolumn:name="backup",type="string",JSONPath=".spec.sourceBackup"
+// +kubebuilder:printcolumn:name="phase",type="string",JSONPath=".status.phase"
+// +kubebuilder:printcolumn:name="node count",type="integer",JSONPath=".spec.nodeCount"
+// +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:subresource:status
+type CouchbaseSnapshotBackupRun struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              CouchbaseSnapshotBackupRunSpec   `json:"spec"`
+	Status            CouchbaseSnapshotBackupRunStatus `json:"status,omitempty"`
+}
+
+// CouchbaseSnapshotBackupRunSpec records the facts captured at the moment the run
+// started, which backup schedule produced it, what the source cluster looked like, and
+// what credential and CR state the captured data expects on restore.
+type CouchbaseSnapshotBackupRunSpec struct {
+	// SourceBackup names the CouchbaseBackup that produced this run, for listing
+	// purposes only. This is not an ownership relationship, a run must survive
+	// deletion of the schedule that created it.
+	SourceBackup string `json:"sourceBackup"`
+
+	// ClusterSpec is the source cluster's specification as captured at run time, so a
+	// new cluster can be provisioned on restore without reconstructing topology by hand.
+	// This is stored as raw JSON, not the typed spec, so it doesn't have to pass today's
+	// validation rules.
+	ClusterSpec runtime.RawExtension `json:"clusterSpec"`
+
+	// ServerVersion is the Couchbase Server version running on the source cluster at
+	// capture time, checked for compatibility with a restore target before any
+	// destructive action is taken.
+	ServerVersion string `json:"serverVersion"`
+
+	// NodeCount is the number of members captured in this run.
+	NodeCount int `json:"nodeCount"`
+
+	// ClusterUUID is the source cluster's identity at capture time, recorded for audit
+	// and for the credential continuity behaviour used when restoring to a different
+	// cluster.
+	ClusterUUID string `json:"clusterUUID"`
+
+	// AdminSecretName names the Secret holding the administrative credentials the
+	// captured data expects to authenticate with.
+	AdminSecretName string `json:"adminSecretName"`
+
+	// Buckets, Scopes and Collections record the names that existed at capture time, so
+	// a restore can detect one with no matching CR and require acknowledgement before
+	// proceeding, rather than silently losing it to ordinary reconciliation right after
+	// restore completes.
+	// Buckets is the set of bucket names captured in this run.
+	// +optional
+	Buckets []string `json:"buckets,omitempty"`
+
+	// Scopes is the set of scope names captured in this run.
+	// +optional
+	Scopes []string `json:"scopes,omitempty"`
+
+	// Collections is the set of collection names captured in this run.
+	// +optional
+	Collections []string `json:"collections,omitempty"`
+}
+
+// CouchbaseSnapshotBackupRunStatus records the outcome of the capture attempt, whether it
+// succeeded, what was actually captured, and how it was captured.
+type CouchbaseSnapshotBackupRunStatus struct {
+	// Phase is the run's current state.
+	// +kubebuilder:validation:Enum=InProgress;Complete;Invalid
+	// +kubebuilder:default="InProgress"
+	Phase CouchbaseSnapshotBackupRunPhase `json:"phase,omitempty"`
+
+	// GroupSnapshot records whether this run was captured as a single
+	// VolumeGroupSnapshot or as concurrent individual VolumeSnapshots, as evidence of
+	// the capture mechanism actually used.
+	GroupSnapshot bool `json:"groupSnapshot"`
+
+	// Snapshots is the full list of every volume snapshot taken as part of the run, one
+	// entry per volume. A restore reads this list directly to know exactly which snapshot
+	// to restore each volume from.
+	// +optional
+	Snapshots []CouchbaseSnapshotBackupRunSnapshot `json:"snapshots,omitempty"`
+
+	// StartTime is when this run's capture attempt began, used together with EndTime to
+	// compute MeasuredSkew.
+	// +optional
+	StartTime *metav1.Time `json:"startTime,omitempty"`
+
+	// EndTime is when this run's capture attempt finished, used together with StartTime to
+	// compute MeasuredSkew.
+	// +optional
+	EndTime *metav1.Time `json:"endTime,omitempty"`
+
+	// MeasuredSkew is the actual gap observed between the first and last snapshot
+	// taken in this run, checked against CouchbaseBackup.spec.snapshotBackup.maxSkew.
+	// +optional
+	MeasuredSkew *metav1.Duration `json:"measuredSkew,omitempty"`
+}
+
+// CouchbaseSnapshotBackupRunSnapshot names a single captured volume, which member it
+// belongs to, and the VolumeSnapshot (or VolumeGroupSnapshot member) that captured it.
+type CouchbaseSnapshotBackupRunSnapshot struct {
+	// Member is the name of the pod/member this volume belonged to.
+	Member string `json:"member"`
+
+	// VolumeName is the PVC name this snapshot was taken from.
+	VolumeName string `json:"volumeName"`
+
+	// SnapshotName is the VolumeSnapshot object holding the capture.
+	SnapshotName string `json:"snapshotName"`
+}
+
+type CouchbaseSnapshotBackupRunPhase string
+
+const (
+	CouchbaseSnapshotBackupRunPhaseInProgress CouchbaseSnapshotBackupRunPhase = "InProgress"
+	CouchbaseSnapshotBackupRunPhaseComplete   CouchbaseSnapshotBackupRunPhase = "Complete"
+	CouchbaseSnapshotBackupRunPhaseInvalid    CouchbaseSnapshotBackupRunPhase = "Invalid"
+)
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type CouchbaseSnapshotBackupRunList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []CouchbaseSnapshotBackupRun `json:"items"`
+}
+
+// CouchbaseSnapshotBackupRestore represents a single CSI VolumeSnapshot based restore request
+// and its progress. It names a source CouchbaseSnapshotBackupRun and a target
+// CouchbaseCluster. The target must already exist as a CR before a restore can act on it,
+// if it is running, the restore replaces its data (a destructive rollback). If it is
+// hibernated with no pods, the restore fills its volumes and starts it up. If no
+// CouchbaseCluster with that name exists at all, the request is rejected until one is
+// created.
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:categories=all;couchbase
+// +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:resource:shortName=cbsnapbackuprestore
+// +kubebuilder:printcolumn:name="backup",type="string",JSONPath=".spec.backupName"
+// +kubebuilder:printcolumn:name="run",type="string",JSONPath=".spec.runName"
+// +kubebuilder:printcolumn:name="target",type="string",JSONPath=".spec.target.name"
+// +kubebuilder:printcolumn:name="phase",type="string",JSONPath=".status.phase"
+// +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:subresource:status
+type CouchbaseSnapshotBackupRestore struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              CouchbaseSnapshotBackupRestoreSpec   `json:"spec"`
+	Status            CouchbaseSnapshotBackupRestoreStatus `json:"status,omitempty"`
+}
+
+// CouchbaseSnapshotBackupRestoreSpec names what to restore, and where to.
+type CouchbaseSnapshotBackupRestoreSpec struct {
+	// BackupName is the CouchbaseBackup that scheduled the run to restore from.
+	BackupName string `json:"backupName"`
+
+	// RunName is the specific CouchbaseSnapshotBackupRun to restore. This field is
+	// required and must always be set explicitly.
+	RunName string `json:"runName"`
+
+	// Target describes the cluster to restore into.
+	Target CouchbaseSnapshotBackupRestoreTarget `json:"target"`
+}
+
+// CouchbaseSnapshotBackupRestoreTarget describes the restore's destination and the explicit
+// acknowledgements required before a destructive or lossy action is allowed to proceed.
+type CouchbaseSnapshotBackupRestoreTarget struct {
+	// Name is the target CouchbaseCluster's name. If no CouchbaseCluster with this name
+	// exists yet, the request is rejected, create the target first, hibernated and with
+	// zero pods, before restoring into it.
+	Name string `json:"name"`
+
+	// AcknowledgeDataLoss must be true when the target already exists and is running.
+	// Restoring into a running cluster deletes its current pods and volumes first, this
+	// is irreversible.
+	// +optional
+	AcknowledgeDataLoss bool `json:"acknowledgeDataLoss,omitempty"`
+
+	// AcknowledgeBucketGap must be true when the run's recorded buckets, scopes, or
+	// collections are not all covered by CRs that will exist at restore time. Without
+	// this acknowledgement, ordinary bucket reconciliation would delete that data again
+	// immediately after the restore completes.
+	// +optional
+	AcknowledgeBucketGap bool `json:"acknowledgeBucketGap,omitempty"`
+
+	// ServerSecretName is the TLS certificate secret for the target cluster. Required
+	// only when the target is a new, differently named cluster, since the restored data
+	// won't already have a certificate valid for it.
+	// +optional
+	ServerSecretName string `json:"serverSecretName,omitempty"`
+}
+
+// CouchbaseSnapshotBackupRestoreStatus reports restore progress and outcome.
+type CouchbaseSnapshotBackupRestoreStatus struct {
+	// Phase is the restore's current state.
+	// +kubebuilder:validation:Enum=Validating;Destroying;Provisioning;Remapping;WaitingForCluster;Complete;Failed
+	// +kubebuilder:default="Validating"
+	Phase CouchbaseSnapshotBackupRestorePhase `json:"phase,omitempty"`
+
+	// StartTime is when this restore attempt began.
+	// +optional
+	StartTime *metav1.Time `json:"startTime,omitempty"`
+
+	// CompletionTime is when this restore attempt reached a terminal phase, Complete or
+	// Failed.
+	// +optional
+	CompletionTime *metav1.Time `json:"completionTime,omitempty"`
+
+	// FailureReason explains why Phase is Failed, when it is.
+	// +optional
+	FailureReason string `json:"failureReason,omitempty"`
+}
+
+type CouchbaseSnapshotBackupRestorePhase string
+
+const (
+	CouchbaseSnapshotBackupRestorePhaseValidating        CouchbaseSnapshotBackupRestorePhase = "Validating"
+	CouchbaseSnapshotBackupRestorePhaseDestroying        CouchbaseSnapshotBackupRestorePhase = "Destroying"
+	CouchbaseSnapshotBackupRestorePhaseProvisioning      CouchbaseSnapshotBackupRestorePhase = "Provisioning"
+	CouchbaseSnapshotBackupRestorePhaseRemapping         CouchbaseSnapshotBackupRestorePhase = "Remapping"
+	CouchbaseSnapshotBackupRestorePhaseWaitingForCluster CouchbaseSnapshotBackupRestorePhase = "WaitingForCluster"
+	CouchbaseSnapshotBackupRestorePhaseComplete          CouchbaseSnapshotBackupRestorePhase = "Complete"
+	CouchbaseSnapshotBackupRestorePhaseFailed            CouchbaseSnapshotBackupRestorePhase = "Failed"
+)
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type CouchbaseSnapshotBackupRestoreList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []CouchbaseSnapshotBackupRestore `json:"items"`
 }
 
 // CouchbaseBackupRestore allows the restoration of all Couchbase cluster data from
