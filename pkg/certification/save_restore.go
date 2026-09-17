@@ -563,6 +563,11 @@ func gatherResources(client *couchbaseutil.Client, host string, path pathVar) ([
 			return nil, err
 		}
 
+		// The system scope is created and owned by Couchbase Server, it cannot be
+		// managed by us, and its name is rejected by the scope and collection name
+		// validation, so drop it before anything else looks at the list.
+		filterSystemScope(&scopes)
+
 		// Filter scopes passed on path.
 		if err := filterScopes(&scopes, path); err != nil {
 			return nil, err
@@ -626,6 +631,20 @@ func filterBuckets(buckets *couchbaseutil.BucketList, path pathVar) error {
 	*buckets = couchbaseutil.BucketList{*bucket}
 
 	return nil
+}
+
+func filterSystemScope(scopes *couchbaseutil.ScopeList) {
+	filtered := make([]couchbaseutil.Scope, 0, len(scopes.Scopes))
+
+	for _, scope := range scopes.Scopes {
+		if scope.Name == couchbasev2.SystemScope {
+			continue
+		}
+
+		filtered = append(filtered, scope)
+	}
+
+	scopes.Scopes = filtered
 }
 
 // filterScopes updates the scope list to contain only the selected scope,
@@ -3010,12 +3029,19 @@ func gatherScopeResources(clients *clients, scopeSelector *couchbasev2.ScopeSele
 	}
 
 	if scopeSelector.Selector != nil {
-		selectedScopes, err := clients.couchbaseClient.CouchbaseV2().CouchbaseScopes(clients.namespace).List(context.Background(), metav1.ListOptions{LabelSelector: scopeSelector.Selector.String()})
+		// NOTE: LabelSelector.String() is the generated Go representation of the
+		// struct, not a label selector expression, so it must be converted.
+		selector, err := metav1.LabelSelectorAsSelector(scopeSelector.Selector)
 		if err != nil {
 			return nil, err
 		}
 
-		selectedScopeGroups, err := clients.couchbaseClient.CouchbaseV2().CouchbaseScopeGroups(clients.namespace).List(context.Background(), metav1.ListOptions{LabelSelector: scopeSelector.Selector.String()})
+		selectedScopes, err := clients.couchbaseClient.CouchbaseV2().CouchbaseScopes(clients.namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
+		if err != nil {
+			return nil, err
+		}
+
+		selectedScopeGroups, err := clients.couchbaseClient.CouchbaseV2().CouchbaseScopeGroups(clients.namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
 		if err != nil {
 			return nil, err
 		}
@@ -3105,12 +3131,18 @@ func gatherCollectionResources(clients *clients, collectionSelector *couchbasev2
 	}
 
 	if collectionSelector.Selector != nil {
-		selectedCollections, err := clients.couchbaseClient.CouchbaseV2().CouchbaseCollections(clients.namespace).List(context.Background(), metav1.ListOptions{LabelSelector: collectionSelector.Selector.String()})
+		// catching label parsing error otherwise the API call will fail and error will be masked.
+		selector, err := metav1.LabelSelectorAsSelector(collectionSelector.Selector)
 		if err != nil {
 			return nil, err
 		}
 
-		selectedCollectionGroups, err := clients.couchbaseClient.CouchbaseV2().CouchbaseCollectionGroups(clients.namespace).List(context.Background(), metav1.ListOptions{LabelSelector: collectionSelector.Selector.String()})
+		selectedCollections, err := clients.couchbaseClient.CouchbaseV2().CouchbaseCollections(clients.namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
+		if err != nil {
+			return nil, err
+		}
+
+		selectedCollectionGroups, err := clients.couchbaseClient.CouchbaseV2().CouchbaseCollectionGroups(clients.namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
 		if err != nil {
 			return nil, err
 		}
