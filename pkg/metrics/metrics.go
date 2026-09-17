@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/version"
@@ -483,7 +484,15 @@ func separateNameAndNamespaceWithConstrainedLabels(labels prometheus.Constrained
 	return append(labels, prometheus.ConstrainedLabel{Name: "name"})
 }
 
+// Metrics can only be initialised once during the lifecycle of any process.
+// so guard against any coding boo boos that might be made further down.
+var initOnce sync.Once
+
 func InitMetrics() {
+	initOnce.Do(initMetrics)
+}
+
+func initMetrics() {
 	additionalLabels := os.Getenv("additional-prometheus-labels")
 
 	SeparateNameAndNamespace, _ = strconv.ParseBool(os.Getenv("separate-cluster-name-and-namespace"))

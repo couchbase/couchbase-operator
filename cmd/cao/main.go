@@ -12,6 +12,7 @@ package main
 
 import (
 	"github.com/couchbase/couchbase-operator/pkg/certification"
+	"github.com/couchbase/couchbase-operator/pkg/metrics"
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth/azure"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -19,5 +20,7 @@ import (
 )
 
 func main() {
+	metrics.InitMetrics()
+
 	certification.Run()
 }
