@@ -417,6 +417,8 @@ func registerTests() {
 		framework.NewTestDef(TestNetworkAddressFamilyAndNodeToNodeDisabledControlPlaneOnly).WithTags(TagFeatureNetwork, TagFeatureTLS),
 		framework.NewTestDef(TestNetworkAddressFamilyAndNodeToNodeDisabledStrict).WithTags(TagFeatureNetwork, TagFeatureTLS),
 		framework.NewTestDef(TestNetworkAddressFamilyAndNodeToNodeDisabledAll).WithTags(TagFeatureNetwork, TagFeatureTLS),
+		framework.NewTestDef(TestRescheduleCandidatesAlternateAddressExternalDNSCheck).WithTags(TagFeatureNetwork, TagFeatureTLS),
+		framework.NewTestDef(TestRescheduleCandidatesAndScaleDownAlternateAddressExternalDNSCheck).WithTags(TagFeatureNetwork, TagFeatureTLS),
 		framework.NewTestDef(TestLoadBalancerSourceRanges).WithTags(TagSuiteP0, TagFeatureNetwork),
 		framework.NewTestDef(TestRBACDeleteUser).WithTags(TagSuiteP0, TagSuitePlatform, TagFeatureRBAC),
 		framework.NewTestDef(TestRBACUpdateRole).WithTags(TagSuiteP0, TagSuitePlatform, TagFeatureRBAC),
