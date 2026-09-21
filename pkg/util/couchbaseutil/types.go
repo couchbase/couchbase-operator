@@ -151,6 +151,7 @@ type ClusterInfo struct {
 	Counters               map[string]int              `json:"counters"`
 	ServicesNeedRebalance  []ServicesNeedRebalanceCode `json:"servicesNeedRebalance,omitempty"`
 	BucketsNeedRebalance   []BucketNeedsRebalanceCode  `json:"bucketsNeedRebalance,omitempty"`
+	ChronicleRev           int64                       `json:"chronicleRev"`
 }
 
 type RebalanceReasonCode struct {

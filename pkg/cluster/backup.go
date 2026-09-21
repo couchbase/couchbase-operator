@@ -224,6 +224,12 @@ func (c *Cluster) generateBackupResources() (backupResourcesList, error) {
 			continue
 		}
 
+		// A snapshot based backup doesn't need any of the archive resources,
+		// reconcileSnapshotBackup handles it separately instead.
+		if backup.Spec.SnapshotBackup != nil {
+			continue
+		}
+
 		resource := backupResources{
 			name:   backup.Name,
 			backup: backup,

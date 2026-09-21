@@ -601,6 +601,14 @@ func generatePVC(cluster *couchbasev2.CouchbaseCluster, member couchbaseutil.Mem
 		constants.LabelVolumeName: mount.persistentVolumeClaimTemplateName,
 	}
 
+	// Marks every volume that isn't a log volume, so a group snapshot can pick them out
+	// with a simple label match. That kind of match can only check whether a label
+	// equals a value, it has no way to check that a label is absent, so we mark the
+	// volumes we want instead of the one we don't.
+	if mount.mountPath != CouchbaseVolumeMountLogsDir {
+		labels[constants.LabelDataVolume] = "true"
+	}
+
 	annotations := map[string]string{
 		constants.AnnotationVolumeMountPath:     mount.mountPath,
 		constants.AnnotationVolumeNodeConf:      config.Name,

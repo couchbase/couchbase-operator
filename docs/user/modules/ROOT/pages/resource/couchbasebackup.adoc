@@ -82,6 +82,7 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbasebackups-spec-size,size>>: 20Gi
   <<couchbasebackups-spec-snapshotbackup,snapshotBackup>>:
     <<couchbasebackups-spec-snapshotbackup-maxskew,maxSkew>>: 10s
+    <<couchbasebackups-spec-snapshotbackup-schedule,schedule>>: ""
     <<couchbasebackups-spec-snapshotbackup-volumegroupsnapshotclassname,volumeGroupSnapshotClassName>>: ""
     <<couchbasebackups-spec-snapshotbackup-volumesnapshotclassname,volumeSnapshotClassName>>: ""
   <<couchbasebackups-spec-storageclassname,storageClassName>>: ""
@@ -1007,6 +1008,21 @@ per node).
 If the time between the earliest and latest snapshot exceeds this, the
 volumes were not captured close enough together to be trusted as one consistent set,
 and the run is marked invalid and discarded.
+
+=== couchbasebackups.spec.snapshotBackup.schedule
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Schedule takes a cron schedule in string format, in the same form as
+CouchbaseBackupSchedule.Schedule.
+A snapshot capture has no full, incremental, or
+merge distinction the way an archive based backup does, so this is its own field.
 
 === couchbasebackups.spec.snapshotBackup.volumeGroupSnapshotClassName
 

@@ -51,6 +51,21 @@ func (c *CouchbaseCluster) AsOwner() metav1.OwnerReference {
 	}
 }
 
+// AsOwner returns an owner reference to the CouchbaseSnapshotBackupRun, used on every snapshot
+// the run takes, so deleting the run also deletes its snapshots.
+func (r *CouchbaseSnapshotBackupRun) AsOwner() metav1.OwnerReference {
+	trueVar := true
+
+	return metav1.OwnerReference{
+		APIVersion:         SchemeGroupVersion.String(),
+		Kind:               SnapshotBackupRunCRDResourceKind,
+		Name:               r.Name,
+		UID:                r.UID,
+		Controller:         &trueVar,
+		BlockOwnerDeletion: &trueVar,
+	}
+}
+
 // Convert from typed to string.
 func (s Service) String() string {
 	return string(s)

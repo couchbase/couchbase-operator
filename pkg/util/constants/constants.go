@@ -144,6 +144,8 @@ const (
 	LabelNode               = "couchbase_node"
 	LabelNodeConf           = "couchbase_node_conf"
 	LabelVolumeName         = "couchbase_volume"
+	LabelDataVolume         = "couchbase_data_volume"
+	LabelSnapshotBackupRun  = "couchbase_snapshot_backup_run"
 	LabelServer             = "couchbase_server"
 	LabelBackup             = "couchbase_backup"
 	LabelBackupRestore      = "couchbase_restore"

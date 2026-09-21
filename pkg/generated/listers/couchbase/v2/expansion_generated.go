@@ -139,6 +139,22 @@ type CouchbaseScopeGroupListerExpansion interface{}
 // CouchbaseScopeGroupNamespaceLister.
 type CouchbaseScopeGroupNamespaceListerExpansion interface{}
 
+// CouchbaseSnapshotBackupRestoreListerExpansion allows custom methods to be added to
+// CouchbaseSnapshotBackupRestoreLister.
+type CouchbaseSnapshotBackupRestoreListerExpansion interface{}
+
+// CouchbaseSnapshotBackupRestoreNamespaceListerExpansion allows custom methods to be added to
+// CouchbaseSnapshotBackupRestoreNamespaceLister.
+type CouchbaseSnapshotBackupRestoreNamespaceListerExpansion interface{}
+
+// CouchbaseSnapshotBackupRunListerExpansion allows custom methods to be added to
+// CouchbaseSnapshotBackupRunLister.
+type CouchbaseSnapshotBackupRunListerExpansion interface{}
+
+// CouchbaseSnapshotBackupRunNamespaceListerExpansion allows custom methods to be added to
+// CouchbaseSnapshotBackupRunNamespaceLister.
+type CouchbaseSnapshotBackupRunNamespaceListerExpansion interface{}
+
 // CouchbaseUserListerExpansion allows custom methods to be added to
 // CouchbaseUserLister.
 type CouchbaseUserListerExpansion interface{}

@@ -964,6 +964,63 @@ func (c *CouchbaseBackupRestoreCache) stop() {
 	c.resourceCache.stop()
 }
 
+// CouchbaseSnapshotBackupRunCache keeps an up to date, in memory list of
+// CouchbaseSnapshotBackupRun objects.
+type CouchbaseSnapshotBackupRunCache struct {
+	resourceCache *resourceCache
+	namespace     string
+}
+
+// newCouchbaseSnapshotBackupRunCache creates a new synchronized cache
+// for CouchbaseSnapshotBackupRun resources.
+func newCouchbaseSnapshotBackupRunCache(ctx context.Context, client couchbaseclientv2.Interface, namespace string) (*CouchbaseSnapshotBackupRunCache, error) {
+	selector := labels.Everything()
+
+	resourceCache, err := newResourceCache(ctx, client.CouchbaseV2().RESTClient(), &couchbasev2.CouchbaseSnapshotBackupRun{}, selector, couchbasev2.SnapshotBackupRunCRDResourcePlural, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CouchbaseSnapshotBackupRunCache{
+		resourceCache: resourceCache,
+		namespace:     namespace,
+	}, nil
+}
+
+// get returns the requested couchbasesnapshotbackuprun based on name.
+func (c *CouchbaseSnapshotBackupRunCache) Get(name string) (*couchbasev2.CouchbaseSnapshotBackupRun, bool) {
+	key := c.namespace + "/" + name
+
+	// Cannot error
+	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
+	if !exists {
+		return nil, exists
+	}
+
+	return obj.(*couchbasev2.CouchbaseSnapshotBackupRun), true
+}
+
+// list returns all couchbasesnapshotbackupruns.
+func (c *CouchbaseSnapshotBackupRunCache) List() (resources []*couchbasev2.CouchbaseSnapshotBackupRun) {
+	objs := c.resourceCache.informer.GetStore().List()
+	for _, obj := range objs {
+		resources = append(resources, obj.(*couchbasev2.CouchbaseSnapshotBackupRun))
+	}
+
+	return
+}
+
+// Update updates the run in the cache. This only changes the local, in memory copy, it
+// does not write anything to the k8s API server.
+func (c *CouchbaseSnapshotBackupRunCache) Update(resource *couchbasev2.CouchbaseSnapshotBackupRun) error {
+	return c.resourceCache.informer.GetStore().Update(resource)
+}
+
+// stop stops the cache synchronization and frees resources.
+func (c *CouchbaseSnapshotBackupRunCache) stop() {
+	c.resourceCache.stop()
+}
+
 // CouchbaseAutoscalerCache is a wrapper around a resourceCache that provides concrete typing for
 // CouchbaseAutoscaler resources.
 type CouchbaseAutoscalerCache struct {

@@ -85,6 +85,14 @@ func (c *FakeCouchbaseV2) CouchbaseScopeGroups(namespace string) v2.CouchbaseSco
 	return &FakeCouchbaseScopeGroups{c, namespace}
 }
 
+func (c *FakeCouchbaseV2) CouchbaseSnapshotBackupRestores(namespace string) v2.CouchbaseSnapshotBackupRestoreInterface {
+	return &FakeCouchbaseSnapshotBackupRestores{c, namespace}
+}
+
+func (c *FakeCouchbaseV2) CouchbaseSnapshotBackupRuns(namespace string) v2.CouchbaseSnapshotBackupRunInterface {
+	return &FakeCouchbaseSnapshotBackupRuns{c, namespace}
+}
+
 func (c *FakeCouchbaseV2) CouchbaseUsers(namespace string) v2.CouchbaseUserInterface {
 	return &FakeCouchbaseUsers{c, namespace}
 }

@@ -37,6 +37,8 @@ type CouchbaseV2Interface interface {
 	CouchbaseRoleBindingsGetter
 	CouchbaseScopesGetter
 	CouchbaseScopeGroupsGetter
+	CouchbaseSnapshotBackupRestoresGetter
+	CouchbaseSnapshotBackupRunsGetter
 	CouchbaseUsersGetter
 }
 
@@ -107,6 +109,14 @@ func (c *CouchbaseV2Client) CouchbaseScopes(namespace string) CouchbaseScopeInte
 
 func (c *CouchbaseV2Client) CouchbaseScopeGroups(namespace string) CouchbaseScopeGroupInterface {
 	return newCouchbaseScopeGroups(c, namespace)
+}
+
+func (c *CouchbaseV2Client) CouchbaseSnapshotBackupRestores(namespace string) CouchbaseSnapshotBackupRestoreInterface {
+	return newCouchbaseSnapshotBackupRestores(c, namespace)
+}
+
+func (c *CouchbaseV2Client) CouchbaseSnapshotBackupRuns(namespace string) CouchbaseSnapshotBackupRunInterface {
+	return newCouchbaseSnapshotBackupRuns(c, namespace)
 }
 
 func (c *CouchbaseV2Client) CouchbaseUsers(namespace string) CouchbaseUserInterface {

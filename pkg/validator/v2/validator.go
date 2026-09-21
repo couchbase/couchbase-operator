@@ -3456,6 +3456,10 @@ func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBac
 	if err := validateBackupCronSchedules(backup); err != nil {
 		errs = err
 	}
+
+	if err := validateSnapshotBackupSchedule(backup.Spec.SnapshotBackup); err != nil {
+		errs = append(errs, err)
+	}
 	// Ensure generated CronJob names will be within Kubernetes limits.
 	if err := checkConstraintBackupNameLength(backup); err != nil {
 		errs = append(errs, err)
@@ -5064,6 +5068,27 @@ func validateCronJobString(schedule *couchbasev2.CouchbaseBackupSchedule, name s
 	p := cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
 	if _, err := p.Parse(schedule.Schedule); err != nil {
 		return fmt.Errorf("%s.schedule : %w", name, err)
+	}
+
+	return nil
+}
+
+// validateSnapshotBackupSchedule checks that a snapshot backup's cron schedule string
+// actually parses, using the same parser as the archive based schedules. Catching a
+// bad schedule here, at admission, keeps it from reaching the reconciler instead.
+func validateSnapshotBackupSchedule(snapshotBackup *couchbasev2.CouchbaseSnapshotBackupSpec) error {
+	// Only backups actually using snapshotBackup need this check.
+	if snapshotBackup == nil {
+		return nil
+	}
+
+	if len(snapshotBackup.Schedule) == 0 {
+		return fmt.Errorf("spec.snapshotBackup.schedule : cronjob schedule cannot be empty")
+	}
+
+	p := cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
+	if _, err := p.Parse(snapshotBackup.Schedule); err != nil {
+		return fmt.Errorf("spec.snapshotBackup.schedule : %w", err)
 	}
 
 	return nil

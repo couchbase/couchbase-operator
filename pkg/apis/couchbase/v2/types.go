@@ -504,6 +504,11 @@ type CouchbaseBackupAutoScaling struct {
 // archive based configuration above, scheduling and retention are shared with the rest of
 // CouchbaseBackupSpec.
 type CouchbaseSnapshotBackupSpec struct {
+	// Schedule takes a cron schedule in string format, in the same form as
+	// CouchbaseBackupSchedule.Schedule. A snapshot capture has no full, incremental, or
+	// merge distinction the way an archive based backup does, so this is its own field.
+	Schedule string `json:"schedule"`
+
 	// VolumeSnapshotClassName is the VolumeSnapshotClass used to capture each member's
 	// volumes individually. This is the universally available path, used whenever the
 	// driver does not support VolumeGroupSnapshot.
@@ -713,10 +718,32 @@ type CouchbaseSnapshotBackupRunStatus struct {
 	// +kubebuilder:default="InProgress"
 	Phase CouchbaseSnapshotBackupRunPhase `json:"phase,omitempty"`
 
-	// GroupSnapshot records whether this run was captured as a single
+	// BaselineOrchestrator is the source cluster's orchestrator node name, captured
+	// immediately before the run's capture began. Compared against the same value read
+	// again after capture, to detect whether the cluster's topology changed mid capture.
+	BaselineOrchestrator string `json:"baselineOrchestrator"`
+
+	// BaselineBalanced records whether the source cluster was balanced immediately before
+	// the run's capture began. Compared the same way as BaselineOrchestrator.
+	BaselineBalanced bool `json:"baselineBalanced"`
+
+	// BaselineChronicleRev is the source cluster's chronicle revision counter, captured
+	// immediately before the run's capture began. Only captured on server versions that
+	// support it (8.5.0 and later), left unset on older versions, which rely on
+	// BaselineOrchestrator and BaselineBalanced alone.
+	// +optional
+	BaselineChronicleRev *int64 `json:"baselineChronicleRev,omitempty"`
+
+	// GroupSnapshot records whether the run was captured as a single
 	// VolumeGroupSnapshot or as concurrent individual VolumeSnapshots, as evidence of
 	// the capture mechanism actually used.
 	GroupSnapshot bool `json:"groupSnapshot"`
+
+	// GroupSnapshotName is the VolumeGroupSnapshot object created for the run, set only
+	// when GroupSnapshot is true. Its members are created asynchronously by k8s, so the
+	// run's Snapshots list is filled in once that finishes, not here.
+	// +optional
+	GroupSnapshotName *string `json:"groupSnapshotName,omitempty"`
 
 	// Snapshots is the full list of every volume snapshot taken as part of the run, one
 	// entry per volume. A restore reads this list directly to know exactly which snapshot
@@ -818,14 +845,14 @@ type CouchbaseSnapshotBackupRestoreTarget struct {
 	// Restoring into a running cluster deletes its current pods and volumes first, this
 	// is irreversible.
 	// +optional
-	AcknowledgeDataLoss bool `json:"acknowledgeDataLoss,omitempty"`
+	AcknowledgeDataLoss *bool `json:"acknowledgeDataLoss,omitempty"`
 
 	// AcknowledgeBucketGap must be true when the run's recorded buckets, scopes, or
 	// collections are not all covered by CRs that will exist at restore time. Without
 	// this acknowledgement, ordinary bucket reconciliation would delete that data again
 	// immediately after the restore completes.
 	// +optional
-	AcknowledgeBucketGap bool `json:"acknowledgeBucketGap,omitempty"`
+	AcknowledgeBucketGap *bool `json:"acknowledgeBucketGap,omitempty"`
 
 	// ServerSecretName is the TLS certificate secret for the target cluster. Required
 	// only when the target is a new, differently named cluster, since the restored data
@@ -853,6 +880,11 @@ type CouchbaseSnapshotBackupRestoreStatus struct {
 	// FailureReason explains why Phase is Failed, when it is.
 	// +optional
 	FailureReason string `json:"failureReason,omitempty"`
+
+	// Conditions is the set of status conditions for this resource.
+	// +optional
+	// +listType=atomic
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 type CouchbaseSnapshotBackupRestorePhase string

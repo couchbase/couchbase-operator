@@ -49,6 +49,10 @@ type Interface interface {
 	CouchbaseScopes() CouchbaseScopeInformer
 	// CouchbaseScopeGroups returns a CouchbaseScopeGroupInformer.
 	CouchbaseScopeGroups() CouchbaseScopeGroupInformer
+	// CouchbaseSnapshotBackupRestores returns a CouchbaseSnapshotBackupRestoreInformer.
+	CouchbaseSnapshotBackupRestores() CouchbaseSnapshotBackupRestoreInformer
+	// CouchbaseSnapshotBackupRuns returns a CouchbaseSnapshotBackupRunInformer.
+	CouchbaseSnapshotBackupRuns() CouchbaseSnapshotBackupRunInformer
 	// CouchbaseUsers returns a CouchbaseUserInformer.
 	CouchbaseUsers() CouchbaseUserInformer
 }
@@ -142,6 +146,16 @@ func (v *version) CouchbaseScopes() CouchbaseScopeInformer {
 // CouchbaseScopeGroups returns a CouchbaseScopeGroupInformer.
 func (v *version) CouchbaseScopeGroups() CouchbaseScopeGroupInformer {
 	return &couchbaseScopeGroupInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// CouchbaseSnapshotBackupRestores returns a CouchbaseSnapshotBackupRestoreInformer.
+func (v *version) CouchbaseSnapshotBackupRestores() CouchbaseSnapshotBackupRestoreInformer {
+	return &couchbaseSnapshotBackupRestoreInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// CouchbaseSnapshotBackupRuns returns a CouchbaseSnapshotBackupRunInformer.
+func (v *version) CouchbaseSnapshotBackupRuns() CouchbaseSnapshotBackupRunInformer {
+	return &couchbaseSnapshotBackupRunInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // CouchbaseUsers returns a CouchbaseUserInformer.

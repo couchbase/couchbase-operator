@@ -43,4 +43,8 @@ type CouchbaseScopeExpansion interface{}
 
 type CouchbaseScopeGroupExpansion interface{}
 
+type CouchbaseSnapshotBackupRestoreExpansion interface{}
+
+type CouchbaseSnapshotBackupRunExpansion interface{}
+
 type CouchbaseUserExpansion interface{}

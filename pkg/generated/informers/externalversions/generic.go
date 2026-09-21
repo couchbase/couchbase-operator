@@ -78,6 +78,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Couchbase().V2().CouchbaseScopes().Informer()}, nil
 	case v2.SchemeGroupVersion.WithResource("couchbasescopegroups"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Couchbase().V2().CouchbaseScopeGroups().Informer()}, nil
+	case v2.SchemeGroupVersion.WithResource("couchbasesnapshotbackuprestores"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Couchbase().V2().CouchbaseSnapshotBackupRestores().Informer()}, nil
+	case v2.SchemeGroupVersion.WithResource("couchbasesnapshotbackupruns"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Couchbase().V2().CouchbaseSnapshotBackupRuns().Informer()}, nil
 	case v2.SchemeGroupVersion.WithResource("couchbaseusers"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Couchbase().V2().CouchbaseUsers().Informer()}, nil
 

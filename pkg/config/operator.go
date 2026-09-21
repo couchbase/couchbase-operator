@@ -434,6 +434,9 @@ func (o *generateOperatorOptions) getOperatorRole() runtime.Object {
 			Resources: []string{
 				couchbasev2.AutoscalerCRDResourcePlural,
 				couchbasev2.SnapshotBackupRunCRDResourcePlural,
+				// Snapshots are owned by their backup run. OpenShift only allows that if the operator can
+				// also update the run's finalizers.
+				couchbasev2.SnapshotBackupRunCRDResourcePlural + "/finalizers",
 			},
 			Verbs: []string{
 				"get",    // used to get specific resource
@@ -449,23 +452,21 @@ func (o *generateOperatorOptions) getOperatorRole() runtime.Object {
 				"snapshot.storage.k8s.io",
 			},
 			Resources: []string{
-				"volumesnapshotclasses",
-				"volumegroupsnapshotclasses",
-				"volumesnapshotcontents",
-				"volumegroupsnapshotcontents",
+				"volumesnapshots",
 			},
 			Verbs: []string{
-				"get",   // used by the operator to check it exists and is ready to use
-				"list",  // used by the operator for caching
-				"watch", // used by the operator for caching
+				"get",    // used by the operator to poll snapshot readiness
+				"list",   // used by the operator for caching
+				"watch",  // used by the operator for caching
+				"create", // used by the operator to capture a backup run
+				"delete", // used by the operator to remove a snapshot directly when needed
 			},
 		},
 		{
 			APIGroups: []string{
-				"snapshot.storage.k8s.io",
+				"groupsnapshot.storage.k8s.io",
 			},
 			Resources: []string{
-				"volumesnapshots",
 				"volumegroupsnapshots",
 			},
 			Verbs: []string{

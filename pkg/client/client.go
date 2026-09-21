@@ -95,6 +95,9 @@ type Client struct {
 	// CouchbaseBackupRestores is a read only cache of couchbase restores (namespace scoped)
 	CouchbaseBackupRestores *CouchbaseBackupRestoreCache
 
+	// CouchbaseSnapshotBackupRuns is a read only cache of snapshot backup runs (namespace scoped)
+	CouchbaseSnapshotBackupRuns *CouchbaseSnapshotBackupRunCache
+
 	// CouchbaseAutoscalers is a read only cache of couchbase autoscaler resources (namespace scoped)
 	CouchbaseAutoscalers *CouchbaseAutoscalerCache
 
@@ -144,6 +147,11 @@ func NewClient(ctx context.Context, namespace string, selector fmt.Stringer, con
 	}
 
 	c.KubeConfig.WarningHandler = rest.NoWarnings{}
+
+	// The client-go default (5 requests a second, burst 10) is too low now that some
+	// reconcilers make several calls at once like creating snapshots in parallel.
+	c.KubeConfig.QPS = 25
+	c.KubeConfig.Burst = 50
 
 	c.KubeConfig.Wrap(KubeAPIWrapper)
 
@@ -254,6 +262,11 @@ func NewClient(ctx context.Context, namespace string, selector fmt.Stringer, con
 		return nil, err
 	}
 
+	c.CouchbaseSnapshotBackupRuns, err = newCouchbaseSnapshotBackupRunCache(ctx, c.CouchbaseClient, namespace)
+	if err != nil {
+		return nil, err
+	}
+
 	c.CouchbaseAutoscalers, err = newCouchbaseAutoscalerCache(ctx, c.CouchbaseClient, namespace, selector)
 	if err != nil {
 		return nil, err
@@ -311,6 +324,7 @@ func (c *Client) Shutdown() {
 	c.ConfigMaps.stop()
 	c.CouchbaseBackups.stop()
 	c.CouchbaseBackupRestores.stop()
+	c.CouchbaseSnapshotBackupRuns.stop()
 	c.CouchbaseAutoscalers.stop()
 	c.CouchbaseScopes.stop()
 	c.CouchbaseScopeGroups.stop()

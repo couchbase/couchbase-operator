@@ -263,6 +263,7 @@ func (c *Cluster) reconcile() error {
 		(*Cluster).reconcilePasswordPolicy,
 		(*Cluster).reconcileRBAC,
 		(*Cluster).reconcileBackup,
+		(*Cluster).reconcileSnapshotBackup,
 		(*Cluster).reconcileBackupRestore,
 		(*Cluster).reconcileAutoscalers,
 		(*Cluster).reconcileCloudNativeGatewayService,

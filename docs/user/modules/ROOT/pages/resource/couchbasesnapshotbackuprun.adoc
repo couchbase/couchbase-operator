@@ -32,8 +32,12 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbasesnapshotbackupruns-spec-serverversion,serverVersion>>: ""
   <<couchbasesnapshotbackupruns-spec-sourcebackup,sourceBackup>>: ""
 <<couchbasesnapshotbackupruns-status,status>>:
+  <<couchbasesnapshotbackupruns-status-baselinebalanced,baselineBalanced>>: false
+  <<couchbasesnapshotbackupruns-status-baselinechroniclerev,baselineChronicleRev>>: 0
+  <<couchbasesnapshotbackupruns-status-baselineorchestrator,baselineOrchestrator>>: ""
   <<couchbasesnapshotbackupruns-status-endtime,endTime>>: ""
   <<couchbasesnapshotbackupruns-status-groupsnapshot,groupSnapshot>>: false
+  <<couchbasesnapshotbackupruns-status-groupsnapshotname,groupSnapshotName>>: ""
   <<couchbasesnapshotbackupruns-status-measuredskew,measuredSkew>>: ""
   <<couchbasesnapshotbackupruns-status-phase,phase>>: InProgress
   <<couchbasesnapshotbackupruns-status-snapshots,snapshots>>:
@@ -214,6 +218,49 @@ deletion of the schedule that created it.
 CouchbaseSnapshotBackupRunStatus records the outcome of the capture attempt, whether it
 succeeded, what was actually captured, and how it was captured.
 
+=== couchbasesnapshotbackupruns.status.baselineBalanced
+
+==== Constraints
+
+*Required*
+
+*Type*: `boolean`
+
+==== Description
+
+BaselineBalanced records whether the source cluster was balanced immediately before
+the run's capture began.
+Compared the same way as BaselineOrchestrator.
+
+=== couchbasesnapshotbackupruns.status.baselineChronicleRev
+
+==== Constraints
+
+*Type*: `integer`
+
+==== Description
+
+BaselineChronicleRev is the source cluster's chronicle revision counter, captured
+immediately before the run's capture began.
+Only captured on server versions that
+support it (8.5.0 and later), left unset on older versions, which rely on
+BaselineOrchestrator and BaselineBalanced alone.
+
+=== couchbasesnapshotbackupruns.status.baselineOrchestrator
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+BaselineOrchestrator is the source cluster's orchestrator node name, captured
+immediately before the run's capture began.
+Compared against the same value read
+again after capture, to detect whether the cluster's topology changed mid capture.
+
 === couchbasesnapshotbackupruns.status.endTime
 
 ==== Constraints
@@ -235,9 +282,22 @@ compute MeasuredSkew.
 
 ==== Description
 
-GroupSnapshot records whether this run was captured as a single
+GroupSnapshot records whether the run was captured as a single
 VolumeGroupSnapshot or as concurrent individual VolumeSnapshots, as evidence of
 the capture mechanism actually used.
+
+=== couchbasesnapshotbackupruns.status.groupSnapshotName
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+GroupSnapshotName is the VolumeGroupSnapshot object created for the run, set only
+when GroupSnapshot is true.
+Its members are created asynchronously by k8s, so the
+run's Snapshots list is filled in once that finishes, not here.
 
 === couchbasesnapshotbackupruns.status.measuredSkew
 
