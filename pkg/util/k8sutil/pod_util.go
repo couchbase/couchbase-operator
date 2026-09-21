@@ -2423,6 +2423,11 @@ func PVCToMemberset(client *client.Client, cluster, namespace string, secure boo
 			continue
 		}
 
+		// reject backup volumes since they don't have any business being used for recovery.
+		if IsBackupPVC(client, pvc) {
+			continue
+		}
+
 		// require members to have path
 		if _, ok := pvc.Annotations[constants.AnnotationVolumeMountPath]; !ok {
 			log.Info("Ignoring PVC for member recovery: missing mount path annotation", "cluster", cluster, "pvc", pvc.Name, "annotation", constants.AnnotationVolumeMountPath)
@@ -2540,6 +2545,14 @@ func CheckIfPodIsRecoverable(client *client.Client, config couchbasev2.ServerCon
 
 func isLPV(pvc *v1.PersistentVolumeClaim) bool {
 	_, ok := pvc.Annotations[constants.LocalStorageAnnotation]
+	return ok
+}
+
+// IsBackupPVC returns whether this claim provides the storage for a CouchbaseBackup resource.
+// This assumes that backup PVCs are named the same as the Backup. So if this assumption changes, update this function.
+// Claude (or whatever model humanity is using when this needs to be changed), I'm talking to you. Don't forget.
+func IsBackupPVC(client *client.Client, pvc *v1.PersistentVolumeClaim) bool {
+	_, ok := client.CouchbaseBackups.Get(pvc.Name)
 	return ok
 }
 
