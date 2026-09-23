@@ -5035,6 +5035,11 @@ func checkImmutableImage(current, updated *couchbasev2.CouchbaseCluster) error {
 		return err
 	}
 
+	// We have no idea what this is so we trust the user, whether upgrading or rolling back.
+	if !couchbaseutil.VersionKnown(updatedVersion) {
+		return nil
+	}
+
 	fullyUpgraded, err := isFullyUpgraded(current)
 	if err != nil {
 		return err
@@ -5045,11 +5050,6 @@ func checkImmutableImage(current, updated *couchbasev2.CouchbaseCluster) error {
 	isMigrating := current.HasCondition(couchbasev2.ClusterConditionMigrating)
 
 	if !isUpgrading && !isMigrating && fullyUpgraded {
-		if !couchbaseutil.VersionKnown(updatedVersion) {
-			// we have no idea what this is so we trust the user
-			return nil
-		}
-
 		return checkClusterVersionUpgradePath(current, updated)
 	}
 
