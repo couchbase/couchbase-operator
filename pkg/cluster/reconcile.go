@@ -264,8 +264,15 @@ func (c *Cluster) reconcile() error {
 	c.clearFailedSchedulingServerGroupsIfReady()
 
 	c.cluster.Status.Size = c.members.Size()
-	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScaling)
-	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScalingDown)
+
+	// Only clear ScalingDown (and the umbrella Scaling) if no server class is
+	// still oversized. This is needed as member removal may not occur in a single reconcile loop
+	// if rebalances are blocked (e.g. waiting on external DNS of a new member).
+	if !c.isScalingDown() {
+		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScalingDown)
+		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScaling)
+	}
+
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScalingUp)
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionRebalancing)
 

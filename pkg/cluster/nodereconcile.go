@@ -336,6 +336,18 @@ func (c *Cluster) newReconcileMachine() (*ReconcileMachine, error) {
 		pendingMembers: c.members.Intersect(podsToMemberSet(c.getPendingPods())),
 	}
 
+	// Members replaced by a swap rebalance that has yet to complete (e.g. blocked on external
+	// DNS checks) must still be ejected. The swap only records this in memory for the reconcile
+	// that performed it, so restore it from the replaced-by annotation. This also stops them
+	// counting towards the server class size when scaling.
+	for _, member := range c.replacedMembers().Intersect(fsm.clusteredMembers) {
+		if err := c.scheduler.Upgrade(member.Config(), member.Name()); err != nil {
+			return nil, err
+		}
+
+		fsm.removeMemberUser(member)
+	}
+
 	// Reset any timeout counters if nodes have recovered.
 	for name := range state.ActiveNodes {
 		delete(c.recoveryTime, name)
@@ -1053,6 +1065,23 @@ func parseSizePerMember(memberName string, allmetrices allMetrics) float64 {
 	return sizeByService(allmetrices.idx) + sizeByService(allmetrices.data) + sizeByService(allmetrices.view)
 }
 
+// isScalingDown reports, per live membership, whether any server class currently
+// has more members than its desired size. Pods still waiting to be ejected only
+// because they've already been replaced (e.g. blocked on pending DNS checks) are
+// excluded from the count, mirroring their exclusion from clusteredMembers in newReconcileMachine.
+func (c *Cluster) isScalingDown() bool {
+	for _, serverSpec := range c.cluster.Spec.Servers {
+		members := c.members.GroupByServerConfig(serverSpec.Name)
+		delta := members.Size() - serverSpec.Size
+
+		if delta > c.replacedMembers().Intersect(members).Size() {
+			return true
+		}
+	}
+
+	return false
+}
+
 // populateRemovalQueuePerServerClass enqueues pod(server) names which are version 7.0+.
 func populateRemovalQueuePerServerClass(serverClass string, clusteredMembers couchbaseutil.MemberSet, c *Cluster) error {
 	serverConf := c.cluster.Spec.GetServerConfigByName(serverClass)
@@ -1064,6 +1093,9 @@ func populateRemovalQueuePerServerClass(serverClass string, clusteredMembers cou
 
 	getCandidatesFuncs := []func() (couchbaseutil.MemberSet, error){
 		func() (couchbaseutil.MemberSet, error) {
+			return c.needsMove(), nil
+		},
+		func() (couchbaseutil.MemberSet, error) {
 			candidates, _, err := c.needsUpgrade()
 			return candidates, err
 		},
@@ -1074,6 +1106,8 @@ func populateRemovalQueuePerServerClass(serverClass string, clusteredMembers cou
 		c.getNodeServiceMismatchCandidates,
 	}
 
+	var queueMembers []string
+
 	for _, getCandidatesFunc := range getCandidatesFuncs {
 		// Get any candidates that need to be removed.
 		candidates, err := getCandidatesFunc()
@@ -1081,16 +1115,12 @@ func populateRemovalQueuePerServerClass(serverClass string, clusteredMembers cou
 			return err
 		}
 
-		// Only keep candidates that are in the server class.
-		candidates = candidates.Intersect(clusteredMembers)
+		// Only keep candidates that are in the server class and not already queued by a higher-priority func.
+		candidates = candidates.Intersect(clusteredMembers).Diff(prioritizedRemoveCandidates)
 
-		// Add the candidates to the list of candidates to be removed.
+		queueMembers = append(queueMembers, candidates.Names()...)
 		prioritizedRemoveCandidates.Merge(candidates)
 	}
-
-	// Add the candidates to the list of candidates to be removed.
-	var queueMembers []string
-	queueMembers = append(queueMembers, prioritizedRemoveCandidates.Names()...)
 
 	// Get remaining members that aren't in the above list.
 	remainingMembers := clusteredMembers.Diff(prioritizedRemoveCandidates)
@@ -1793,8 +1823,10 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 
 	r.log()
 
-	// Check which pods need moving
-	candidates := c.needsMove()
+	// Check which pods need moving, ignoring those which already have a replacement.
+	// This is an additional check, we shouldn't expect to get here as once replacement members
+	// are created the needsRebalance should equal true.
+	candidates := c.needsMove().Diff(c.replacedMembers())
 
 	if candidates.Empty() {
 		return nil
@@ -1815,6 +1847,7 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 	}
 
 	candidates = constrained
+	log.Info("Moving nodes", "cluster", c.namespacedName(), "candidates", candidates.Names())
 
 	// Is it possible to do InPlaceUpgrade if that's what they asked for?
 	canDoInPlaceReschedule := true
@@ -1827,8 +1860,6 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 	for _, candidate := range candidates {
 		// The target version is going to stay the same as the current version
 		targetVersion = candidate.Version()
-
-		log.Info("Moving node", "cluster", c.namespacedName(), "candidate", candidate.Name())
 
 		if c.isPodReschedulable(candidate) == false {
 			canDoInPlaceReschedule = false
@@ -2814,6 +2845,26 @@ func migrationCycleStrategy(upgradeProcess couchbasev2.UpgradeProcess, hasStorag
 	return true, hasStorageBackendOverrides
 }
 
+// markMemberReplaced annotates the member's pod with the name of the member created to replace it.
+func (c *Cluster) markMemberReplaced(member, replacement couchbaseutil.Member) error {
+	pod, found := c.k8s.Pods.Get(member.Name())
+	if !found {
+		return fmt.Errorf("failed to find pod by name %s %w", member.Name(), errors.ErrResourceRequired)
+	}
+
+	if pod.Annotations == nil {
+		pod.Annotations = map[string]string{}
+	}
+
+	pod.Annotations[constants.AnnotationReplacedBy] = replacement.Name()
+
+	if _, err := c.k8s.KubeClient.CoreV1().Pods(c.cluster.Namespace).Update(c.ctx, pod, metav1.UpdateOptions{}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // nolint:gocognit
 func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseutil.MemberSet) error {
 	candidatesSlice := make([]couchbaseutil.Member, 0, len(members))
@@ -2876,6 +2927,13 @@ func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseuti
 			r.addMember(result.Member)
 			r.removeMemberUser(candidatesSlice[index])
 			r.upgradedMembers.Add(result.Member)
+
+			// Record the replacement on the old pod so it is still ejected, and not counted
+			// towards the server class size, if the rebalance doesn't complete this reconcile.
+			if err := c.markMemberReplaced(candidatesSlice[index], result.Member); err != nil {
+				errs = append(errs, fmt.Errorf("swap rebalance failed to mark member as replaced: %w", err))
+				log.Error(err, "Failed to mark member as replaced", "cluster", c.namespacedName(), "pod", candidatesSlice[index].Name(), "replacement", result.Member.Name())
+			}
 
 			metrics.SwapRebalancesTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 			metrics.PodReplacementsMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()

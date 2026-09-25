@@ -225,6 +225,33 @@ func (c *Cluster) needsMove() couchbaseutil.MemberSet {
 	return candidates
 }
 
+// replacedMembers returns members whose swap rebalance replacement has been created
+// and is still a cluster member, but which have not yet been removed (e.g. because
+// the rebalance is blocked on external DNS checks). These account for the members
+// in excess of a server class size that are not due to a scale down.
+func (c *Cluster) replacedMembers() couchbaseutil.MemberSet {
+	candidates := couchbaseutil.MemberSet{}
+
+	for name, member := range c.members {
+		actual, exists := c.k8s.Pods.Get(name)
+		if !exists {
+			continue
+		}
+
+		replacement, ok := actual.Annotations[constants.AnnotationReplacedBy]
+		if !ok {
+			continue
+		}
+
+		// Ignore stale annotations where the replacement has since gone away.
+		if _, ok := c.members[replacement]; ok {
+			candidates.Add(member)
+		}
+	}
+
+	return candidates
+}
+
 // filterCandidatesByUpgradeOrder returns the upgrade candidates ordered by the upgrade order specified in the cluster spec.
 // This method does not apply any limits to the number of candidates that can be upgraded at once.
 // If ordering by server class or service, only candidates from the first non-empty class/service group are returned.

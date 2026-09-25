@@ -1829,6 +1829,25 @@ func MustWaitForPodWithCondition(t *testing.T, k8s *types.Cluster, podName strin
 	return pod
 }
 
+func MustWaitForPodWithAnnotation(t *testing.T, k8s *types.Cluster, podName, key, value string, timeout time.Duration) {
+	callback := func() error {
+		pod, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Get(context.Background(), podName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		if actual, ok := pod.Annotations[key]; !ok || actual != value {
+			return fmt.Errorf("pod %s annotation %s is %q, want %q", podName, key, actual, value)
+		}
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
+		Die(t, err)
+	}
+}
+
 func MustWaitForPodWithoutCondition(t *testing.T, k8s *types.Cluster, podName string, conditionType v1.PodConditionType, timeout time.Duration) *v1.Pod {
 	var pod *v1.Pod
 

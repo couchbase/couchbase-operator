@@ -1602,3 +1602,386 @@ func TestPodUpgradesWaitForDNSAvailableBeforeEjection(t *testing.T) {
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
+
+// TestRescheduleCandidatesAlternateAddressExternalDNSCheck tests that the reschedule annotation works
+// when delayed external dns checking is enabled.
+func TestRescheduleCandidatesAlternateAddressExternalDNSCheck(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	testDomain := "dnstest.com"
+
+	dns := e2eutil.MustProvisionCoreDNSForExternalDNSCheck(t, kubernetes, testDomain)
+	e2eutil.MustUpdateOperatorDeploymentDNSConfig(t, kubernetes, dns)
+
+	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
+	clusterSize := constants.Size2
+	cluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).WithDNS(dns).Generate(kubernetes)
+	cluster.Name = clusterName
+
+	cluster.Spec.Networking = couchbasev2.CouchbaseClusterNetworkingSpec{
+		DNS: &couchbasev2.DNS{
+			Domain: testDomain,
+		},
+		WaitForAddressReachableDelay: &metav1.Duration{Duration: 10 * time.Second},
+		WaitForAddressReachable:      &metav1.Duration{Duration: 2 * time.Minute},
+		ExposedFeatures:              []couchbasev2.ExposedFeature{couchbasev2.FeatureClient},
+	}
+
+	cluster = e2eutil.MustNewClusterFromSpecAsync(t, kubernetes, cluster)
+
+	// Once the pods have been created, we can add them to the dns forwarding list. This might take some time to propagate.
+	pods := e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize, 5*time.Minute)
+	e2eutil.MustAddPodsForDNSCheck(t, kubernetes, dns.GetName(), testDomain, pods)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+
+	// Check the pods are marked as ready after the dns check delay has elapsed.
+	for _, pod := range pods {
+		e2eutil.MustWaitForPodWithCondition(t, kubernetes, pod.Name, k8sutil.PodReadinessCondition, corev1.ConditionTrue, "", time.Minute)
+	}
+
+	// Add the reschedule annotation to a pod.
+	var annotations = make(map[string]string)
+	annotations["cao.couchbase.com/reschedule"] = "true"
+	rescheduledPod := pods[0].Name
+	e2eutil.MustAddCustomAnnotationAndLabelsSinglePod(t, kubernetes, annotations, nil, rescheduledPod)
+
+	// Wait for the new pod to be added.
+	pods = e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize+1, 2*time.Minute)
+
+	// Check the rescheduled pod has been marked as replaced by the new pod. This must happen before the new pod
+	// is added for the DNS check, as the rescheduled pod is removed once the rebalance completes.
+	replacementPod := couchbaseutil.CreateMemberName(clusterName, clusterSize)
+	e2eutil.MustWaitForPodWithAnnotation(t, kubernetes, rescheduledPod, "cao.couchbase.com/replaced-by", replacementPod, time.Minute)
+
+	// Add the new pod for the DNS check.
+	e2eutil.MustAddPodsForDNSCheck(t, kubernetes, dns.GetName(), testDomain, pods)
+
+	// Check that the cluster never gets the scaling down condition given 100% of the removal are reschedule members.
+	time.Sleep(30 * time.Second)
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 5*time.Minute, couchbasev2.ClusterConditionScalingDown)
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 5*time.Minute, couchbasev2.ClusterConditionScaling)
+
+	// Wait for the number of pods to equal the cluster size.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+	pods = e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize, time.Minute)
+
+	// Check that the pods are marked as ready and that none of them are the rescheduled member.
+	for _, pod := range pods {
+		if pod.Name == rescheduledPod {
+			e2eutil.Die(t, fmt.Errorf("expected rescheduled member to no longer exist: %s", rescheduledPod))
+		}
+		e2eutil.MustWaitForPodWithCondition(t, kubernetes, pod.Name, k8sutil.PodReadinessCondition, corev1.ConditionTrue, "", time.Minute)
+	}
+
+	// Check the events match what we expect.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted}},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted}},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestRescheduleCandidatesAndScaleDownAlternateAddressExternalDNSCheck tests that the reschedule annotation works
+// when delayed external dns checking is enabled, and that scaling down while the external DNS check delay
+// is occurring will set the Scaling Down condition and prioritize the reschedule candidate + replacement member.
+func TestRescheduleCandidatesAndScaleDownAlternateAddressExternalDNSCheck(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	testDomain := "dnstest.com"
+
+	dns := e2eutil.MustProvisionCoreDNSForExternalDNSCheck(t, kubernetes, testDomain)
+	e2eutil.MustUpdateOperatorDeploymentDNSConfig(t, kubernetes, dns)
+
+	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
+	clusterSize := constants.Size3
+	cluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).WithDNS(dns).Generate(kubernetes)
+	cluster.Name = clusterName
+
+	cluster.Spec.Networking = couchbasev2.CouchbaseClusterNetworkingSpec{
+		DNS: &couchbasev2.DNS{
+			Domain: testDomain,
+		},
+		WaitForAddressReachableDelay: &metav1.Duration{Duration: 30 * time.Second},
+		WaitForAddressReachable:      &metav1.Duration{Duration: 2 * time.Minute},
+		ExposedFeatures:              []couchbasev2.ExposedFeature{couchbasev2.FeatureClient},
+	}
+
+	cluster = e2eutil.MustNewClusterFromSpecAsync(t, kubernetes, cluster)
+
+	// Once the pods have been created, we can add them to the dns forwarding list. This might take some time to propagate.
+	pods := e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize, 5*time.Minute)
+	e2eutil.MustAddPodsForDNSCheck(t, kubernetes, dns.GetName(), testDomain, pods)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+
+	// Check the pods are marked as ready after the dns check delay has elapsed.
+	for _, pod := range pods {
+		e2eutil.MustWaitForPodWithCondition(t, kubernetes, pod.Name, k8sutil.PodReadinessCondition, corev1.ConditionTrue, "", 5*time.Minute)
+	}
+
+	// Add the reschedule annotation to a pod.
+	var annotations = make(map[string]string)
+	annotations["cao.couchbase.com/reschedule"] = "true"
+	rescheduledPod := pods[0].Name
+	e2eutil.MustAddCustomAnnotationAndLabelsSinglePod(t, kubernetes, annotations, nil, rescheduledPod)
+
+	// Wait for the new pod to be added, then add it for the DNS check.
+	pods = e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize+1, 2*time.Minute)
+
+	// Check the rescheduled pod has been marked as replaced by the new pod. This must happen before the new pod
+	// is added for the DNS check, as the rescheduled pod is removed once the rebalance completes.
+	replacementPod := couchbaseutil.CreateMemberName(clusterName, clusterSize)
+	e2eutil.MustWaitForPodWithAnnotation(t, kubernetes, rescheduledPod, "cao.couchbase.com/replaced-by", replacementPod, time.Minute)
+
+	e2eutil.MustAddPodsForDNSCheck(t, kubernetes, dns.GetName(), testDomain, pods)
+
+	// Check that the cluster never gets the scaling down condition given 100% of the removal are reschedule members.
+	time.Sleep(10 * time.Second)
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 5*time.Minute, couchbasev2.ClusterConditionScalingDown)
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 5*time.Minute, couchbasev2.ClusterConditionScaling)
+
+	// Scale down the cluster and check we see the scaling condition.
+	cluster = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize-1, kubernetes, cluster)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionScalingDown, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionScaling, v1.ConditionTrue, cluster, 5*time.Minute)
+
+	// Wait for the number of pods to equal the new cluster size.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+	pods = e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize-1, time.Minute)
+
+	// Check that the pods are marked as ready and that the rescheduled member does not exist.
+	for _, pod := range pods {
+		if pod.Name == rescheduledPod {
+			e2eutil.Die(t, fmt.Errorf("expected rescheduled member to no longer exist: %s", rescheduledPod))
+		}
+		e2eutil.MustWaitForPodWithCondition(t, kubernetes, pod.Name, k8sutil.PodReadinessCondition, corev1.ConditionTrue, "", time.Minute)
+	}
+
+	// Check the events match what we expect.
+	// We should see both the reschedule member and another member removed in the same rebalance.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted}},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted}},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestRescheduleMultipleCandidatesAndScaleDownAlternateAddressExternalDNSCheck runs the same as the above
+// but with multiple reschedule candidates.
+func TestRescheduleMultipleCandidatesAndScaleDownAlternateAddressExternalDNSCheck(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	testDomain := "dnstest.com"
+
+	dns := e2eutil.MustProvisionCoreDNSForExternalDNSCheck(t, kubernetes, testDomain)
+	e2eutil.MustUpdateOperatorDeploymentDNSConfig(t, kubernetes, dns)
+
+	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
+	clusterSize := constants.Size3
+	cluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).WithDNS(dns).Generate(kubernetes)
+	cluster.Name = clusterName
+
+	cluster.Spec.Networking = couchbasev2.CouchbaseClusterNetworkingSpec{
+		DNS: &couchbasev2.DNS{
+			Domain: testDomain,
+		},
+		WaitForAddressReachableDelay: &metav1.Duration{Duration: 30 * time.Second},
+		WaitForAddressReachable:      &metav1.Duration{Duration: 2 * time.Minute},
+		ExposedFeatures:              []couchbasev2.ExposedFeature{couchbasev2.FeatureClient},
+	}
+
+	// We want to test both reschedule candidates being replaced in the same reconcile loop.
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeProcess: couchbasev2.SwapRebalance,
+		RollingUpgrade: &couchbasev2.RollingUpgradeConstraints{
+			MaxUpgradable: 2,
+		},
+	}
+
+	cluster = e2eutil.MustNewClusterFromSpecAsync(t, kubernetes, cluster)
+
+	// Once the pods have been created, we can add them to the dns forwarding list. This might take some time to propagate.
+	pods := e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize, 5*time.Minute)
+	e2eutil.MustAddPodsForDNSCheck(t, kubernetes, dns.GetName(), testDomain, pods)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+
+	// Check the pods are marked as ready after the dns check delay has elapsed.
+	e2eutil.MustWaitForPodWithCondition(t, kubernetes, pods[clusterSize-1].Name, k8sutil.PodReadinessCondition, corev1.ConditionTrue, "", time.Minute)
+	for i := range clusterSize {
+		e2eutil.MustWaitForPodWithCondition(t, kubernetes, pods[i].Name, k8sutil.PodReadinessCondition, corev1.ConditionTrue, "", 5*time.Minute)
+	}
+
+	// Add the reschedule annotation to two of the cluster members. We're using pods[1] and pods[2] here to avoid rescheduling the orchestrator, which can't
+	// be rescheduled in the same reconcile as another pod.
+	var annotations = make(map[string]string)
+	annotations["cao.couchbase.com/reschedule"] = "true"
+	rescheduledPods := []string{pods[1].Name, pods[2].Name}
+	for _, podName := range rescheduledPods {
+		e2eutil.MustAddCustomAnnotationAndLabelsSinglePod(t, kubernetes, annotations, nil, podName)
+	}
+
+	// Wait for a new pod to be added.
+	pods = e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize+2, 2*time.Minute)
+	e2eutil.MustAddPodsForDNSCheck(t, kubernetes, dns.GetName(), testDomain, pods)
+
+	// Check that the cluster never gets the scaling down condition given 100% of the removal are reschedule members.
+	time.Sleep(10 * time.Second)
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 5*time.Minute, couchbasev2.ClusterConditionScalingDown)
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 5*time.Minute, couchbasev2.ClusterConditionScaling)
+
+	// Scale down the cluster and check we see the scaling condition.
+	cluster = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize-1, kubernetes, cluster)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionScalingDown, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionScaling, v1.ConditionTrue, cluster, 5*time.Minute)
+
+	// Wait for the number of pods to equal the new cluster size.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+	pods = e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize-1, time.Minute)
+
+	// Check all of the pods are marked as ready and none have are the ones we rescheduled earlier.
+	for _, pod := range pods {
+		for _, rescheduledPodName := range rescheduledPods {
+			if pod.Name == rescheduledPodName {
+				e2eutil.Die(t, fmt.Errorf("expected rescheduled member to no longer exist: %s", rescheduledPodName))
+			}
+		}
+		e2eutil.MustWaitForPodWithCondition(t, kubernetes, pod.Name, k8sutil.PodReadinessCondition, corev1.ConditionTrue, "", time.Minute)
+	}
+
+	// Check the events match what we expect.
+	// Cluster created.
+	// Both rescheduled pods have new members created + added to the cluster.
+	// Three pods removed during the rebalance; rescheduled members + one other member.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted}},
+		eventschema.Repeat{Times: 3, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved}},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted}},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestRescheduleCandidatesAndScaleUpAlternateAddressExternalDNSCheck runs the same as the above
+// but with a scale up while a candidate is marked as requiring reschedule. We should still see the rescheduled
+// member ejected.
+func TestRescheduleCandidatesAndScaleUpAlternateAddressExternalDNSCheck(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	testDomain := "dnstest.com"
+
+	dns := e2eutil.MustProvisionCoreDNSForExternalDNSCheck(t, kubernetes, testDomain)
+	e2eutil.MustUpdateOperatorDeploymentDNSConfig(t, kubernetes, dns)
+
+	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
+	clusterSize := constants.Size3
+	cluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).WithDNS(dns).Generate(kubernetes)
+	cluster.Name = clusterName
+
+	networking := couchbasev2.CouchbaseClusterNetworkingSpec{
+		DNS: &couchbasev2.DNS{
+			Domain: testDomain,
+		},
+		WaitForAddressReachableDelay: &metav1.Duration{Duration: 30 * time.Second},
+		WaitForAddressReachable:      &metav1.Duration{Duration: 2 * time.Minute},
+		ExposedFeatures:              []couchbasev2.ExposedFeature{couchbasev2.FeatureClient},
+	}
+
+	cluster.Spec.Networking = networking
+	cluster = e2eutil.MustNewClusterFromSpecAsync(t, kubernetes, cluster)
+
+	// Once the pods have been created, we can add them to the dns forwarding list. This might take some time to propagate.
+	pods := e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize, 5*time.Minute)
+	e2eutil.MustAddPodsForDNSCheck(t, kubernetes, dns.GetName(), testDomain, pods)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+
+	// Check the pods are marked as ready after the dns check delay has elapsed.
+	for i := range clusterSize {
+		e2eutil.MustWaitForPodWithCondition(t, kubernetes, pods[i].Name, k8sutil.PodReadinessCondition, corev1.ConditionTrue, "", 5*time.Minute)
+	}
+
+	// Add the reschedule annotation to a pod.
+	var annotations = make(map[string]string)
+	annotations["cao.couchbase.com/reschedule"] = "true"
+	rescheduledPod := pods[0].Name
+	e2eutil.MustAddCustomAnnotationAndLabelsSinglePod(t, kubernetes, annotations, nil, rescheduledPod)
+
+	// Wait for the new pod to be added, then add it for the DNS check.
+	pods = e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize+1, 2*time.Minute)
+
+	// Check the rescheduled pod has been marked as replaced by the new pod. This must happen before the new pod
+	// is added for the DNS check, as the rescheduled pod is removed once the rebalance completes.
+	replacementPod := couchbaseutil.CreateMemberName(clusterName, clusterSize)
+	e2eutil.MustWaitForPodWithAnnotation(t, kubernetes, rescheduledPod, "cao.couchbase.com/replaced-by", replacementPod, time.Minute)
+
+	e2eutil.MustAddPodsForDNSCheck(t, kubernetes, dns.GetName(), testDomain, pods)
+
+	// Check that the cluster never gets the scaling down condition given 100% of the removal are reschedule members.
+	time.Sleep(10 * time.Second)
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 5*time.Minute, couchbasev2.ClusterConditionScalingDown)
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 5*time.Minute, couchbasev2.ClusterConditionScaling)
+
+	// Scale up the cluster and check we see the scaling condition.
+	cluster = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize+1, kubernetes, cluster)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionScalingUp, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionScaling, v1.ConditionTrue, cluster, 5*time.Minute)
+
+	// Wait for the new pod to be added, then add it for the DNS check. We expect clusterSize+2 here as the replaced-by pod will also exist.
+	pods = e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize+2, 2*time.Minute)
+	e2eutil.MustAddPodsForDNSCheck(t, kubernetes, dns.GetName(), testDomain, pods)
+
+	// Wait for the number of pods to equal the new cluster size.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+	pods = e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize+1, time.Minute)
+
+	// Check that the pods are marked as ready and that none of them are the rescheduled members.
+	for _, pod := range pods {
+		if pod.Name == rescheduledPod {
+			e2eutil.Die(t, fmt.Errorf("expected rescheduled member to no longer exist: %s", rescheduledPod))
+		}
+		e2eutil.MustWaitForPodWithCondition(t, kubernetes, pod.Name, k8sutil.PodReadinessCondition, corev1.ConditionTrue, "", time.Minute)
+	}
+
+	// Check the events match what we expect.
+	// Cluster created.
+	// Replacement pod and scale up member added.
+	// Rescheduled pod removed during the rebalance.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted}},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted}},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}

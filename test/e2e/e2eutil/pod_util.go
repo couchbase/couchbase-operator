@@ -36,12 +36,12 @@ func MustAddCustomAnnotationAndLabels(t *testing.T, k8s *types.Cluster, couchbas
 		LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
 	}
 
-	pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), listOptions)
-	if err != nil {
-		Die(t, err)
-	}
-
 	callback := func() error {
+		pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), listOptions)
+		if err != nil {
+			Die(t, err)
+		}
+
 		return addCustomAnnotationAndLabels(k8s, annotations, labels, *pods)
 	}
 
@@ -50,16 +50,23 @@ func MustAddCustomAnnotationAndLabels(t *testing.T, k8s *types.Cluster, couchbas
 	}
 }
 
-func MustAddCustomAnnotationAndLabelsSinglePod(t *testing.T, k8s *types.Cluster, annotations, labels map[string]string, pod v1.Pod) {
+func MustAddCustomAnnotationAndLabelsSinglePod(t *testing.T, k8s *types.Cluster, annotations, labels map[string]string, podName string) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	var pods = []v1.Pod{pod}
-
-	var podList = v1.PodList{Items: pods}
-
 	callback := func() error {
-		return addCustomAnnotationAndLabels(k8s, annotations, labels, podList)
+		pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), metav1.ListOptions{})
+		if err != nil {
+			Die(t, err)
+		}
+
+		for _, pod := range pods.Items {
+			if pod.Name == podName {
+				return addCustomAnnotationAndLabels(k8s, annotations, labels, v1.PodList{Items: []v1.Pod{pod}})
+			}
+		}
+
+		return fmt.Errorf("no pod found with name %s", podName)
 	}
 
 	if err := retryutil.Retry(ctx, 10*time.Second, callback); err != nil {
