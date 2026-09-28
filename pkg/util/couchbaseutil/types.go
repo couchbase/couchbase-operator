@@ -151,7 +151,6 @@ type ClusterInfo struct {
 	Counters               map[string]int              `json:"counters"`
 	ServicesNeedRebalance  []ServicesNeedRebalanceCode `json:"servicesNeedRebalance,omitempty"`
 	BucketsNeedRebalance   []BucketNeedsRebalanceCode  `json:"bucketsNeedRebalance,omitempty"`
-	ChronicleRev           int64                       `json:"chronicleRev"`
 }
 
 type RebalanceReasonCode struct {
@@ -2502,6 +2501,21 @@ type StatsRangeMetrics struct {
 	Errors         []interface{}           `json:"errors"`
 	StartTimestamp int                     `json:"startTimestamp"`
 	EndTimestamp   int                     `json:"endTimestamp"`
+}
+
+// SystemEvent is one entry in the server's system event log.
+type SystemEvent struct {
+	Timestamp   time.Time `json:"timestamp"`
+	EventID     int       `json:"event_id"`
+	Component   string    `json:"component"`
+	Description string    `json:"description"`
+	Severity    string    `json:"severity"`
+	Node        string    `json:"node"`
+}
+
+// SystemEvents is the server's system event log.
+type SystemEvents struct {
+	Events []SystemEvent `json:"events"`
 }
 
 type TerseClusterInfo struct {

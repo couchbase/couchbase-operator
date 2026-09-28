@@ -100,6 +100,9 @@ const (
 	EventReasonBackupMergeCompleted   = "BackupMergeCompleted"
 	EventReasonBackupMergeFailed      = "BackupMergeFailed"
 
+	EventReasonSnapshotBackupRunCompleted = "SnapshotBackupRunCompleted"
+	EventReasonSnapshotBackupRunInvalid   = "SnapshotBackupRunInvalid"
+
 	// Security lifecycle.
 	EventReasonSecuritySettingsUpdated = "SecuritySettingsUpdated"
 	EventReasonAdminPasswordChanged    = "AdminPasswordChanged"
@@ -326,6 +329,24 @@ func BackupDeleteEvent(backup string, cl *couchbasev2.CouchbaseCluster) *v1.Even
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonBackupDeleted
 	event.Message = fmt.Sprintf("Backup `%s` was deleted", backup)
+
+	return event
+}
+
+func SnapshotBackupRunCompletedEvent(run string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonSnapshotBackupRunCompleted
+	event.Message = fmt.Sprintf("Snapshot backup run `%s` completed", run)
+
+	return event
+}
+
+func SnapshotBackupRunInvalidEvent(run, reason, message string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeWarning
+	event.Reason = EventReasonSnapshotBackupRunInvalid
+	event.Message = fmt.Sprintf("Snapshot backup run `%s` is invalid (%s): %s", run, reason, message)
 
 	return event
 }

@@ -38,6 +38,7 @@ type operatorCacheAdapter struct {
 	backupRestores        *client.CouchbaseBackupRestoreCache
 	migrationReplications *client.CouchbaseMigrationReplicationCache
 	encryptionKeys        *client.CouchbaseEncryptionKeyCache
+	vtypes.GroupVersionCache
 }
 
 func newOperatorCacheAdapter(k8s *client.Client) *operatorCacheAdapter {

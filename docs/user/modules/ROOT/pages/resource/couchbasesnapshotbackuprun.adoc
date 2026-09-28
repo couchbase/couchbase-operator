@@ -26,20 +26,23 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbasesnapshotbackupruns-spec-clusteruuid,clusterUUID>>: ""
   <<couchbasesnapshotbackupruns-spec-collections,collections>>:
   - ""
+  <<couchbasesnapshotbackupruns-spec-maxskew,maxSkew>>: ""
   <<couchbasesnapshotbackupruns-spec-nodecount,nodeCount>>: 0
+  <<couchbasesnapshotbackupruns-spec-readytimeout,readyTimeout>>: ""
   <<couchbasesnapshotbackupruns-spec-scopes,scopes>>:
   - ""
   <<couchbasesnapshotbackupruns-spec-serverversion,serverVersion>>: ""
   <<couchbasesnapshotbackupruns-spec-sourcebackup,sourceBackup>>: ""
 <<couchbasesnapshotbackupruns-status,status>>:
   <<couchbasesnapshotbackupruns-status-baselinebalanced,baselineBalanced>>: false
-  <<couchbasesnapshotbackupruns-status-baselinechroniclerev,baselineChronicleRev>>: 0
   <<couchbasesnapshotbackupruns-status-baselineorchestrator,baselineOrchestrator>>: ""
   <<couchbasesnapshotbackupruns-status-endtime,endTime>>: ""
   <<couchbasesnapshotbackupruns-status-groupsnapshot,groupSnapshot>>: false
   <<couchbasesnapshotbackupruns-status-groupsnapshotname,groupSnapshotName>>: ""
   <<couchbasesnapshotbackupruns-status-measuredskew,measuredSkew>>: ""
+  <<couchbasesnapshotbackupruns-status-message,message>>: ""
   <<couchbasesnapshotbackupruns-status-phase,phase>>: InProgress
+  <<couchbasesnapshotbackupruns-status-reason,reason>>: ""
   <<couchbasesnapshotbackupruns-status-snapshots,snapshots>>:
   - <<couchbasesnapshotbackupruns-status-snapshots-member,member>>: ""
     <<couchbasesnapshotbackupruns-status-snapshots-snapshotname,snapshotName>>: ""
@@ -156,6 +159,18 @@ cluster.
 
 Collections is the set of collection names captured in this run.
 
+=== couchbasesnapshotbackupruns.spec.maxSkew
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+MaxSkew is the backup's maxSkew when the run was taken.
+The run is checked against
+it, so later changes to the backup, or deleting it, don't change the result.
+
 === couchbasesnapshotbackupruns.spec.nodeCount
 
 ==== Constraints
@@ -167,6 +182,17 @@ Collections is the set of collection names captured in this run.
 ==== Description
 
 NodeCount is the number of members captured in this run.
+
+=== couchbasesnapshotbackupruns.spec.readyTimeout
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+ReadyTimeout is the backup's readyTimeout when the run was taken, used the same way
+as MaxSkew.
 
 === couchbasesnapshotbackupruns.spec.scopes
 
@@ -232,20 +258,6 @@ BaselineBalanced records whether the source cluster was balanced immediately bef
 the run's capture began.
 Compared the same way as BaselineOrchestrator.
 
-=== couchbasesnapshotbackupruns.status.baselineChronicleRev
-
-==== Constraints
-
-*Type*: `integer`
-
-==== Description
-
-BaselineChronicleRev is the source cluster's chronicle revision counter, captured
-immediately before the run's capture began.
-Only captured on server versions that
-support it (8.5.0 and later), left unset on older versions, which rely on
-BaselineOrchestrator and BaselineBalanced alone.
-
 === couchbasesnapshotbackupruns.status.baselineOrchestrator
 
 ==== Constraints
@@ -310,6 +322,18 @@ run's Snapshots list is filled in once that finishes, not here.
 MeasuredSkew is the actual gap observed between the first and last snapshot
 taken in this run, checked against CouchbaseBackup.spec.snapshotBackup.maxSkew.
 
+=== couchbasesnapshotbackupruns.status.message
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Message explains in plain words why the run is Invalid.
+It's only set when the phase
+is Invalid.
+
 === couchbasesnapshotbackupruns.status.phase
 
 ==== Constraints
@@ -323,6 +347,18 @@ taken in this run, checked against CouchbaseBackup.spec.snapshotBackup.maxSkew.
 ==== Description
 
 Phase is the run's current state.
+
+=== couchbasesnapshotbackupruns.status.reason
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Reason is a short code for why the run is Invalid, for example SkewExceeded.
+It's
+only set when the phase is Invalid.
 
 === couchbasesnapshotbackupruns.status.snapshots
 

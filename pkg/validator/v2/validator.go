@@ -3454,12 +3454,14 @@ func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBac
 		return err
 	}
 
-	if err := validateBackupCronSchedules(backup); err != nil {
-		errs = err
+	// A snapshot backup doesn't use any of the archive settings checked below, like the full
+	// and incremental schedules or the object store, so it only gets its own checks.
+	if backup.Spec.SnapshotBackup != nil {
+		return checkConstraintsSnapshotBackup(v, backup)
 	}
 
-	if err := validateSnapshotBackupSchedule(backup.Spec.SnapshotBackup); err != nil {
-		errs = append(errs, err)
+	if err := validateBackupCronSchedules(backup); err != nil {
+		errs = err
 	}
 	// Ensure generated CronJob names will be within Kubernetes limits.
 	if err := checkConstraintBackupNameLength(backup); err != nil {
@@ -5074,17 +5076,88 @@ func validateCronJobString(schedule *couchbasev2.CouchbaseBackupSchedule, name s
 	return nil
 }
 
-// validateSnapshotBackupSchedule checks that a snapshot backup's cron schedule string
+// maxSnapshotBackupNameLength is the longest a snapshot backup's name can be. Each run is named
+// after its backup plus "-" and 5 random characters, and that run name is used as a label on
+// the run's snapshots, which k8s limits to 63 characters.
+const maxSnapshotBackupNameLength = 57
+
+// checkConstraintsSnapshotBackup checks a backup that uses spec.snapshotBackup.
+func checkConstraintsSnapshotBackup(v *types.Validator, backup *couchbasev2.CouchbaseBackup) error {
+	var errs []error
+
+	snapshotBackup := backup.Spec.SnapshotBackup
+
+	if err := checkSnapshotAPIsInstalled(v, snapshotBackup); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := validateSnapshotBackupSchedule(snapshotBackup); err != nil {
+		errs = append(errs, err)
+	}
+
+	// An empty class name passes the schema but makes every snapshot create fail.
+	if snapshotBackup.VolumeSnapshotClassName == "" {
+		errs = append(errs, fmt.Errorf("spec.snapshotBackup.volumeSnapshotClassName cannot be empty"))
+	}
+
+	if snapshotBackup.VolumeGroupSnapshotClassName != nil && *snapshotBackup.VolumeGroupSnapshotClassName == "" {
+		errs = append(errs, fmt.Errorf("spec.snapshotBackup.volumeGroupSnapshotClassName cannot be empty when set"))
+	}
+
+	if snapshotBackup.MaxSkew.Duration < 0 {
+		errs = append(errs, fmt.Errorf("spec.snapshotBackup.maxSkew %s cannot be negative", snapshotBackup.MaxSkew.Duration))
+	}
+
+	// A zero timeout would mark every run Invalid the moment it starts.
+	if snapshotBackup.ReadyTimeout.Duration <= 0 {
+		errs = append(errs, fmt.Errorf("spec.snapshotBackup.readyTimeout %s must be greater than 0", snapshotBackup.ReadyTimeout.Duration))
+	}
+
+	if snapshotBackup.RetryInterval.Duration < 0 {
+		errs = append(errs, fmt.Errorf("spec.snapshotBackup.retryInterval %s cannot be negative", snapshotBackup.RetryInterval.Duration))
+	}
+
+	if len(backup.Name) > maxSnapshotBackupNameLength {
+		errs = append(errs, fmt.Errorf("backup name %q cannot be longer than %d characters when using spec.snapshotBackup", backup.Name, maxSnapshotBackupNameLength))
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+// checkSnapshotAPIsInstalled rejects a snapshot backup if the cluster doesn't have the
+// snapshot add on installed. Without it, every snapshot would fail later with an unclear error.
+func checkSnapshotAPIsInstalled(v *types.Validator, snapshotBackup *couchbasev2.CouchbaseSnapshotBackupSpec) error {
+	groupVersions := []string{"snapshot.storage.k8s.io/v1"}
+
+	if snapshotBackup.VolumeGroupSnapshotClassName != nil {
+		groupVersions = append(groupVersions, "groupsnapshot.storage.k8s.io/v1beta1")
+	}
+
+	for _, groupVersion := range groupVersions {
+		served, err := v.Abstraction.IsGroupVersionServed(groupVersion)
+		if err != nil {
+			return err
+		}
+
+		if !served {
+			return fmt.Errorf("spec.snapshotBackup needs %s, which isn't installed on this Kubernetes cluster, install the CSI external snapshotter first", groupVersion)
+		}
+	}
+
+	return nil
+}
+
+// validateSnapshotBackupSchedule checks that a snapshot backup's cron schedule, if set,
 // actually parses, using the same parser as the archive based schedules. Catching a
 // bad schedule here, at admission, keeps it from reaching the reconciler instead.
 func validateSnapshotBackupSchedule(snapshotBackup *couchbasev2.CouchbaseSnapshotBackupSpec) error {
-	// Only backups actually using snapshotBackup need this check.
-	if snapshotBackup == nil {
-		return nil
-	}
-
+	// No schedule means one backup is taken straight away, so there's nothing to check.
 	if len(snapshotBackup.Schedule) == 0 {
-		return fmt.Errorf("spec.snapshotBackup.schedule : cronjob schedule cannot be empty")
+		return nil
 	}
 
 	p := cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)

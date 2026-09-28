@@ -34,6 +34,9 @@ type KubeAbstraction interface { //nolint: interfacebloat
 	GetStorageClass(string) (*storagev1.StorageClass, bool, error)
 	// GetStorageClasses returns all storage classes in the cluster.
 	GetStorageClasses() (*storagev1.StorageClassList, error)
+	// IsGroupVersionServed checks whether the API server serves the given group/version,
+	// for example snapshot.storage.k8s.io/v1.
+	IsGroupVersionServed(string) (bool, error)
 	// GetCouchbaseClusters returns all clusters in the specified namespace.
 	GetCouchbaseClusters(string) (*couchbasev2.CouchbaseClusterList, error)
 	// GetCouchbaseBuckets returns all couchbase buckets for a specified selector.
@@ -113,6 +116,25 @@ func (ab *kubeAbstractionImpl) GetStorageClass(name string) (*storagev1.StorageC
 	}
 
 	return storageClass, true, nil
+}
+
+// IsGroupVersionServed checks whether the API server serves the given group/version.
+func (ab *kubeAbstractionImpl) IsGroupVersionServed(groupVersion string) (bool, error) {
+	if err := ab.cache.InitGroupVersionCache(groupVersion, func() (bool, error) {
+		if _, err := ab.client.Discovery().ServerResourcesForGroupVersion(groupVersion); err != nil {
+			if apierrors.IsNotFound(err) {
+				return false, nil
+			}
+
+			return false, err
+		}
+
+		return true, nil
+	}); err != nil {
+		return false, err
+	}
+
+	return ab.cache.GetGroupVersionServed(groupVersion)
 }
 
 // GetStorageClasses returns all storage classes in the cluster.

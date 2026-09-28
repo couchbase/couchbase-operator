@@ -13,6 +13,7 @@ package e2eutil
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -409,6 +410,83 @@ func (b *Backup) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbasev
 	}
 
 	return newBackup
+}
+
+// MustCreateSnapshotBackup creates a snapshot backup with the given settings.
+func MustCreateSnapshotBackup(t *testing.T, kubernetes *types.Cluster, snapshotBackup *couchbasev2.CouchbaseSnapshotBackupSpec, retention time.Duration) *couchbasev2.CouchbaseBackup {
+	backup := &couchbasev2.CouchbaseBackup{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "snapshot-",
+		},
+		Spec: couchbasev2.CouchbaseBackupSpec{
+			SnapshotBackup: snapshotBackup,
+		},
+	}
+
+	if retention != 0 {
+		backup.Spec.BackupRetention = &metav1.Duration{Duration: retention}
+	}
+
+	newBackup, err := kubernetes.CRClient.CouchbaseV2().CouchbaseBackups(kubernetes.Namespace).Create(context.Background(), backup, metav1.CreateOptions{})
+	if err != nil {
+		Die(t, err)
+	}
+
+	return newBackup
+}
+
+// ListSnapshotBackupRuns returns the backup's runs, oldest first.
+func ListSnapshotBackupRuns(kubernetes *types.Cluster, backup *couchbasev2.CouchbaseBackup) ([]couchbasev2.CouchbaseSnapshotBackupRun, error) {
+	list, err := kubernetes.CRClient.CouchbaseV2().CouchbaseSnapshotBackupRuns(kubernetes.Namespace).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	var runs []couchbasev2.CouchbaseSnapshotBackupRun
+
+	for _, run := range list.Items {
+		if run.Spec.SourceBackup == backup.Name {
+			runs = append(runs, run)
+		}
+	}
+
+	sort.Slice(runs, func(i, j int) bool {
+		return runs[i].CreationTimestamp.Before(&runs[j].CreationTimestamp)
+	})
+
+	return runs, nil
+}
+
+// MustWaitForSnapshotBackupRuns waits until the backup has at least count runs in the given
+// phase, and returns them.
+func MustWaitForSnapshotBackupRuns(t *testing.T, kubernetes *types.Cluster, backup *couchbasev2.CouchbaseBackup, phase couchbasev2.CouchbaseSnapshotBackupRunPhase, count int, timeout time.Duration) []couchbasev2.CouchbaseSnapshotBackupRun {
+	var matched []couchbasev2.CouchbaseSnapshotBackupRun
+
+	err := retryutil.RetryFor(timeout, func() error {
+		runs, err := ListSnapshotBackupRuns(kubernetes, backup)
+		if err != nil {
+			return err
+		}
+
+		matched = nil
+
+		for _, run := range runs {
+			if run.Status.Phase == phase {
+				matched = append(matched, run)
+			}
+		}
+
+		if len(matched) < count {
+			return fmt.Errorf("backup %s has %d %s runs, waiting for %d", backup.Name, len(matched), phase, count)
+		}
+
+		return nil
+	})
+	if err != nil {
+		Die(t, err)
+	}
+
+	return matched
 }
 
 // Restore is an abstract type used to build restores.

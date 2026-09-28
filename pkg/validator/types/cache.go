@@ -11,6 +11,8 @@ licenses/APL2.txt.
 package types
 
 import (
+	"sync"
+
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -37,6 +39,7 @@ type ResourceCacheProvider interface {
 	InitBackupRestoreCache(namespace string, load func() (*couchbasev2.CouchbaseBackupRestoreList, error)) error
 	InitMigrationReplicationCache(namespace string, load func() (*couchbasev2.CouchbaseMigrationReplicationList, error)) error
 	InitEncryptionKeyCache(namespace string, load func() (*couchbasev2.CouchbaseEncryptionKeyList, error)) error
+	InitGroupVersionCache(groupVersion string, load func() (bool, error)) error
 	GetCollection(namespace, name string) (*couchbasev2.CouchbaseCollection, bool, error)
 	GetCollections(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseCollectionList, error)
 	GetCollectionGroup(namespace, name string) (*couchbasev2.CouchbaseCollectionGroup, bool, error)
@@ -67,6 +70,35 @@ type ResourceCacheProvider interface {
 	GetMigrationReplications(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseMigrationReplicationList, error)
 	GetEncryptionKey(namespace, name string) (*couchbasev2.CouchbaseEncryptionKey, bool, error)
 	GetEncryptionKeys(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseEncryptionKeyList, error)
+	GetGroupVersionServed(groupVersion string) (bool, error)
+}
+
+// GroupVersionCache remembers which API groups the API server serves. Both the operator and the
+// DAC use it, since there's no informer for API groups. It only remembers a group once it's
+// served, one that isn't is looked up again next time, so if the snapshot add on is installed
+// later we pick it up.
+type GroupVersionCache struct {
+	served sync.Map
+}
+
+func (c *GroupVersionCache) InitGroupVersionCache(groupVersion string, load func() (bool, error)) error {
+	if _, ok := c.served.Load(groupVersion); ok {
+		return nil
+	}
+
+	served, err := load()
+	if err != nil || !served {
+		return err
+	}
+
+	c.served.Store(groupVersion, true)
+
+	return nil
+}
+
+func (c *GroupVersionCache) GetGroupVersionServed(groupVersion string) (bool, error) {
+	_, ok := c.served.Load(groupVersion)
+	return ok, nil
 }
 
 // SimpleIndexCache is a typed, single namespace cache backed by a client-go Indexer.
@@ -243,6 +275,7 @@ type AdmissionControlCache struct {
 	backupRestores        *SimpleIndexCache[*couchbasev2.CouchbaseBackupRestore]
 	migrationReplications *SimpleIndexCache[*couchbasev2.CouchbaseMigrationReplication]
 	encryptionKeys        *SimpleIndexCache[*couchbasev2.CouchbaseEncryptionKey]
+	GroupVersionCache
 }
 
 func NewAdmissionControlCache() *AdmissionControlCache {

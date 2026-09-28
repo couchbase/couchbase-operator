@@ -17,9 +17,14 @@ import (
 	"testing"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/unreconcilable"
 	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubefake "k8s.io/client-go/kubernetes/fake"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 func TestBackupResourceListUnique(t *testing.T) {
@@ -211,5 +216,68 @@ func validateBackupJob(t *testing.T, cluster *couchbasev2.CouchbaseCluster, jobS
 
 	if len(errs) != 0 {
 		t.Error(errors.Join(errs...))
+	}
+}
+
+// TestCleanupUnusedBackupResourcesAfterSwitchToSnapshot checks that when an archive backup
+// switches to snapshotBackup, its archive CronJob is removed but its PVC is kept, so the
+// archive data from before the switch can still be restored. A backup that's still archive
+// based keeps its CronJob.
+func TestCleanupUnusedBackupResourcesAfterSwitchToSnapshot(t *testing.T) {
+	cronJob := func(name string) *v1.CronJob {
+		return &v1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: fakeClusterNamespace}}
+	}
+
+	switchedCronJob := cronJob("switched-backup-full")
+	archiveCronJob := cronJob("archive-backup-full")
+	switchedPVC := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "switched-backup", Namespace: fakeClusterNamespace}}
+
+	kubeClient := kubefake.NewSimpleClientset(switchedCronJob, archiveCronJob, switchedPVC)
+
+	c := &Cluster{
+		k8s:            &client.Client{KubeClient: kubeClient},
+		cluster:        &couchbasev2.CouchbaseCluster{ObjectMeta: metav1.ObjectMeta{Name: fakeClusterName, Namespace: fakeClusterNamespace}},
+		log:            logf.Log.WithName("test"),
+		unreconcilable: unreconcilable.New(fakeClusterName),
+	}
+
+	current := backupResourcesList{
+		{
+			name: "switched-backup",
+			backup: &couchbasev2.CouchbaseBackup{
+				ObjectMeta: metav1.ObjectMeta{Name: "switched-backup"},
+				Spec:       couchbasev2.CouchbaseBackupSpec{SnapshotBackup: &couchbasev2.CouchbaseSnapshotBackupSpec{}},
+			},
+			fullCronJob: switchedCronJob,
+			pvc:         switchedPVC,
+		},
+		{
+			name:        "archive-backup",
+			backup:      &couchbasev2.CouchbaseBackup{ObjectMeta: metav1.ObjectMeta{Name: "archive-backup"}},
+			fullCronJob: archiveCronJob,
+		},
+	}
+
+	if err := c.cleanupUnusedBackupResources(current); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	cronJobs, err := kubeClient.BatchV1().CronJobs(fakeClusterNamespace).List(t.Context(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("failed to list cronjobs: %v", err)
+	}
+
+	var remaining []string
+
+	for _, item := range cronJobs.Items {
+		remaining = append(remaining, item.Name)
+	}
+
+	if !reflect.DeepEqual(remaining, []string{"archive-backup-full"}) {
+		t.Errorf("expected only archive-backup-full to remain, got %v", remaining)
+	}
+
+	if _, err := kubeClient.CoreV1().PersistentVolumeClaims(fakeClusterNamespace).Get(t.Context(), "switched-backup", metav1.GetOptions{}); err != nil {
+		t.Errorf("expected the switched backup's PVC to be kept, got %v", err)
 	}
 }

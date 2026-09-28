@@ -800,6 +800,20 @@ func (c *Cluster) updateBackupPVC(notifier backupUpdateNotifier, backup *couchba
 // would do this for us, we'd lose the ability to generate an event... but then we could
 // use the shared informer to raise it for us (if we are online at the time).
 func (c *Cluster) deleteBackupResource(resource backupResources) error {
+	if err := c.deleteArchiveBackupJobs(resource); err != nil {
+		return err
+	}
+
+	c.log.Info("Backup deleted", "cluster", c.cluster.NamespacedName(), "cbbackup", resource.name)
+
+	c.raiseEvent(k8sutil.BackupDeleteEvent(resource.name, c.cluster))
+
+	return nil
+}
+
+// deleteArchiveBackupJobs deletes a backup's archive CronJobs and Jobs. The backup's PVC is
+// left alone, so the archive data on it can still be restored.
+func (c *Cluster) deleteArchiveBackupJobs(resource backupResources) error {
 	if resource.fullCronJob != nil {
 		if err := c.k8s.KubeClient.BatchV1().CronJobs(c.cluster.Namespace).Delete(context.Background(), resource.fullCronJob.Name, metav1.DeleteOptions{}); err != nil {
 			return err
@@ -824,10 +838,6 @@ func (c *Cluster) deleteBackupResource(resource backupResources) error {
 			return err
 		}
 	}
-
-	c.log.Info("Backup deleted", "cluster", c.cluster.NamespacedName(), "cbbackup", resource.name)
-
-	c.raiseEvent(k8sutil.BackupDeleteEvent(resource.name, c.cluster))
 
 	return nil
 }
@@ -1934,18 +1944,32 @@ func (c *Cluster) reconcileBackup() error {
 		}
 	}
 
+	return c.cleanupUnusedBackupResources(current)
+}
+
+// cleanupUnusedBackupResources deletes archive backup jobs that nothing uses any more.
+func (c *Cluster) cleanupUnusedBackupResources(current backupResourcesList) error {
 	for _, cur := range current {
 		if c.unreconcilable.IsSkipped(couchbasev2.BackupCRDResourceKind, cur.name) {
 			continue
 		}
 
-		if cur.backup != nil {
-			continue
-		}
+		switch {
+		case cur.backup == nil:
+			// The backup was deleted, so its jobs go too.
+			if err := c.deleteBackupResource(cur); err != nil {
+				return err
+			}
+		case cur.backup.Spec.SnapshotBackup != nil:
+			// The backup switched to snapshotBackup and doesn't use its archive jobs any more.
+			// If we can't remove them, log it and try again next time, so the rest of the
+			// reconcile still runs.
+			if err := c.deleteArchiveBackupJobs(cur); err != nil {
+				c.log.Error(err, "Failed to remove archive backup jobs, backup now uses snapshotBackup", "cluster", c.cluster.NamespacedName(), "cbbackup", cur.name)
+				continue
+			}
 
-		// Current resource is no longer valid, so delete them.
-		if err := c.deleteBackupResource(cur); err != nil {
-			return err
+			c.log.Info("Removed archive backup jobs, backup now uses snapshotBackup", "cluster", c.cluster.NamespacedName(), "cbbackup", cur.name)
 		}
 	}
 

@@ -120,6 +120,9 @@ type Framework struct {
 
 	// BackupStorageClassName is the name of the storage class to use for test volumes.
 	BackupStorageClassName string
+
+	// VolumeSnapshotClassName is the VolumeSnapshotClass used by snapshot backup tests.
+	VolumeSnapshotClassName string
 }
 
 // RegistryConfig defines a container image registry.  Registry configurations will

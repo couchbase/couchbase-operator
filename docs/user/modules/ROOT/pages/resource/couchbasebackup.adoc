@@ -81,7 +81,10 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbasebackups-spec-services-views,views>>: True
   <<couchbasebackups-spec-size,size>>: 20Gi
   <<couchbasebackups-spec-snapshotbackup,snapshotBackup>>:
+    <<couchbasebackups-spec-snapshotbackup-maxretries,maxRetries>>: 3
     <<couchbasebackups-spec-snapshotbackup-maxskew,maxSkew>>: 10s
+    <<couchbasebackups-spec-snapshotbackup-readytimeout,readyTimeout>>: 2h
+    <<couchbasebackups-spec-snapshotbackup-retryinterval,retryInterval>>: 5m
     <<couchbasebackups-spec-snapshotbackup-schedule,schedule>>: ""
     <<couchbasebackups-spec-snapshotbackup-volumegroupsnapshotclassname,volumeGroupSnapshotClassName>>: ""
     <<couchbasebackups-spec-snapshotbackup-volumesnapshotclassname,volumeSnapshotClassName>>: ""
@@ -992,6 +995,22 @@ is faster to take and restore for large datasets, at the cost of a weaker consis
 guarantee.
 Scheduling and retention behave the same as an archive based backup.
 
+=== couchbasebackups.spec.snapshotBackup.maxRetries
+
+==== Constraints
+
+*Type*: `integer`
+
+*Default*: `3`
+
+*Minimum*: `0`
+
+==== Description
+
+MaxRetries is how many times a run that ends up Invalid is tried again, before waiting
+for the next scheduled time.
+This field defaults to 3.
+
 === couchbasebackups.spec.snapshotBackup.maxSkew
 
 ==== Constraints
@@ -1009,11 +1028,41 @@ If the time between the earliest and latest snapshot exceeds this, the
 volumes were not captured close enough together to be trusted as one consistent set,
 and the run is marked invalid and discarded.
 
-=== couchbasebackups.spec.snapshotBackup.schedule
+=== couchbasebackups.spec.snapshotBackup.readyTimeout
 
 ==== Constraints
 
-*Required*
+*Type*: `string`
+
+*Default*: `2h`
+
+==== Description
+
+ReadyTimeout is how long a run can stay InProgress before it's marked Invalid, for
+example because a snapshot never becomes ready.
+Snapshots of large volumes can take a
+long time to finish on some clouds.
+This field defaults to 2h.
+
+=== couchbasebackups.spec.snapshotBackup.retryInterval
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `5m`
+
+==== Description
+
+RetryInterval is how long to wait before trying an Invalid run again.
+Some clouds limit
+how often the same volume can be snapshotted, so retrying straight away would likely
+fail again.
+This field defaults to 5m.
+
+=== couchbasebackups.spec.snapshotBackup.schedule
+
+==== Constraints
 
 *Type*: `string`
 
@@ -1023,6 +1072,7 @@ Schedule takes a cron schedule in string format, in the same form as
 CouchbaseBackupSchedule.Schedule.
 A snapshot capture has no full, incremental, or
 merge distinction the way an archive based backup does, so this is its own field.
+If not set, one snapshot backup is taken straight away and no more are scheduled.
 
 === couchbasebackups.spec.snapshotBackup.volumeGroupSnapshotClassName
 

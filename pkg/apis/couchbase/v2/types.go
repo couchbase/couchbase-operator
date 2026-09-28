@@ -507,7 +507,9 @@ type CouchbaseSnapshotBackupSpec struct {
 	// Schedule takes a cron schedule in string format, in the same form as
 	// CouchbaseBackupSchedule.Schedule. A snapshot capture has no full, incremental, or
 	// merge distinction the way an archive based backup does, so this is its own field.
-	Schedule string `json:"schedule"`
+	// If not set, one snapshot backup is taken straight away and no more are scheduled.
+	// +optional
+	Schedule string `json:"schedule,omitempty"`
 
 	// VolumeSnapshotClassName is the VolumeSnapshotClass used to capture each member's
 	// volumes individually. This is the universally available path, used whenever the
@@ -528,6 +530,27 @@ type CouchbaseSnapshotBackupSpec struct {
 	// and the run is marked invalid and discarded.
 	// +kubebuilder:default="10s"
 	MaxSkew metav1.Duration `json:"maxSkew,omitempty"`
+
+	// MaxRetries is how many times a run that ends up Invalid is tried again, before waiting
+	// for the next scheduled time. This field defaults to 3.
+	// +kubebuilder:default=3
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	MaxRetries *int32 `json:"maxRetries,omitempty"`
+
+	// RetryInterval is how long to wait before trying an Invalid run again. Some clouds limit
+	// how often the same volume can be snapshotted, so retrying straight away would likely
+	// fail again. This field defaults to 5m.
+	// +kubebuilder:default="5m"
+	// +optional
+	RetryInterval metav1.Duration `json:"retryInterval,omitempty"`
+
+	// ReadyTimeout is how long a run can stay InProgress before it's marked Invalid, for
+	// example because a snapshot never becomes ready. Snapshots of large volumes can take a
+	// long time to finish on some clouds. This field defaults to 2h.
+	// +kubebuilder:default="2h"
+	// +optional
+	ReadyTimeout metav1.Duration `json:"readyTimeout,omitempty"`
 }
 
 // CouchbaseBackupStatus provides status notifications about the Couchbase backup
@@ -708,6 +731,16 @@ type CouchbaseSnapshotBackupRunSpec struct {
 	// Collections is the set of collection names captured in this run.
 	// +optional
 	Collections []string `json:"collections,omitempty"`
+
+	// MaxSkew is the backup's maxSkew when the run was taken. The run is checked against
+	// it, so later changes to the backup, or deleting it, don't change the result.
+	// +optional
+	MaxSkew *metav1.Duration `json:"maxSkew,omitempty"`
+
+	// ReadyTimeout is the backup's readyTimeout when the run was taken, used the same way
+	// as MaxSkew.
+	// +optional
+	ReadyTimeout *metav1.Duration `json:"readyTimeout,omitempty"`
 }
 
 // CouchbaseSnapshotBackupRunStatus records the outcome of the capture attempt, whether it
@@ -726,13 +759,6 @@ type CouchbaseSnapshotBackupRunStatus struct {
 	// BaselineBalanced records whether the source cluster was balanced immediately before
 	// the run's capture began. Compared the same way as BaselineOrchestrator.
 	BaselineBalanced bool `json:"baselineBalanced"`
-
-	// BaselineChronicleRev is the source cluster's chronicle revision counter, captured
-	// immediately before the run's capture began. Only captured on server versions that
-	// support it (8.5.0 and later), left unset on older versions, which rely on
-	// BaselineOrchestrator and BaselineBalanced alone.
-	// +optional
-	BaselineChronicleRev *int64 `json:"baselineChronicleRev,omitempty"`
 
 	// GroupSnapshot records whether the run was captured as a single
 	// VolumeGroupSnapshot or as concurrent individual VolumeSnapshots, as evidence of
@@ -765,6 +791,16 @@ type CouchbaseSnapshotBackupRunStatus struct {
 	// taken in this run, checked against CouchbaseBackup.spec.snapshotBackup.maxSkew.
 	// +optional
 	MeasuredSkew *metav1.Duration `json:"measuredSkew,omitempty"`
+
+	// Reason is a short code for why the run is Invalid, for example SkewExceeded. It's
+	// only set when the phase is Invalid.
+	// +optional
+	Reason string `json:"reason,omitempty"`
+
+	// Message explains in plain words why the run is Invalid. It's only set when the phase
+	// is Invalid.
+	// +optional
+	Message string `json:"message,omitempty"`
 }
 
 // CouchbaseSnapshotBackupRunSnapshot names a single captured volume, which member it

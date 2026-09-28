@@ -12,6 +12,7 @@ package v2
 
 import (
 	"strings"
+	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	couchbasefake "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned/fake"
@@ -20,6 +21,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	discoveryfake "k8s.io/client-go/discovery/fake"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 
 	"testing"
@@ -1585,5 +1587,157 @@ func TestCheckChangeConstraintsHibernate(t *testing.T) {
 
 	if err := checkChangeConstraintsHibernate(cluster(ran, 1), cluster(ran, 2)); err == nil {
 		t.Errorf("expected a hibernated cluster that has run to reject changes")
+	}
+}
+
+// TestCheckConstraintsSnapshotBackup checks the admission rules for a backup that uses
+// spec.snapshotBackup. None of these backups set archive settings like the full and
+// incremental schedules or size, so they also show those archive checks are skipped.
+func TestCheckConstraintsSnapshotBackup(t *testing.T) {
+	emptyClass := ""
+	groupClass := "csi-groupclass"
+
+	// A validator whose fake Kubernetes cluster serves only the given APIs.
+	newValidator := func(groupVersions []string) *types.Validator {
+		client := k8sfake.NewSimpleClientset()
+
+		discovery := client.Discovery().(*discoveryfake.FakeDiscovery)
+		for _, groupVersion := range groupVersions {
+			discovery.Resources = append(discovery.Resources, &metav1.APIResourceList{GroupVersion: groupVersion})
+		}
+
+		return types.New(client, couchbasefake.NewSimpleClientset(), &types.ValidatorOptions{})
+	}
+
+	bothSnapshotAPIs := []string{"snapshot.storage.k8s.io/v1", "groupsnapshot.storage.k8s.io/v1beta1"}
+
+	valid := func() couchbasev2.CouchbaseSnapshotBackupSpec {
+		return couchbasev2.CouchbaseSnapshotBackupSpec{
+			Schedule:                "0 2 * * *",
+			VolumeSnapshotClassName: "csi-snapclass",
+			MaxSkew:                 metav1.Duration{Duration: 10 * time.Second},
+			ReadyTimeout:            metav1.Duration{Duration: 2 * time.Hour},
+		}
+	}
+
+	testcases := []struct {
+		name       string
+		backupName string
+		change     func(*couchbasev2.CouchbaseSnapshotBackupSpec)
+		// served lists the snapshot APIs the cluster has. Left out means both are served.
+		served      []string
+		expectedErr string
+	}{
+		{
+			name:       "snapshot backup without any archive settings is valid",
+			backupName: "snap-backup",
+		},
+		{
+			name:       "no schedule is valid, one backup is taken straight away",
+			backupName: "snap-backup",
+			change:     func(s *couchbasev2.CouchbaseSnapshotBackupSpec) { s.Schedule = "" },
+		},
+		{
+			name:        "invalid schedule",
+			backupName:  "snap-backup",
+			change:      func(s *couchbasev2.CouchbaseSnapshotBackupSpec) { s.Schedule = "not a schedule" },
+			expectedErr: "spec.snapshotBackup.schedule",
+		},
+		{
+			name:        "empty class name",
+			backupName:  "snap-backup",
+			change:      func(s *couchbasev2.CouchbaseSnapshotBackupSpec) { s.VolumeSnapshotClassName = "" },
+			expectedErr: "volumeSnapshotClassName cannot be empty",
+		},
+		{
+			name:        "empty group class name",
+			backupName:  "snap-backup",
+			change:      func(s *couchbasev2.CouchbaseSnapshotBackupSpec) { s.VolumeGroupSnapshotClassName = &emptyClass },
+			expectedErr: "volumeGroupSnapshotClassName cannot be empty",
+		},
+		{
+			name:        "negative max skew",
+			backupName:  "snap-backup",
+			change:      func(s *couchbasev2.CouchbaseSnapshotBackupSpec) { s.MaxSkew = metav1.Duration{Duration: -time.Second} },
+			expectedErr: "maxSkew",
+		},
+		{
+			name:        "zero ready timeout",
+			backupName:  "snap-backup",
+			change:      func(s *couchbasev2.CouchbaseSnapshotBackupSpec) { s.ReadyTimeout = metav1.Duration{} },
+			expectedErr: "readyTimeout",
+		},
+		{
+			name:       "negative retry interval",
+			backupName: "snap-backup",
+			change: func(s *couchbasev2.CouchbaseSnapshotBackupSpec) {
+				s.RetryInterval = metav1.Duration{Duration: -time.Minute}
+			},
+			expectedErr: "retryInterval",
+		},
+		{
+			name:       "snapshot add on not installed",
+			backupName: "snap-backup",
+			// Empty, not left out, so neither snapshot API is served.
+			served:      []string{},
+			expectedErr: "snapshot.storage.k8s.io/v1",
+		},
+		{
+			name:        "group snapshot add on not installed but a group class is set",
+			backupName:  "snap-backup",
+			change:      func(s *couchbasev2.CouchbaseSnapshotBackupSpec) { s.VolumeGroupSnapshotClassName = &groupClass },
+			served:      []string{"snapshot.storage.k8s.io/v1"},
+			expectedErr: "groupsnapshot.storage.k8s.io/v1beta1",
+		},
+		{
+			name:       "group snapshot add on not needed without a group class",
+			backupName: "snap-backup",
+			served:     []string{"snapshot.storage.k8s.io/v1"},
+		},
+		{
+			name:       "name at the 57 character limit is valid",
+			backupName: strings.Repeat("a", 57),
+		},
+		{
+			name:        "name over the 57 character limit",
+			backupName:  strings.Repeat("a", 58),
+			expectedErr: "cannot be longer than 57 characters",
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			snapshotBackup := valid()
+			if testcase.change != nil {
+				testcase.change(&snapshotBackup)
+			}
+
+			backup := &couchbasev2.CouchbaseBackup{
+				ObjectMeta: metav1.ObjectMeta{Name: testcase.backupName},
+				Spec: couchbasev2.CouchbaseBackupSpec{
+					Strategy:       couchbasev2.FullIncremental,
+					SnapshotBackup: &snapshotBackup,
+				},
+			}
+
+			served := testcase.served
+			if served == nil {
+				served = bothSnapshotAPIs
+			}
+
+			err := CheckConstraintsBackup(newValidator(served), backup)
+
+			if testcase.expectedErr == "" {
+				if err != nil {
+					t.Errorf("expected no error, got %v", err)
+				}
+
+				return
+			}
+
+			if err == nil || !strings.Contains(err.Error(), testcase.expectedErr) {
+				t.Errorf("expected an error containing %q, got %v", testcase.expectedErr, err)
+			}
+		})
 	}
 }

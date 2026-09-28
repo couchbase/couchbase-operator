@@ -497,6 +497,9 @@ func configure() (err error) {
 	flag.StringVar(&params.BackupStorageClassName, "backup-storage-class",
 		"",
 		"Storage class to use for backup volumes. Falls back to the storage-class flag value if not specified. If neither are set, the platform default storage class is used.")
+	flag.StringVar(&params.VolumeSnapshotClassName, "volume-snapshot-class",
+		"",
+		"VolumeSnapshotClass to use for snapshot backup tests. They're skipped if not set.")
 
 	params.SharedTestFlags.BindSharedFlags(nil)
 	flag.Parse()
@@ -1801,6 +1804,44 @@ func (r *TestRequirement) ExpandableStorage() *TestRequirement {
 
 	if sc.AllowVolumeExpansion == nil || !*sc.AllowVolumeExpansion {
 		r.t.Skip("Storage Class does not have allowVolumeExpansion=true")
+	}
+
+	return r
+}
+
+// VolumeSnapshots skips the test if snapshot backups can't be taken, because the snapshot
+// add on isn't installed, no snapshot class was given, or the snapshot class can't snapshot
+// the cluster's volumes.
+func (r *TestRequirement) VolumeSnapshots() *TestRequirement {
+	if Global.VolumeSnapshotClassName == "" {
+		r.t.Skip("No volume snapshot class configured")
+	}
+
+	gvr := schema.GroupVersionResource{Group: "snapshot.storage.k8s.io", Version: "v1", Resource: "volumesnapshotclasses"}
+
+	snapshotClass, err := r.kubernetes.DynamicClient.Resource(gvr).Get(context.Background(), Global.VolumeSnapshotClassName, metav1.GetOptions{})
+	if err != nil {
+		r.t.Skipf("Volume snapshot class %s not found: %v", Global.VolumeSnapshotClassName, err)
+	}
+
+	storageClassName := Global.SharedTestFlags.StorageClassName
+
+	if storageClassName == "" {
+		name, err := r.getDefaultStorageClassName()
+		if err != nil {
+			e2eutil.Die(r.t, err)
+		}
+
+		storageClassName = name
+	}
+
+	sc, err := r.kubernetes.KubeClient.StorageV1().StorageClasses().Get(context.Background(), storageClassName, metav1.GetOptions{})
+	if err != nil {
+		e2eutil.Die(r.t, err)
+	}
+
+	if driver, _, _ := unstructured.NestedString(snapshotClass.Object, "driver"); driver != sc.Provisioner {
+		r.t.Skipf("Volume snapshot class driver %s can't snapshot storage class %s volumes (%s)", driver, storageClassName, sc.Provisioner)
 	}
 
 	return r

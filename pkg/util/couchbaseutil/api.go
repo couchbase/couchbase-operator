@@ -1120,6 +1120,11 @@ func GetTerseClusterInfo(clusterInfo *TerseClusterInfo) *Request {
 	return NewRequest((*Client).Get, "/pools/default/terseClusterInfo", nil, clusterInfo)
 }
 
+// GetSystemEvents gets every system event logged since the given time.
+func GetSystemEvents(since time.Time, events *SystemEvents) *Request {
+	return NewRequest((*Client).Get, "/events?limit=-1&sinceTime="+url.QueryEscape(since.UTC().Format(time.RFC3339)), nil, events)
+}
+
 // GetDataSettings gets data service settings.
 func GetDataServiceSettings(settings *DataServiceSettings) *Request {
 	return NewRequest((*Client).Get, "/settings/dataService", nil, settings)
