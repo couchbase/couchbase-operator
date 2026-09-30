@@ -103,7 +103,7 @@ func VersionKnown(v string) bool {
 
 // Get readable version from sha256.
 func GetSHA256Version(version string) string {
-	if v, ok := constants.ImageDigests[version]; ok {
+	if v, ok := lookupDigest(version); ok {
 		return v
 	}
 
