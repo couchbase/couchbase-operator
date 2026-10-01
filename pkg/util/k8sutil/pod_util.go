@@ -1317,9 +1317,11 @@ func applyCloudNativeGateway(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod,
 	pod.Labels = mergeLabels(pod.Labels, map[string]string{constants.LabelCloudNativeGateway: constants.EnabledValue})
 }
 
-// applyCloudNativeGatewayPodTLSProvided adds Cloud Native Gateway server TLS certs and keys from secret to volumes and mounted.
+// applyCloudNativeGatewayPodTLSProvided adds Cloud Native Gateway server TLS certs and keys to volumes and mounts them.
+// It mounts the shadow secret rather than the user-supplied secret directly, so that changes to the
+// user-supplied secret's contents don't require the pod to be recreated.
 func applyCloudNativeGatewayPodTLSProvided(cluster *couchbasev2.CouchbaseCluster, container *v1.Container, pod *v1.Pod) {
-	addSecretToPodVolume(container, pod, CngVolumeName, cluster.Spec.Networking.CloudNativeGateway.TLS.ServerSecretName)
+	addSecretToPodVolume(container, pod, CngVolumeName, CNGShadowTLSSecretName(cluster))
 }
 
 func getSelfCertSecretName(clusterName string) string {
@@ -2188,6 +2190,11 @@ func ShadowTLSCASecretName(cluster *couchbasev2.CouchbaseCluster) string {
 
 func KeyShadowSecretName(cluster *couchbasev2.CouchbaseCluster) string {
 	return cluster.Name + "-key-shadow"
+}
+
+// CNGShadowTLSSecretName generates the shadow secret name for Cloud Native Gateway TLS certs.
+func CNGShadowTLSSecretName(cluster *couchbasev2.CouchbaseCluster) string {
+	return cluster.Name + "-cng-tls-shadow"
 }
 
 // ClientTLSSecretName generates a TLS secret name for the client certificates.

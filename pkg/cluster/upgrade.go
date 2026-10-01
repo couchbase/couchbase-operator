@@ -514,6 +514,15 @@ func (c *Cluster) normalizePodSpecsForComparison(actualSpec, requestedSpec *v1.P
 		removeKeyShadowSecretVolumeMount(actualSpec)
 	}
 
+	// Ignore a pre-shadow direct mount of the currently configured Cloud Native Gateway server
+	// secret. Pods created before shadowing was introduced mount that secret directly rather than
+	// the shadow secret; they should not be recreated just to pick up the new mount, but will do so
+	// naturally next time they're recreated for any other reason. Any other mismatch (switching
+	// between self-signed and provided TLS, or pointing at a different ServerSecretName) is a real
+	// change and is left alone, so it still triggers recreation.
+	normalizeCNGTLSVolumeSecretName(c.cluster, requestedSpec)
+	normalizeCNGTLSVolumeSecretName(c.cluster, actualSpec)
+
 	return nil
 }
 
@@ -769,6 +778,30 @@ func removeKeyShadowSecretVolumeMount(podSpec *v1.PodSpec) {
 	}
 
 	podSpec.Volumes = filterVolumes(podSpec.Volumes)
+}
+
+// normalizeCNGTLSVolumeSecretName rewrites a pre-shadow direct mount of the currently configured
+// Cloud Native Gateway server secret onto the shadow secret name, so that a pod created before
+// shadowing was introduced isn't flagged for recreation purely because a freshly-computed spec
+// would mount the shadow secret instead. Any other mismatch (e.g. self-signed vs provided, or a
+// ServerSecretName the user has since changed) is left alone and still triggers recreation.
+func normalizeCNGTLSVolumeSecretName(cluster *couchbasev2.CouchbaseCluster, podSpec *v1.PodSpec) {
+	cng := cluster.Spec.Networking.CloudNativeGateway
+	if cng == nil || cng.TLS == nil {
+		return
+	}
+
+	for i := range podSpec.Volumes {
+		if podSpec.Volumes[i].Name != k8sutil.CngVolumeName {
+			continue
+		}
+
+		if podSpec.Volumes[i].Secret != nil && podSpec.Volumes[i].Secret.SecretName == cng.TLS.ServerSecretName {
+			podSpec.Volumes[i].Secret.SecretName = k8sutil.CNGShadowTLSSecretName(cluster)
+		}
+
+		return
+	}
 }
 
 func ignoreMigratedHostnameAlias(actual *v1.Pod, requested *v1.PodSpec) {

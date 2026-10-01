@@ -167,6 +167,7 @@ func (c *Cluster) reconcileMigrationCluster() error {
 		(*Cluster).refreshTLSPassphraseResources,
 		(*Cluster).reconcileLogConfig,
 		(*Cluster).reconcileCloudNativeGatewayConfig,
+		(*Cluster).refreshCNGTLSShadowSecret,
 		(*Cluster).refreshKeyShadowSecret,
 	}
 

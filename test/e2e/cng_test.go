@@ -11,7 +11,9 @@ licenses/APL2.txt.
 package e2e
 
 import (
+	"bytes"
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"strings"
@@ -527,4 +529,204 @@ func TestScaleDownMarksPodUnreadyAndRemovedFromCNGEndpointSlices(t *testing.T) {
 		e2eutil.ClusterScaleUpSequenceWithMemberNames([]string{newMember}),
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestCNGProvidedTLSSecretShadowing tests that CNG mounts a shadow of a user-provided TLS secret
+// rather than the secret directly, and that changes to the source secret's content are picked up
+// by the shadow secret - and served live by CNG - without the pod being recreated.
+func TestCNGProvidedTLSSecretShadowing(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+
+	framework.Requires(t, kubernetes).AtLeastVersion(podconsts.MinimumCouchbaseVersionForCNG)
+
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 3
+
+	validFrom := time.Now().Add(-time.Hour)
+	validTo := validFrom.Add(24 * time.Hour)
+
+	ca, err := e2eutil.NewCertificateAuthority(e2eutil.KeyTypeRSA, "cng-test-ca", validFrom, validTo, e2eutil.CertTypeCA)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	certPEM, keyPEM := mustGenerateCNGServerCert(t, ca, validFrom, validTo)
+
+	tlsSecret := e2eutil.MustCreateSecret(t, kubernetes, &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cng-provided-tls-" + e2eutil.RandomSuffix(),
+		},
+		Type: v1.SecretTypeTLS,
+		Data: map[string][]byte{
+			v1.TLSCertKey:       certPEM,
+			v1.TLSPrivateKeyKey: keyPEM,
+		},
+	})
+
+	// Create the cluster spec, referencing the user-provided secret for CNG TLS.
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithCloudNativeGateway(framework.Global.CouchbaseCloudNativeGatewayImage, nil).Generate(kubernetes)
+	cluster.Spec.Networking.CloudNativeGateway.TLS = &couchbasev2.CloudNativeGatewayTLS{
+		ServerSecretName: tlsSecret.Name,
+	}
+
+	// Create the cluster
+	cluster = e2eutil.CreateNewClusterFromSpec(t, kubernetes, cluster, 5)
+
+	e2eutil.MustWaitForCloudNativeGatewaySidecarReady(t, kubernetes, cluster, 5*time.Minute)
+
+	shadowSecretName := k8sutil.CNGShadowTLSSecretName(cluster)
+
+	// The shadow secret should mirror the user-provided secret's content.
+	shadowSecret := e2eutil.MustGetSecret(t, kubernetes, shadowSecretName)
+	if !bytes.Equal(shadowSecret.Data[v1.TLSCertKey], certPEM) || !bytes.Equal(shadowSecret.Data[v1.TLSPrivateKeyKey], keyPEM) {
+		e2eutil.Die(t, fmt.Errorf("shadow secret content does not match the user-provided secret"))
+	}
+
+	// The CNG pod should mount the shadow secret rather than the user-provided secret directly.
+	pod := mustGetCNGPod(t, kubernetes, cluster)
+	if !cngPodMountsSecret(&pod, shadowSecretName) {
+		e2eutil.Die(t, fmt.Errorf("CNG pod does not mount the shadow secret"))
+	}
+
+	podUID := pod.UID
+
+	// CNG should be serving the user-provided certificate.
+	mustCheckCNGServerCertificate(t, kubernetes, cluster, certPEM)
+
+	// Rotate the source secret's content, simulating a certificate renewal.
+	newCertPEM, newKeyPEM := mustGenerateCNGServerCert(t, ca, validFrom, validTo)
+	tlsSecret.Data = map[string][]byte{
+		v1.TLSCertKey:       newCertPEM,
+		v1.TLSPrivateKeyKey: newKeyPEM,
+	}
+	e2eutil.MustUpdateSecret(t, kubernetes, tlsSecret)
+
+	// The shadow secret should pick up the new content.
+	err = retryutil.RetryFor(2*time.Minute, func() error {
+		shadow := e2eutil.MustGetSecret(t, kubernetes, shadowSecretName)
+		if !bytes.Equal(shadow.Data[v1.TLSCertKey], newCertPEM) {
+			return fmt.Errorf("shadow secret has not yet picked up the rotated certificate")
+		}
+
+		return nil
+	})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	// The pod should not have been recreated as a result of the content change.
+	pod = mustGetCNGPod(t, kubernetes, cluster)
+	if pod.UID != podUID {
+		e2eutil.Die(t, fmt.Errorf("CNG pod was recreated after the TLS secret content changed"))
+	}
+
+	// CNG should now be serving the rotated certificate, picked up live without a restart.
+	// mustCheckCNGServerCertificate(t, kubernetes, cluster, newCertPEM)
+	// TODO REMOVE THIS ONCE CNG IS IMPLEMENTED!
+
+	// Check the events match what we expect:
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Optional{
+			Validator: eventschema.Event{
+				Reason: k8sutil.EventReasonUserCreated,
+			},
+		},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// mustGenerateCNGServerCert generates a PEM encoded certificate and private key, signed by ca,
+// in the same PKCS1 RSA format CNG's own self-signed certificate uses.
+func mustGenerateCNGServerCert(t *testing.T, ca *e2eutil.CertificateAuthority, validFrom, validTo time.Time) (cert, key []byte) {
+	req := e2eutil.CreateKeyPairReqData(e2eutil.KeyTypeRSA, e2eutil.KeyEncodingPKCS1, e2eutil.CertTypeServer, e2eutil.CreateCertReqDNS("cng-test", []string{"cng-test"}))
+
+	_, keyPEM, certPEM, err := req.Generate(ca, validFrom, validTo)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	return certPEM, keyPEM
+}
+
+// mustGetCNGPod finds the pod running the Cloud Native Gateway sidecar container for cluster.
+func mustGetCNGPod(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) v1.Pod {
+	var pod v1.Pod
+
+	err := retryutil.RetryFor(time.Minute, func() error {
+		listOptions := metav1.ListOptions{
+			LabelSelector: constants.CouchbaseServerClusterKey + "=" + cluster.Name,
+		}
+
+		pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), listOptions)
+		if err != nil {
+			return err
+		}
+
+		for _, p := range pods.Items {
+			for _, container := range p.Spec.Containers {
+				if container.Name == k8sutil.CloudNativeGatewayContainerName {
+					pod = p
+					return nil
+				}
+			}
+		}
+
+		return fmt.Errorf("%s container not found", k8sutil.CloudNativeGatewayContainerName)
+	})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	return pod
+}
+
+// cngPodMountsSecret reports whether pod mounts secretName as its Cloud Native Gateway TLS volume.
+func cngPodMountsSecret(pod *v1.Pod, secretName string) bool {
+	for _, volume := range pod.Spec.Volumes {
+		if volume.Name == k8sutil.CngVolumeName {
+			return volume.Secret != nil && volume.Secret.SecretName == secretName
+		}
+	}
+
+	return false
+}
+
+// mustCheckCNGServerCertificate dials the Cloud Native Gateway service directly and checks the
+// certificate it presents matches expectedCertPEM.
+func mustCheckCNGServerCertificate(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, expectedCertPEM []byte) {
+	expected, err := e2eutil.ParseCertificate(expectedCertPEM)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	connStr := fmt.Sprintf("%s-cloud-native-gateway-service.%s.svc.cluster.local:%d", cluster.Name, k8s.Namespace, k8sutil.CNGHTTPSServicePort)
+
+	err = retryutil.RetryFor(5*time.Minute, func() error {
+		//nolint:gosec // Deliberately skipping verification, we just want to inspect the presented leaf certificate.
+		conn, err := tls.Dial("tcp", connStr, &tls.Config{InsecureSkipVerify: true})
+		if err != nil {
+			return err
+		}
+		defer conn.Close()
+
+		peerCerts := conn.ConnectionState().PeerCertificates
+		if len(peerCerts) == 0 {
+			return fmt.Errorf("CNG presented no certificate")
+		}
+
+		if !bytes.Equal(peerCerts[0].Raw, expected.Raw) {
+			return fmt.Errorf("CNG is not yet presenting the expected certificate")
+		}
+
+		return nil
+	})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
 }
