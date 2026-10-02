@@ -245,3 +245,24 @@ func TestServerGroupLabel(t *testing.T) {
 		})
 	}
 }
+
+func TestBucketMigrationConditionReasons(t *testing.T) {
+	cluster := &CouchbaseCluster{}
+
+	cluster.Status.SetBucketEvictionMigrationCondition()
+
+	if !cluster.HasCondition(ClusterConditionBucketMigration) || cluster.IsStorageBackendMigrating() {
+		t.Fatal("an eviction policy migration should set BucketMigrating without being a storage backend migration")
+	}
+
+	if ok, reason := cluster.CanHibernate(); ok || reason != "Cluster is migrating buckets" {
+		t.Errorf("an eviction policy migration should block hibernation, got %v %q", ok, reason)
+	}
+
+	// The reason is updated in place when a backend override appears.
+	cluster.Status.SetBucketMigrationCondition()
+
+	if !cluster.IsStorageBackendMigrating() || len(cluster.Status.Conditions) != 1 {
+		t.Errorf("expected a single storage backend BucketMigrating condition, got %v", cluster.Status.Conditions)
+	}
+}

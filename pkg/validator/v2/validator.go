@@ -131,6 +131,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintTwoDataNodesForDeltaRecovery,
 		checkConstraintUpgradeFieldsDeprecated,
 		checkConstraintArbiterOverAdminService,
+		checkConstraintUnmanagedBucketMigrationRoutines,
 		checkMigrationConstraints,
 		checkConstraintMemcachedBucketDeprecated,
 		checkServerClassImageDeprecated,
@@ -5191,10 +5192,6 @@ func CheckChangeConstraintsCluster(v *types.Validator, prev, curr *couchbasev2.C
 		errs = append(errs, err)
 	}
 
-	if err := checkChangeConstraintsBucketMigratingAnnotation(prev, curr); err != nil {
-		errs = append(errs, err)
-	}
-
 	if err := checkClusterUpgradePrerequisites(v, prev, curr); err != nil {
 		errs = append(errs, err)
 	}
@@ -5343,8 +5340,9 @@ func checkClusterUpgradePrerequisites(v *types.Validator, prev, curr *couchbasev
 		return nil
 	}
 
-	if (curr.HasCondition(couchbasev2.ClusterConditionBucketMigration) || prev.HasCondition(couchbasev2.ClusterConditionBucketMigration)) && prev.Spec.Image != curr.Spec.Image {
-		return fmt.Errorf("cannot upgrade cluster while bucket migration is in progress")
+	bucketMigrating := curr.IsStorageBackendMigrating() || prev.IsStorageBackendMigrating()
+	if bucketMigrating && prev.Spec.Image != curr.Spec.Image {
+		return fmt.Errorf("cannot upgrade cluster while bucket storage backend migration is in progress")
 	}
 
 	startVersion, err := k8sutil.CouchbaseVersion(prev.Spec.CouchbaseImage())
@@ -5488,6 +5486,10 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 				errs = append(errs, err)
 			}
 
+			if !c.Spec.Buckets.EnableBucketMigrationRoutines {
+				warnings = append(warnings, bucketMigrationRoutinesDisabledWarning(c))
+			}
+
 			if prevBackend == couchbasev2.CouchbaseStorageBackendMagma && currBackend == couchbasev2.CouchbaseStorageBackendCouchstore {
 				// Bucket history must have been disabled on the previous bucket spec. Cannot be done as part of the same change operation.
 				if err := checkBucketHistoryDisabled(prev); err != nil {
@@ -5505,12 +5507,6 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 
 		if !after80 {
 			continue
-		}
-
-		if !c.Spec.Buckets.EnableBucketMigrationRoutines {
-			if curr.Spec.EvictionPolicy != prev.Spec.EvictionPolicy && curr.Spec.OnlineEvictionPolicyChange {
-				errs = append(errs, fmt.Errorf("spec.evictionPolicy cannot be changed unless all referencing clusters have spec.buckets.enableBucketMigrationRoutines set to true"))
-			}
 		}
 
 		if err := checkNumVBucketsChangeConstraint(prev, curr, c, c); err != nil {
@@ -5615,10 +5611,6 @@ func checkBucketHistoryDisabled(bucket *couchbasev2.CouchbaseBucket) error {
 
 //nolint:gocognit
 func checkClusterValidForBucketMigration(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
-	if !cluster.Spec.Buckets.EnableBucketMigrationRoutines {
-		return fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters have spec.buckets.enableBucketMigrationRoutines set to true")
-	}
-
 	if cluster.HasCondition(couchbasev2.ClusterConditionUpgrading) {
 		return fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters are not in an upgrade")
 	}
@@ -6056,21 +6048,19 @@ func checkClusterGroupRBACConstraints(v *types.Validator, cluster *couchbasev2.C
 	return nil
 }
 
-func checkChangeConstraintsBucketMigratingAnnotation(prev, current *couchbasev2.CouchbaseCluster) error {
-	if prev.Spec.Buckets.EnableBucketMigrationRoutines != current.Spec.Buckets.EnableBucketMigrationRoutines {
-		// If there is no migration in progress, the annotation needs
-		// routines enabled to finish migrations it triggers. So we block
-		// turning routines off unless the annotation is being cleared too,
-		// otherwise the next reconcile will flip a bucket and then be unable
-		// to drain it.
-		if prev.Spec.Buckets.EnableBucketMigrationRoutines && !current.Spec.Buckets.EnableBucketMigrationRoutines {
-			if current.Spec.Buckets.TargetUnmanagedBucketStorageBackend != nil {
-				return fmt.Errorf("spec.buckets.enableBucketMigrationRoutines cannot be set to false while the cao.couchbase.com/buckets.targetUnmanagedBucketStorageBackend annotation is set, remove the annotation first")
-			}
-		}
+// bucketMigrationRoutinesDisabledWarning warns that backend changes will not complete without migration routines.
+func bucketMigrationRoutinesDisabledWarning(cluster *couchbasev2.CouchbaseCluster) string {
+	return fmt.Sprintf("the operator will not cycle nodes to complete storage backend changes on cluster %s because spec.buckets.enableBucketMigrationRoutines is not true, "+
+		"nodes keep their old backend until they are swapped or fully recovered for another reason", cluster.NamespacedName())
+}
+
+// checkConstraintUnmanagedBucketMigrationRoutines warns when unmanaged buckets are migrated without migration routines.
+func checkConstraintUnmanagedBucketMigrationRoutines(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+	if cluster.Spec.Buckets.Managed || cluster.Spec.Buckets.TargetUnmanagedBucketStorageBackend == nil || cluster.Spec.Buckets.EnableBucketMigrationRoutines {
+		return nil, nil
 	}
 
-	return nil
+	return []string{bucketMigrationRoutinesDisabledWarning(cluster)}, nil
 }
 
 // checkConstraintArbiterOverAdminService returns a warning if the AdminService is used, recommending

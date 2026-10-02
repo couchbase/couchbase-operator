@@ -889,8 +889,19 @@ func (cs *ClusterStatus) SetExpandingVolumeCondition() {
 	cs.setClusterCondition(c)
 }
 
+// BucketMigrating reasons, a storage backend migration restricts bucket updates, an eviction policy one does not.
+const (
+	bucketMigrationReasonStorageBackend = "BucketMigration"
+	bucketMigrationReasonEvictionPolicy = "BucketEvictionMigration"
+)
+
 func (cs *ClusterStatus) SetBucketMigrationCondition() {
-	c := newClusterCondition(ClusterConditionBucketMigration, v1.ConditionTrue, "BucketMigration", "Migrating buckets")
+	c := newClusterCondition(ClusterConditionBucketMigration, v1.ConditionTrue, bucketMigrationReasonStorageBackend, "Migrating buckets")
+	cs.setClusterCondition(c)
+}
+
+func (cs *ClusterStatus) SetBucketEvictionMigrationCondition() {
+	c := newClusterCondition(ClusterConditionBucketMigration, v1.ConditionTrue, bucketMigrationReasonEvictionPolicy, "Migrating bucket eviction policy")
 	cs.setClusterCondition(c)
 }
 
@@ -1829,6 +1840,12 @@ func (c *CouchbaseCluster) IsInIndexMismatchErrorState() bool {
 
 func (c *CouchbaseCluster) HasCondition(condition ClusterConditionType) bool {
 	return c.Status.GetCondition(condition) != nil && c.Status.GetCondition(condition).Status == v1.ConditionTrue
+}
+
+// IsStorageBackendMigrating reports whether BucketMigrating is set for a storage backend migration.
+func (c *CouchbaseCluster) IsStorageBackendMigrating() bool {
+	return c.HasCondition(ClusterConditionBucketMigration) &&
+		c.Status.GetCondition(ClusterConditionBucketMigration).Reason == bucketMigrationReasonStorageBackend
 }
 
 func (c *CouchbaseCluster) GetMaxUpgradable() (int, error) {

@@ -2742,26 +2742,30 @@ func (r *ReconcileMachine) handleBucketStorageBackendMigration(c *Cluster) error
 		return nil
 	}
 
-	// Only advertise the migration condition when there are storage-backend overrides
-	// AND the operator is actually driving the migration. The operator is driving it
+	// Only advertise the migration condition when the operator is actually driving
+	// the migration, with a reason saying which kind it is. The operator is driving it
 	// when the buckets are managed — reconcileBuckets pushes corrective updates via the
 	// restricted migration-safe API even when swap routines are off — or when migration
 	// routines are enabled, in which case the operator swap-rebalances even unmanaged buckets.
 	operatorDrivingMigration := c.cluster.Spec.Buckets.Managed || c.cluster.Spec.Buckets.EnableBucketMigrationRoutines
 
-	if hasStorageBackendOverrides && operatorDrivingMigration {
+	switch {
+	case !operatorDrivingMigration:
+		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionBucketMigration)
+	case hasStorageBackendOverrides:
 		// Persist before any swap pod is created so an external observer (and the
 		// CouchbaseCluster DAC's upgrade-during-migration block) sees the condition.
 		// Done above the EnableBucketMigrationRoutines guard because reconcileBuckets
 		// also reads the condition to pick the migration-safe REST API.
-		if !c.cluster.HasCondition(couchbasev2.ClusterConditionBucketMigration) {
+		if !c.cluster.IsStorageBackendMigrating() {
 			c.cluster.Status.SetBucketMigrationCondition()
 			if err := c.updateCRStatus(); err != nil {
 				return err
 			}
 		}
-	} else {
-		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionBucketMigration)
+	default:
+		// Eviction policy overrides only, which blocks hibernation but not bucket updates or upgrades.
+		c.cluster.Status.SetBucketEvictionMigrationCondition()
 	}
 
 	// Swap-rebalances are skipped when either:
