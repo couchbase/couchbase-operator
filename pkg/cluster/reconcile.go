@@ -138,6 +138,7 @@ func (c *Cluster) reconcile() error {
 		(*Cluster).refreshTLSPassphraseResources,
 		(*Cluster).reconcileLogConfig,
 		(*Cluster).reconcileCloudNativeGatewayConfig,
+		(*Cluster).refreshCNGTLSShadowSecret,
 		(*Cluster).refreshKeyShadowSecret,
 	}
 
@@ -189,10 +190,11 @@ func (c *Cluster) reconcile() error {
 	// These should not use c.members, preferring c.callableMembers to avoid
 	// log spam until the cluster is repaired.
 	preTopologyReconcilers := reconcileFuncList{
+		(*Cluster).reconcilePodServerVersions,
+		(*Cluster).reconcileVersionBaseline,
 		(*Cluster).reconcilePersistentStatus,
 		(*Cluster).reconcileAdminPassword,
 		(*Cluster).reconcileTLSPreTopologyChange,
-		(*Cluster).reconcilePodServerVersions,
 		(*Cluster).reconcilePVCImages,
 	}
 
@@ -283,7 +285,8 @@ func (c *Cluster) reconcile() error {
 
 // updateFinalReconcileStatus sets status.size (excluding pending-init pods) and the
 // balanced/ready conditions. It clears the scaling and rebalancing conditions, but
-// keeps Scaling/ScalingUp set while async node additions are still pending.
+// keeps Scaling/ScalingUp set while async node additions are still pending, and
+// Scaling/ScalingDown set while a server class is still oversized.
 func (c *Cluster) updateFinalReconcileStatus() {
 	// Count only CBS-initialized members for status.size.  Pods with
 	// PendingInitializationCondition are Running in Kubernetes but have not yet
@@ -307,10 +310,21 @@ func (c *Cluster) updateFinalReconcileStatus() {
 	// aren't driven by pending async adds.
 	pendingInitPods := c.getPendingInitPods()
 	if len(pendingInitPods) == 0 {
-		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScaling)
 		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScalingUp)
 	}
-	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScalingDown)
+
+	// Only clear ScalingDown if no server class is still oversized. This is needed as
+	// member removal may not occur in a single reconcile loop if rebalances are blocked
+	// (e.g. waiting on external DNS of a new member).
+	scalingDown := c.isScalingDown()
+	if !scalingDown {
+		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScalingDown)
+	}
+
+	// The umbrella Scaling condition stays while either direction is still in progress.
+	if len(pendingInitPods) == 0 && !scalingDown {
+		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScaling)
+	}
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionRebalancing)
 
 	// Only mark as balanced when no pods are still pending async CBS initialization.
@@ -875,7 +889,7 @@ func (c *Cluster) reconcileMemcachedDataSettings() error {
 
 		// magmaFlusherThreadPercentage is available in 7.6.10+ and 8.0.1+, but not 8.0.0.
 		// SupportsVersionFeatures cannot be used here as it only checks major.minor via compat version.
-		if lowestVersion := c.GetLowestMemberVersion(); lowestVersion != "" {
+		if lowestVersion := c.GetLowestKnownMemberVersion(); lowestVersion != "" {
 			after7610, _ := couchbaseutil.VersionAfter(lowestVersion, "7.6.10")
 			before800, _ := couchbaseutil.VersionBefore(lowestVersion, "8.0.0")
 			after801, _ := couchbaseutil.VersionAfter(lowestVersion, "8.0.1")
@@ -1562,13 +1576,7 @@ func (c *Cluster) reconcilePersistentStatus() error {
 		return err
 	}
 
-	version, err := c.state.Get(persistence.Version)
-	if err != nil {
-		return err
-	}
-
 	c.cluster.Status.ClusterID = uuid
-	c.cluster.Status.CurrentVersion = version
 
 	if err := c.updateCRStatus(); err != nil {
 		c.log.Info("failed to update cluster status", "cluster", c.namespacedName())

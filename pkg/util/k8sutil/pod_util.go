@@ -610,10 +610,14 @@ func generatePVC(cluster *couchbasev2.CouchbaseCluster, member couchbaseutil.Mem
 	}
 
 	annotations := map[string]string{
-		constants.AnnotationVolumeMountPath:     mount.mountPath,
-		constants.AnnotationVolumeNodeConf:      config.Name,
-		constants.CouchbaseVersionAnnotationKey: version,
-		constants.PVCImageAnnotation:            cbImage,
+		constants.AnnotationVolumeMountPath: mount.mountPath,
+		constants.AnnotationVolumeNodeConf:  config.Name,
+		constants.PVCImageAnnotation:        cbImage,
+	}
+
+	// Omit an unknown version; the image annotation still records what wrote the volume.
+	if couchbaseutil.VersionKnown(version) {
+		annotations[constants.CouchbaseVersionAnnotationKey] = version
 	}
 
 	// Merge our labels/annotations on top of any user defined ones.  We take
@@ -1014,7 +1018,11 @@ func MaintainMutablePodConfiguration(actual, requested *v1.Pod) {
 	// subsequent pod changes can be detected by the topology reconciler.  Not
 	// doing this means that upgrades won't happen as they should.
 	newAnnotations[constants.PodSpecAnnotation] = actual.Annotations[constants.PodSpecAnnotation]
-	newAnnotations[constants.CouchbaseVersionAnnotationKey] = actual.Annotations[constants.CouchbaseVersionAnnotationKey]
+
+	// Copy only if set, so a missing value isn't copied as empty.
+	if version, ok := actual.Annotations[constants.CouchbaseVersionAnnotationKey]; ok {
+		newAnnotations[constants.CouchbaseVersionAnnotationKey] = version
+	}
 
 	// Now use the copy as the version to set
 	requested.Annotations = newAnnotations
@@ -1331,9 +1339,11 @@ func applyCloudNativeGateway(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod,
 	pod.Labels = mergeLabels(pod.Labels, map[string]string{constants.LabelCloudNativeGateway: constants.EnabledValue})
 }
 
-// applyCloudNativeGatewayPodTLSProvided adds Cloud Native Gateway server TLS certs and keys from secret to volumes and mounted.
+// applyCloudNativeGatewayPodTLSProvided adds Cloud Native Gateway server TLS certs and keys to volumes and mounts them.
+// It mounts the shadow secret rather than the user-supplied secret directly, so that changes to the
+// user-supplied secret's contents don't require the pod to be recreated.
 func applyCloudNativeGatewayPodTLSProvided(cluster *couchbasev2.CouchbaseCluster, container *v1.Container, pod *v1.Pod) {
-	addSecretToPodVolume(container, pod, CngVolumeName, cluster.Spec.Networking.CloudNativeGateway.TLS.ServerSecretName)
+	addSecretToPodVolume(container, pod, CngVolumeName, CNGShadowTLSSecretName(cluster))
 }
 
 func getSelfCertSecretName(clusterName string) string {
@@ -2219,6 +2229,11 @@ func KeyShadowSecretName(cluster *couchbasev2.CouchbaseCluster) string {
 	return cluster.Name + "-key-shadow"
 }
 
+// CNGShadowTLSSecretName generates the shadow secret name for Cloud Native Gateway TLS certs.
+func CNGShadowTLSSecretName(cluster *couchbasev2.CouchbaseCluster) string {
+	return cluster.Name + "-cng-tls-shadow"
+}
+
 // ClientTLSSecretName generates a TLS secret name for the client certificates.
 func ClientTLSSecretName(cluster *couchbasev2.CouchbaseCluster) string {
 	return cluster.Name + "-tls-client"
@@ -2454,11 +2469,8 @@ func PVCToMemberset(client *client.Client, cluster, namespace string, secure boo
 			continue
 		}
 
-		version, ok := pvc.Annotations[constants.CouchbaseVersionAnnotationKey]
-		if !ok {
-			log.Info("Ignoring PVC for member recovery: missing version annotation", "cluster", cluster, "pvc", pvc.Name, "annotation", constants.CouchbaseVersionAnnotationKey)
-			continue
-		}
+		// A missing version annotation is normal; keep the member.
+		version := pvc.Annotations[constants.CouchbaseVersionAnnotationKey]
 
 		// Extract the image from PVC annotation
 		image := ""
@@ -2514,7 +2526,8 @@ func CheckIfPodIsRecoverable(client *client.Client, config couchbasev2.ServerCon
 		if err != nil {
 			return err
 		}
-		if targetVersion != nil && pvc.Annotations[constants.CouchbaseVersionAnnotationKey] != "" {
+		// VersionKnown, not != "": older operators wrote 9.9.9, which looks newer than any release.
+		if targetVersion != nil && couchbaseutil.VersionKnown(pvc.Annotations[constants.CouchbaseVersionAnnotationKey]) {
 			pvcServerVersion, err := couchbaseutil.NewVersion(pvc.Annotations[constants.CouchbaseVersionAnnotationKey])
 			if err != nil {
 				return err

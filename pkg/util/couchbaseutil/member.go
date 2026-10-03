@@ -99,6 +99,9 @@ type Member interface { //nolint: interfacebloat
 	SetImage(string)
 	GetImage() string
 	Clone() Member
+
+	// IsExternal reports whether the member came only from Couchbase, with no pod or PVC.
+	IsExternal() bool
 }
 
 // memberImpl is the core internal representation of a Couchbase server node.
@@ -190,6 +193,10 @@ func (m *memberImpl) SetImage(image string) {
 	m.image = image
 }
 
+func (m *memberImpl) IsExternal() bool {
+	return false
+}
+
 // GetImage returns the Couchbase Server image for this member.
 func (m *memberImpl) GetImage() string {
 	return m.image
@@ -277,10 +284,6 @@ func (m *memberImpl) Config() string {
 }
 
 func (m *memberImpl) Version() string {
-	if m.version == "" {
-		return "unknown"
-	}
-
 	return m.version
 }
 
@@ -631,6 +634,11 @@ func (m *externamMemberImpl) UseTLS() bool {
 	return m.useTLS
 }
 
+// IsExternal is always true for an external member.
+func (m *externamMemberImpl) IsExternal() bool {
+	return true
+}
+
 func (m *externamMemberImpl) SetVersion(string) {
 	return
 }
@@ -648,7 +656,7 @@ func (m *externamMemberImpl) GetImage() string {
 }
 
 func (m *externamMemberImpl) Version() string {
-	return "unknown"
+	return ""
 }
 
 func (m *externamMemberImpl) Clone() Member {

@@ -36,12 +36,12 @@ func MustAddCustomAnnotationAndLabels(t *testing.T, k8s *types.Cluster, couchbas
 		LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
 	}
 
-	pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), listOptions)
-	if err != nil {
-		Die(t, err)
-	}
-
 	callback := func() error {
+		pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), listOptions)
+		if err != nil {
+			Die(t, err)
+		}
+
 		return addCustomAnnotationAndLabels(k8s, annotations, labels, *pods)
 	}
 

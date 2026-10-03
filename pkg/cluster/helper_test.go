@@ -76,7 +76,7 @@ func TestClusterIsAtLeastVersion(t *testing.T) {
 	}
 }
 
-func TestGetLowestMemberVersion(t *testing.T) {
+func TestGetLowestKnownMemberVersion(t *testing.T) {
 	t.Parallel()
 
 	testcases := []struct {
@@ -137,14 +137,14 @@ func TestGetLowestMemberVersion(t *testing.T) {
 			c.members.Add(m)
 		}
 
-		lowestVersion := c.GetLowestMemberVersion()
+		lowestVersion := c.GetLowestKnownMemberVersion()
 		if lowestVersion != testcase.expectedVersion {
 			t.Errorf("unexpectedly got lowest version: %s expected %s", lowestVersion, testcase.expectedVersion)
 		}
 	}
 }
 
-func TestGetHighestMemberVersion(t *testing.T) {
+func TestGetHighestKnownMemberVersion(t *testing.T) {
 	t.Parallel()
 
 	testcases := []struct {
@@ -195,7 +195,7 @@ func TestGetHighestMemberVersion(t *testing.T) {
 			c.members.Add(m)
 		}
 
-		highestVersion := c.GetHighestMemberVersion()
+		highestVersion := c.GetHighestKnownMemberVersion()
 		if highestVersion != testcase.expectedVersion {
 			t.Errorf("unexpectedly got highest version: %s expected %s", highestVersion, testcase.expectedVersion)
 		}

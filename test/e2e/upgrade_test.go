@@ -559,7 +559,7 @@ func TestUpgradeSupportable(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
-	cluster := clusterOptionsUpgrade().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
+	cluster := clusterOptionsUpgrade().WithMixedTopologyNoEventing(mdsGroupSize).MustCreate(t, kubernetes)
 
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
 	// then the cluster to become healthy after upgrade has completed.
@@ -612,7 +612,7 @@ func TestUpgradeSupportableKillStatefulPodOnCreate(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	cluster := clusterOptionsUpgrade().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
+	cluster := clusterOptionsUpgrade().WithMixedTopologyNoEventing(mdsGroupSize).MustCreate(t, kubernetes)
 
 	// Runtime configuration.
 
@@ -759,7 +759,7 @@ func TestUpgradeSupportableKillStatelessPodOnCreate(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	cluster := clusterOptionsUpgrade().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
+	cluster := clusterOptionsUpgrade().WithMixedTopologyNoEventing(mdsGroupSize).MustCreate(t, kubernetes)
 
 	// Runtime configuration.
 
@@ -824,7 +824,7 @@ func TestUpgradeSupportableKillStatelessPodOnRebalance(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	cluster := clusterOptionsUpgrade().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
+	cluster := clusterOptionsUpgrade().WithMixedTopologyNoEventing(mdsGroupSize).MustCreate(t, kubernetes)
 
 	// Runtime configuration.
 
@@ -2211,7 +2211,7 @@ func TestServerGroupUpgradeOrderWithArbiterNodes(t *testing.T) {
 	classSize := 2
 
 	// Create a cluster with server groups enabled
-	cluster := clusterOptionsUpgrade().WithMixedTopology(classSize).Generate(kubernetes)
+	cluster := clusterOptionsUpgrade().WithMixedTopologyNoEventing(classSize).Generate(kubernetes)
 
 	// Add an arbiter serverclass to the cluster at the start of the cluster servers list.
 	cluster.Spec.Servers = append([]couchbasev2.ServerConfig{{

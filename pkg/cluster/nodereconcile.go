@@ -1299,6 +1299,32 @@ func parseSizePerMember(memberName string, allmetrices allMetrics) float64 {
 	return sizeByService(allmetrices.idx) + sizeByService(allmetrices.data) + sizeByService(allmetrices.view)
 }
 
+// isScalingDown reports, per live membership, whether any server class currently
+// has more members than its desired size. Pods still waiting to be ejected only
+// because a swap rebalance has already replaced them (e.g. blocked on pending DNS
+// checks) are excluded from the count, mirroring their exclusion from
+// clusteredMembers in deriveEjectFSMMembers.
+func (c *Cluster) isScalingDown() bool {
+	replaced := couchbaseutil.NewMemberSet()
+
+	for name, member := range c.members {
+		if pod, ok := c.k8s.Pods.Get(name); ok && k8sutil.IsPodPendingUpgradeBeforeEjection(pod) {
+			replaced.Add(member)
+		}
+	}
+
+	for _, serverSpec := range c.cluster.Spec.Servers {
+		members := c.members.GroupByServerConfig(serverSpec.Name)
+		delta := members.Size() - serverSpec.Size
+
+		if delta > replaced.Intersect(members).Size() {
+			return true
+		}
+	}
+
+	return false
+}
+
 // populateRemovalQueuePerServerClass enqueues pod(server) names which are version 7.0+.
 func populateRemovalQueuePerServerClass(serverClass string, clusteredMembers couchbaseutil.MemberSet, c *Cluster) error {
 	serverConf := c.cluster.Spec.GetServerConfigByName(serverClass)
@@ -1310,6 +1336,9 @@ func populateRemovalQueuePerServerClass(serverClass string, clusteredMembers cou
 
 	getCandidatesFuncs := []func() (couchbaseutil.MemberSet, error){
 		func() (couchbaseutil.MemberSet, error) {
+			return c.needsMove(), nil
+		},
+		func() (couchbaseutil.MemberSet, error) {
 			candidates, _, err := c.needsUpgrade()
 			return candidates, err
 		},
@@ -1320,6 +1349,8 @@ func populateRemovalQueuePerServerClass(serverClass string, clusteredMembers cou
 		c.getNodeServiceMismatchCandidates,
 	}
 
+	var queueMembers []string
+
 	for _, getCandidatesFunc := range getCandidatesFuncs {
 		// Get any candidates that need to be removed.
 		candidates, err := getCandidatesFunc()
@@ -1327,16 +1358,12 @@ func populateRemovalQueuePerServerClass(serverClass string, clusteredMembers cou
 			return err
 		}
 
-		// Only keep candidates that are in the server class.
-		candidates = candidates.Intersect(clusteredMembers)
+		// Only keep candidates that are in the server class and not already queued by a higher-priority func.
+		candidates = candidates.Intersect(clusteredMembers).Diff(prioritizedRemoveCandidates)
 
-		// Add the candidates to the list of candidates to be removed.
+		queueMembers = append(queueMembers, candidates.Names()...)
 		prioritizedRemoveCandidates.Merge(candidates)
 	}
-
-	// Add the candidates to the list of candidates to be removed.
-	var queueMembers []string
-	queueMembers = append(queueMembers, prioritizedRemoveCandidates.Names()...)
 
 	// Get remaining members that aren't in the above list.
 	remainingMembers := clusteredMembers.Diff(prioritizedRemoveCandidates)
@@ -1466,7 +1493,12 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) error {
 
 	var scheduledScaling couchbasev2.ScalingMessageList
 
-	arbiterNodesSupported, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
+	currentVersion, err := c.clusterVersion()
+	if err != nil {
+		return err
+	}
+
+	arbiterNodesSupported, err := couchbaseutil.VersionAfter(currentVersion, "7.6.0")
 	if err != nil {
 		return err
 	}
@@ -2026,9 +2058,11 @@ func (r *ReconcileMachine) handleInPlaceUpgrade(c *Cluster, candidates couchbase
 				return err
 			} else if pvcState != nil {
 				for _, volume := range pvcState.List() {
-					// Use candidate's version/image (set by getUpgradeCandidates)
+					// Use the candidate's image; its version may still be the sentinel.
 					volume.Annotations[constants.PVCImageAnnotation] = candidate.GetImage()
-					volume.Annotations[constants.CouchbaseVersionAnnotationKey] = candidate.Version()
+					if couchbaseutil.VersionKnown(candidate.Version()) {
+						volume.Annotations[constants.CouchbaseVersionAnnotationKey] = candidate.Version()
+					}
 					_, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Update(c.ctx, volume, metav1.UpdateOptions{})
 
 					if err != nil {
@@ -2099,6 +2133,7 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 	}
 
 	candidates = constrained
+	c.log.Info("Moving nodes", "cluster", c.namespacedName(), "candidates", candidates.Names())
 
 	// Is it possible to do InPlaceUpgrade if that's what they asked for?
 	canDoInPlaceReschedule := true
@@ -2111,8 +2146,6 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 	for _, candidate := range candidates {
 		// The target version is going to stay the same as the current version
 		targetVersion = candidate.Version()
-
-		c.log.Info("Moving node", "cluster", c.namespacedName(), "candidate", candidate.Name())
 
 		if c.isPodReschedulable(candidate) == false {
 			canDoInPlaceReschedule = false
@@ -2170,7 +2203,7 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 }
 
 func (r *ReconcileMachine) checkIfValidUpgradePath() error {
-	currentVersion, err := r.c.state.Get(persistence.Version)
+	currentVersion, err := r.c.clusterVersion()
 	if err != nil {
 		return err
 	}
@@ -2182,8 +2215,8 @@ func (r *ReconcileMachine) checkIfValidUpgradePath() error {
 		return err
 	}
 
-	// We use 9.9.9 to represent an unknown version, so we don't need to check the upgrade path.
-	if newVersion.String() == "9.9.9" {
+	// An unresolved digest tells us nothing to validate against.
+	if !couchbaseutil.VersionKnown(newVersion.String()) {
 		return nil
 	}
 
@@ -2231,7 +2264,14 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return nil
 	}
 
-	arbiterNodesSupported, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
+	currentVersion, err := c.clusterVersion()
+	if err != nil {
+		// Skip with a log rather than fail.
+		c.log.Error(err, "Failed to read the cluster version", "cluster", c.namespacedName())
+		return nil
+	}
+
+	arbiterNodesSupported, err := couchbaseutil.VersionAfter(currentVersion, "7.6.0")
 	if err != nil {
 		return nil
 	}
@@ -2954,7 +2994,12 @@ func (r *ReconcileMachine) shouldRemoveVolumes(server string) bool {
 // eviction policy migrations, and whether any of those nodes actually need
 // cycling to converge to spec.
 func (c *Cluster) getBucketMigrationCandidates() (candidates couchbaseutil.MemberSet, cyclesNeeded bool, hasStorageBackendOverrides bool, hasEvictionOverrides bool, err error) {
-	atleast76, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
+	currentVersion, err := c.clusterVersion()
+	if err != nil {
+		return nil, false, false, false, err
+	}
+
+	atleast76, err := couchbaseutil.VersionAfter(currentVersion, "7.6.0")
 	if err != nil {
 		return nil, false, false, false, err
 	}
@@ -3049,7 +3094,14 @@ func (r *ReconcileMachine) handleBucketMigration(c *Cluster) error {
 		return err
 	}
 
-	atleast76, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
+	currentVersion, err := c.clusterVersion()
+	if err != nil {
+		// Skip with a log rather than fail.
+		c.log.Error(err, "Failed to read the cluster version", "cluster", c.namespacedName())
+		return nil
+	}
+
+	atleast76, err := couchbaseutil.VersionAfter(currentVersion, "7.6.0")
 	if err != nil {
 		return nil
 	}
@@ -3094,18 +3146,23 @@ func (r *ReconcileMachine) handleBucketMigration(c *Cluster) error {
 		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionBucketMigration)
 	}
 
-	if hasEvictionOverrides {
+	// Nodes are only cycled when either:
+	// * Migration routines are enabled (operator permitted to eject pods), and
+	// * Some overridden node doesn't already carry what spec desires
+	//   (the bucket setting drifted then was reverted before any data movement —
+	//   reconcileBuckets will push the corrective REST update this tick).
+	cyclingNodes := c.cluster.Spec.Buckets.EnableBucketMigrationRoutines && cyclesNeeded
+
+	// Eviction overrides only matter for hibernation, so only report them while we are going to
+	// cycle nodes to clear them. Otherwise they stay until the user acts (e.g. turns off
+	// onlineEvictionPolicyChange or enables routines), and must not block hibernation until then.
+	if hasEvictionOverrides && cyclingNodes {
 		r.c.cluster.Status.SetBucketEvictionMigrationCondition()
 	} else {
 		r.c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionBucketEvictionMigration)
 	}
 
-	// Swap-rebalances are skipped when either:
-	// * Migration routines are disabled (operator not permitted to eject pods), or
-	// * Every overridden node already carries the vBucket format spec desires
-	//   (the bucket setting drifted then was reverted before any data movement —
-	//   reconcileBuckets will push the corrective REST update this tick).
-	if !c.cluster.Spec.Buckets.EnableBucketMigrationRoutines || !cyclesNeeded {
+	if !cyclingNodes {
 		return nil
 	}
 
@@ -3214,10 +3271,10 @@ func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseuti
 
 	for _, candidate := range members {
 		// The source version is only meaningful for version driven swaps (like upgrades)
-		// and is unpopulated for others where Version() falls back to "unknown".
+		// and is unpopulated for others, where Version() is empty.
 		// we only include it when we actually know it.
 		keysAndValues := []interface{}{"cluster", c.namespacedName(), "name", candidate.Name()}
-		if version := candidate.Version(); version != "" && version != "unknown" {
+		if version := candidate.Version(); couchbaseutil.VersionKnown(version) {
 			keysAndValues = append(keysAndValues, "source-version", version)
 		}
 
@@ -3274,15 +3331,6 @@ func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseuti
 			c.log.Error(result.Err, "Pod addition to cluster failed", "cluster", c.namespacedName(), "pod", result.Member.Name())
 
 			metrics.PodReplacementsFailedMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
-		case c.cluster.IsMigrationCluster():
-			// Migration: addMembersToTarget blocked until CBS-add. Bookkeeping
-			// and metrics happen at the correct point (same as original sync).
-			r.addMember(result.Member)
-			r.removeMemberUser(candidatesSlice[index])
-			r.stabilizingMembers.Add(result.Member)
-
-			metrics.SwapRebalancesTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
-			metrics.PodReplacementsMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 		default:
 			// New pods are pending init. Defer metrics to handleReadyPendingPod.
 			setupOK := true
@@ -3319,12 +3367,11 @@ func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseuti
 	}
 
 	if len(errs) == 0 {
-		// For async (non-migration) clusters, yield the FSM. The replacement
-		// pods need CBS-add via handleReadyPendingPod, then rebalance ejects
-		// the old members (via PodPendingUpgradeBeforeEjectionCondition) and finalizes the swap.
-		if !c.cluster.IsMigrationCluster() {
-			r.abort("swap rebalance pods created, waiting for async initialization")
-		}
+		// Yield the FSM. The replacement pods need CBS-add via handleReadyPendingPod,
+		// then rebalance ejects the old members (via PodPendingUpgradeBeforeEjectionCondition)
+		// and finalizes the swap. Migration clusters never get here, they swap nodes in
+		// through MigrationReconcileMachine.migrateNode instead.
+		r.abort("swap rebalance pods created, waiting for async initialization")
 
 		return nil
 	}

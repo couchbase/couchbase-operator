@@ -245,3 +245,17 @@ func TestServerGroupLabel(t *testing.T) {
 		})
 	}
 }
+
+func TestBucketMigrationConditions(t *testing.T) {
+	cluster := &CouchbaseCluster{}
+
+	cluster.Status.SetBucketEvictionMigrationCondition()
+
+	if !cluster.HasCondition(ClusterConditionBucketEvictionMigration) || cluster.HasCondition(ClusterConditionBucketMigration) {
+		t.Fatal("an eviction policy migration should set BucketEvictionMigrating without being a storage backend migration")
+	}
+
+	if ok, reason := cluster.CanHibernate(); ok || reason != "Cluster is migrating buckets" {
+		t.Errorf("an eviction policy migration should block hibernation, got %v %q", ok, reason)
+	}
+}

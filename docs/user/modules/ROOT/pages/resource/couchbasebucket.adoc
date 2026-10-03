@@ -893,8 +893,8 @@ change to Couchbase Server with noRestart=true, which changes the bucket-level s
 leaves per-node overrides with the old policy.
 To apply the new policy to all nodes, either
 set this field back to false (the operator will trigger a bucket restart that clears all
-per-node overrides) or set enableBucketMigrationRoutines to true (the operator will perform
-swap-rebalances to converge all nodes to the new policy).
+per-node overrides) or set enableBucketMigrationRoutines to true (the operator will cycle
+nodes to converge them to the new policy).
 This field defaults to false.
 *DEVELOPER PREVIEW*: This feature is in developer preview and should not be used in production clusters.
 

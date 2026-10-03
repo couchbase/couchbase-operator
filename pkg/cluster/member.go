@@ -350,25 +350,20 @@ func (c *Cluster) initMember(ctx context.Context, newMember couchbaseutil.Member
 		return err
 	}
 
-	// check if we already know about this SHA256
-	// update the digest map
+	// Name a digest image from the version the server reports, caching it if new.
 	serverImage := c.cluster.Spec.ServerClassCouchbaseImage(&serverSpec)
 	newVersion, updated := couchbaseutil.UpdateImageDigestMap(serverImage, info.Version, c.log)
-	// check the member version, if it's different then update EVERYTHING.
-	if newVersion != "" {
-		if err := c.updateMemberVersion(newMember, newVersion); err != nil {
-			c.log.V(2).Info("failed to update member version label", "name", newMember.Name(), "version", info.Version, "cluster", c.namespacedName())
-			return err
-		}
+	// "" for a tag image; updateMemberVersion skips a version it cannot name.
+	if err := c.updateMemberVersion(newMember, newVersion); err != nil {
+		c.log.V(2).Info("failed to update member version label", "name", newMember.Name(), "version", info.Version, "cluster", c.namespacedName())
+		return err
 	}
 
-	// update state with the actual version IF we aren't upgrading.
-	// i.e this is a new cluster. We don't want to change versions until we're finished
-	// upgrading.
+	// The baseline only uses this before there are members.
 	if updated {
 		c.log.V(2).Info("discovered new SHA256 ", "image", serverImage, "version", info.Version, "cluster", c.namespacedName())
 
-		if err := c.updatePersistenceVersion(newVersion); err != nil {
+		if err := c.updateVersionBaseline(newVersion); err != nil {
 			c.log.V(2).Info("failed to update version in state", "version", info.Version, "cluster", c.namespacedName())
 
 			return err

@@ -5064,7 +5064,7 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			name:           "TestValidateBucketInvalidCouchbaseStorageBackendChange",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Add("/spec/storageBackend", "magma")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.storageBackend backend can only be changed if all referencing clusters have spec.buckets.enableBucketMigrationRoutines set to true"},
+			expectedErrors: []string{"spec.storageBackend backend can only be changed if all referencing clusters are version 7.6.0 or greater"},
 		},
 	}
 	runValidationTest(t, testDefs, validationContext{operation: operationApply})
@@ -5518,10 +5518,8 @@ func TestBucketMigrationPost76Validation(t *testing.T) {
 			name: "TestBucketMigrationToCouchstoreInvalid",
 			mutations: patchMap{"bucket3": jsonpatch.NewPatchSet().
 				Replace("/spec/storageBackend", "couchstore")},
-			expectedErrors: []string{"spec.storageBackend can only be changed from magma to couchstore if spec.historyRetention.collectionHistoryDefault is first disabled on the bucket",
-				"spec.storageBackend backend can only be changed if all referencing clusters have spec.buckets.enableBucketMigrationRoutines set to true",
-			},
-			shouldFail: true,
+			expectedErrors: []string{"spec.storageBackend can only be changed from magma to couchstore if spec.historyRetention.collectionHistoryDefault is first disabled on the bucket"},
+			shouldFail:     true,
 		},
 		{
 			name: "TestBucketMigrationToMagmaValid",
@@ -5534,12 +5532,12 @@ func TestBucketMigrationPost76Validation(t *testing.T) {
 			shouldFail: false,
 		},
 		{
-			name: "TestBucketMigrationToCouchstoreInvalidAnnotation",
+			name: "TestBucketMigrationToCouchstoreWithoutRoutines",
 			mutations: patchMap{
 				"bucket2": jsonpatch.NewPatchSet().
 					Replace("/spec/storageBackend", "couchstore")},
-			expectedErrors: []string{"spec.storageBackend backend can only be changed if all referencing clusters have spec.buckets.enableBucketMigrationRoutines set to true"},
-			shouldFail:     true,
+			expectedWarnings: []string{"because spec.buckets.enableBucketMigrationRoutines is not true"},
+			shouldFail:       false,
 		},
 	}
 
@@ -7102,16 +7100,14 @@ func TestBucketStorageBackendValidationApply(t *testing.T) {
 			shouldFail: false,
 		},
 		{
-			// The above but with history retention and enableBucketMigrationRoutines not configured correctly.
-			name: "TestNegValidateMagmaToCouchstoreDisabledMigrationRoutines",
+			// The above but without enableBucketMigrationRoutines, which only warns.
+			name: "TestValidateMagmaToCouchstoreDisabledMigrationRoutines",
 			mutations: patchMap{
 				"cluster0": jsonpatch.NewPatchSet().Remove(`/spec/buckets/enableBucketMigrationRoutines`),
 				"bucket1":  jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "couchstore").Add("/spec/numVBuckets", 1024),
 			},
-			shouldFail: true,
-			expectedErrors: []string{
-				`spec.storageBackend backend can only be changed if all referencing clusters have spec.buckets.enableBucketMigrationRoutines set to true`,
-			},
+			shouldFail:       false,
+			expectedWarnings: []string{`because spec.buckets.enableBucketMigrationRoutines is not true`},
 		},
 		{
 			// If you migrate from magma to couchstore, the memory quota can be anything above 100Mi.

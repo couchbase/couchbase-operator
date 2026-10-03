@@ -158,6 +158,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintTwoDataNodesForDeltaRecovery,
 		checkConstraintUpgradeFieldsDeprecated,
 		checkConstraintArbiterOverAdminService,
+		checkConstraintUnmanagedBucketMigrationRoutines,
 		checkMigrationConstraints,
 		checkConstraintMemcachedBucketDeprecated,
 		checkServerClassImageDeprecated,
@@ -5990,6 +5991,11 @@ func checkImmutableImage(current, updated *couchbasev2.CouchbaseCluster) error {
 		return err
 	}
 
+	// We have no idea what this is so we trust the user, whether upgrading or rolling back.
+	if !couchbaseutil.VersionKnown(updatedVersion) {
+		return nil
+	}
+
 	fullyUpgraded, err := isFullyUpgraded(current)
 	if err != nil {
 		return err
@@ -6000,11 +6006,6 @@ func checkImmutableImage(current, updated *couchbasev2.CouchbaseCluster) error {
 	isMigrating := current.HasCondition(couchbasev2.ClusterConditionMigrating)
 
 	if !isUpgrading && !isMigrating && fullyUpgraded {
-		if updatedVersion == "9.9.9" {
-			// we have no idea what this is so we trust the user
-			return nil
-		}
-
 		return checkClusterVersionUpgradePath(current, updated)
 	}
 
@@ -6022,7 +6023,7 @@ func isFullyUpgraded(c *couchbasev2.CouchbaseCluster) (bool, error) {
 		return false, err
 	}
 
-	if imageVersion == "9.9.9" {
+	if !couchbaseutil.VersionKnown(imageVersion) {
 		// we have no idea what this is so we trust the user
 		return true, nil
 	}
@@ -6345,7 +6346,7 @@ func checkClusterVersionUpgradePath(prev, curr *couchbasev2.CouchbaseCluster) er
 		return err
 	}
 
-	if oldVersion == "9.9.9" && prev.Status.CurrentVersion != "" {
+	if !couchbaseutil.VersionKnown(oldVersion) && prev.Status.CurrentVersion != "" {
 		// since we aren't upgrading the status should be what is actually running.
 		oldVersion = prev.Status.CurrentVersion
 	}
@@ -6435,6 +6436,10 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 		if prevBackend != currBackend || prev.IsSampleBucket() && !curr.IsSampleBucket() {
 			if err := checkClusterValidForBucketMigration(v, curr, c); err != nil {
 				errs = append(errs, err)
+			}
+
+			if !c.Spec.Buckets.EnableBucketMigrationRoutines {
+				warnings = append(warnings, bucketMigrationRoutinesDisabledWarning(c))
 			}
 
 			if prevBackend == couchbasev2.CouchbaseStorageBackendMagma && currBackend == couchbasev2.CouchbaseStorageBackendCouchstore {
@@ -6601,10 +6606,6 @@ func checkUserCollectionsHistoryExplicitTrue(v *types.Validator, namespace strin
 
 //nolint:gocognit
 func checkClusterValidForBucketMigration(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
-	if !cluster.Spec.Buckets.EnableBucketMigrationRoutines {
-		return fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters have spec.buckets.enableBucketMigrationRoutines set to true")
-	}
-
 	if cluster.HasCondition(couchbasev2.ClusterConditionUpgrading) {
 		return fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters are not in an upgrade")
 	}
@@ -7040,6 +7041,21 @@ func checkClusterGroupRBACConstraints(v *types.Validator, cluster *couchbasev2.C
 	}
 
 	return nil
+}
+
+// bucketMigrationRoutinesDisabledWarning warns that backend changes will not complete without migration routines.
+func bucketMigrationRoutinesDisabledWarning(cluster *couchbasev2.CouchbaseCluster) string {
+	return fmt.Sprintf("the operator will not cycle nodes to complete storage backend changes on cluster %s because spec.buckets.enableBucketMigrationRoutines is not true, "+
+		"nodes keep their old backend until they are swapped or fully recovered for another reason", cluster.NamespacedName())
+}
+
+// checkConstraintUnmanagedBucketMigrationRoutines warns when unmanaged buckets are migrated without migration routines.
+func checkConstraintUnmanagedBucketMigrationRoutines(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+	if cluster.Spec.Buckets.Managed || cluster.Spec.Buckets.TargetUnmanagedBucketStorageBackend == nil || cluster.Spec.Buckets.EnableBucketMigrationRoutines {
+		return nil, nil
+	}
+
+	return []string{bucketMigrationRoutinesDisabledWarning(cluster)}, nil
 }
 
 // checkConstraintArbiterOverAdminService returns a warning if the AdminService is used, recommending

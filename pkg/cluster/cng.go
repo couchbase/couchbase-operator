@@ -186,3 +186,40 @@ func (c *Cluster) filterUpgradeCandidatesToPreserveCNG(candidates couchbaseutil.
 
 	return finalCandidates
 }
+
+// refreshCNGTLSShadowSecret keeps the Cloud Native Gateway TLS shadow secret in sync with the
+// user-supplied server secret, so that certificate changes can be picked up by already-running
+// pods without needing to be recreated.
+func (c *Cluster) refreshCNGTLSShadowSecret() error {
+	cng := c.cluster.Spec.Networking.CloudNativeGateway
+	if cng == nil || cng.TLS == nil {
+		return nil
+	}
+
+	sourceSecret, ok := c.k8s.Secrets.Get(cng.TLS.ServerSecretName)
+	if !ok {
+		c.log.Error(errors.ErrResourceRequired, "secret not found", "secretName", cng.TLS.ServerSecretName)
+		return errors.ErrResourceRequired
+	}
+
+	if sourceSecret.Data["tls.crt"] == nil || sourceSecret.Data["tls.key"] == nil {
+		c.log.Error(errors.ErrResourceAttributeRequired, "secret missing tls.crt or tls.key data key", "secretName", cng.TLS.ServerSecretName)
+		return errors.ErrResourceAttributeRequired
+	}
+
+	requestedShadowSecret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   k8sutil.CNGShadowTLSSecretName(c.cluster),
+			Labels: k8sutil.LabelsForCluster(c.cluster),
+			OwnerReferences: []metav1.OwnerReference{
+				c.cluster.AsOwner(),
+			},
+		},
+		Data: map[string][]byte{
+			"tls.crt": sourceSecret.Data["tls.crt"],
+			"tls.key": sourceSecret.Data["tls.key"],
+		},
+	}
+
+	return c.reconcileTLSSecrets(requestedShadowSecret)
+}

@@ -484,6 +484,15 @@ func (c *Cluster) normalizePodSpecsForComparison(actualSpec, requestedSpec *v1.P
 		removeKeyShadowSecretVolumeMount(actualSpec)
 	}
 
+	// Ignore a pre-shadow direct mount of the currently configured Cloud Native Gateway server
+	// secret. Pods created before shadowing was introduced mount that secret directly rather than
+	// the shadow secret; they should not be recreated just to pick up the new mount, but will do so
+	// naturally next time they're recreated for any other reason. Any other mismatch (switching
+	// between self-signed and provided TLS, or pointing at a different ServerSecretName) is a real
+	// change and is left alone, so it still triggers recreation.
+	normalizeCNGTLSVolumeSecretName(c.cluster, requestedSpec)
+	normalizeCNGTLSVolumeSecretName(c.cluster, actualSpec)
+
 	return nil
 }
 
@@ -537,7 +546,7 @@ func rollbackDetected(targetVersion, baselineVersion, highestMemberVersion strin
 // isRollback reports whether spec.image takes the cluster back to the version it was
 // running before the in-flight upgrade started.
 func (c *Cluster) isRollback() (bool, error) {
-	baselineVersion, err := c.state.Get(persistence.Version)
+	baselineVersion, err := c.clusterVersion()
 	if err != nil {
 		return false, err
 	}
@@ -547,7 +556,7 @@ func (c *Cluster) isRollback() (bool, error) {
 		return false, err
 	}
 
-	return rollbackDetected(targetVersion, baselineVersion, c.GetHighestMemberVersion()), nil
+	return rollbackDetected(targetVersion, baselineVersion, c.GetHighestKnownMemberVersion()), nil
 }
 
 // nolint:gocognit,gocyclo
@@ -563,15 +572,14 @@ func (c *Cluster) getUpgradeCandidates(logCandidates bool) (couchbaseutil.Member
 		return nil, nil, nil, err
 	}
 
-	baselineVersion, err := c.state.Get(persistence.Version)
+	// Use isRollback, not target == baseline: a wrong baseline would zero the budget.
+	isRollback, err := c.isRollback()
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	isRollback := targetVersion == baselineVersion
-
 	pvpc := 0
-	if c.cluster.Spec.Upgrade != nil && !isRollback {
+	if !isRollback && c.cluster.Spec.Upgrade != nil {
 		pvpc = c.cluster.Spec.Upgrade.PreviousVersionPodCount
 	}
 
@@ -709,6 +717,30 @@ func removeKeyShadowSecretVolumeMount(podSpec *v1.PodSpec) {
 	podSpec.Volumes = filterVolumes(podSpec.Volumes)
 }
 
+// normalizeCNGTLSVolumeSecretName rewrites a pre-shadow direct mount of the currently configured
+// Cloud Native Gateway server secret onto the shadow secret name, so that a pod created before
+// shadowing was introduced isn't flagged for recreation purely because a freshly-computed spec
+// would mount the shadow secret instead. Any other mismatch (e.g. self-signed vs provided, or a
+// ServerSecretName the user has since changed) is left alone and still triggers recreation.
+func normalizeCNGTLSVolumeSecretName(cluster *couchbasev2.CouchbaseCluster, podSpec *v1.PodSpec) {
+	cng := cluster.Spec.Networking.CloudNativeGateway
+	if cng == nil || cng.TLS == nil {
+		return
+	}
+
+	for i := range podSpec.Volumes {
+		if podSpec.Volumes[i].Name != k8sutil.CngVolumeName {
+			continue
+		}
+
+		if podSpec.Volumes[i].Secret != nil && podSpec.Volumes[i].Secret.SecretName == cng.TLS.ServerSecretName {
+			podSpec.Volumes[i].Secret.SecretName = k8sutil.CNGShadowTLSSecretName(cluster)
+		}
+
+		return
+	}
+}
+
 func ignoreMigratedHostnameAlias(actual *v1.Pod, requested *v1.PodSpec) {
 	hostname, ok := actual.Annotations[constants.CouchbaseHostnameAnnotation]
 	if !ok {
@@ -760,7 +792,7 @@ func (c *Cluster) reportUpgrade(status *couchbasev2.UpgradeStatus) error {
 }
 
 func (c *Cluster) reportMixedMode() error {
-	if c.GetLowestMemberVersion() != c.GetHighestMemberVersion() {
+	if c.GetLowestKnownMemberVersion() != c.GetHighestKnownMemberVersion() {
 		c.cluster.Status.SetMixedModeCondition()
 	} else {
 		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionMixedMode)
@@ -778,14 +810,9 @@ func (c *Cluster) reportUpgradeComplete() error {
 		return err
 	}
 
-	// If we're not upgrading, let's ensure the version is set to the lowest member version.
+	// Steady state, and the baseline is not ours to write.
 	if !upgrading {
-		lowestImageVer := c.GetLowestMemberVersion()
-		if lowestImageVer == "" {
-			return nil
-		}
-
-		return c.state.Update(persistence.Version, lowestImageVer)
+		return nil
 	}
 
 	// Wait until all pods pending ejection have been removed before declaring the upgrade complete.
@@ -813,9 +840,7 @@ func (c *Cluster) reportUpgradeComplete() error {
 	// Upgrade has completed, raise and event, remove the cluster condition
 	// update the current cluster version and clear the upgrading flag in
 	// persistent storage.
-	lowestImageVer := c.GetLowestMemberVersion()
-
-	if err := c.state.Update(persistence.Version, lowestImageVer); err != nil {
+	if err := c.setClusterVersion(c.GetLowestKnownMemberVersion()); err != nil {
 		return err
 	}
 
@@ -862,7 +887,7 @@ func (c *Cluster) isUpgrading() (bool, error) {
 // Currently the only prerequisite is that clusters going from < 8.0.0 to 8.0.0,
 // need to not have any memcached buckets.
 func (c *Cluster) getUpgradeBlockers() ([]string, error) {
-	startVersion, err := c.state.Get(persistence.Version)
+	startVersion, err := c.clusterVersion()
 	if err != nil {
 		return nil, err
 	}
@@ -914,8 +939,7 @@ func (c *Cluster) applyPreviousVersionToNewPods(additions []couchbasev2.ServerCo
 		return err
 	}
 
-	// Get the baseline (old) version from persistence
-	baselineVersion, err := c.state.Get(persistence.Version)
+	baselineVersion, err := c.clusterVersion()
 	if err != nil {
 		return err
 	}
@@ -929,7 +953,7 @@ func (c *Cluster) applyPreviousVersionToNewPods(additions []couchbasev2.ServerCo
 	// If that fails, we'll fallback to a check on lowest vs highest active member versions.
 	if clusterCompatLe, err := c.CheckClusterCompatVersion(baselineVersion, false); err == nil && !clusterCompatLe {
 		return errors.ErrClusterNoLongerCompatible
-	} else if err != nil && c.GetLowestMemberVersion() == c.GetHighestMemberVersion() {
+	} else if err != nil && c.GetLowestKnownMemberVersion() == c.GetHighestKnownMemberVersion() {
 		return nil
 	}
 

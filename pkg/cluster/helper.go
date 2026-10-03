@@ -126,11 +126,12 @@ func (c *Cluster) UpdateFailedValidation(err error) error {
 	return nil
 }
 
-func (c *Cluster) GetRunningVersions() []*couchbaseutil.Version {
+func (c *Cluster) GetKnownMemberVersions() []*couchbaseutil.Version {
 	versions := []*couchbaseutil.Version{}
 
 	for _, member := range c.members {
-		if member.Version() == "" || member.Version() == "unknown" {
+		// Better left out than guessed at.
+		if !couchbaseutil.VersionKnown(member.Version()) {
 			continue
 		}
 
@@ -184,7 +185,7 @@ func (c *Cluster) SupportsVersionFeatures(version string) bool {
 	}
 
 	// Fallback to checking the lowest member version
-	lowestVersion := c.GetLowestMemberVersion()
+	lowestVersion := c.GetLowestKnownMemberVersion()
 
 	if lowestVersion == "" {
 		supports, err := c.IsAtLeastVersion(version)
@@ -243,8 +244,23 @@ func (c *Cluster) GetRunningImageForVersion(version string) string {
 	return ""
 }
 
-func (c *Cluster) GetLowestMemberVersion() string {
-	versions := c.GetRunningVersions()
+// allMemberVersionsKnown reports whether every non-external member's version is known.
+func (c *Cluster) allMemberVersionsKnown() bool {
+	for _, member := range c.members {
+		if member.IsExternal() {
+			continue
+		}
+
+		if !couchbaseutil.VersionKnown(member.Version()) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (c *Cluster) GetLowestKnownMemberVersion() string {
+	versions := c.GetKnownMemberVersions()
 
 	sort.Slice(versions, func(i, j int) bool {
 		return versions[i].Less(versions[j])
@@ -257,8 +273,8 @@ func (c *Cluster) GetLowestMemberVersion() string {
 	return versions[0].Version()
 }
 
-func (c *Cluster) GetHighestMemberVersion() string {
-	versions := c.GetRunningVersions()
+func (c *Cluster) GetHighestKnownMemberVersion() string {
+	versions := c.GetKnownMemberVersions()
 
 	sort.Slice(versions, func(i, j int) bool {
 		return versions[i].Less(versions[j])
