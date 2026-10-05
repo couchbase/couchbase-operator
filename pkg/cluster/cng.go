@@ -29,6 +29,11 @@ type CNGConfig struct {
 	LogLevel          string `json:"log-level"`
 	DapiPort          int    `json:"dapi-port,omitempty"`
 	DapiProxyServices string `json:"dapi-proxy-services,omitempty"`
+	// WatchTLSConfig enables CNG to reload its TLS certificates when the mounted secret changes.
+	// It's set via the config file rather than a container arg so that older CNG images, which
+	// don't recognise it, ignore it rather than failing to start, and so that it doesn't alter
+	// the pod spec and force existing pods to be recreated. CNG only reads it on startup.
+	WatchTLSConfig bool `json:"watch-tls-config"`
 }
 
 func (c *Cluster) reconcileCloudNativeGatewayConfig() error {
@@ -41,7 +46,8 @@ func (c *Cluster) reconcileCloudNativeGatewayConfig() error {
 	current, exists := c.k8s.ConfigMaps.Get(configMapName)
 
 	newConfig := CNGConfig{
-		LogLevel: string(cng.LogLevel),
+		LogLevel:       string(cng.LogLevel),
+		WatchTLSConfig: true,
 	}
 
 	if cng.DataAPI != nil && cng.DataAPI.Enabled {
