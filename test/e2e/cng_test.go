@@ -626,7 +626,7 @@ func TestCNGProvidedTLSSecretShadowing(t *testing.T) {
 
 	// CNG should now be serving the rotated certificate, picked up live without a restart.
 	// mustCheckCNGServerCertificate(t, kubernetes, cluster, newCertPEM)
-	// TODO REMOVE THIS ONCE CNG IS IMPLEMENTED!
+	mustCheckCNGServerCertificate(t, kubernetes, cluster, newCertPEM)
 
 	// Check the events match what we expect:
 	expectedEvents := []eventschema.Validatable{
