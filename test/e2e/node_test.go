@@ -1005,6 +1005,39 @@ func TestRebalanceMetrics(t *testing.T) {
 	e2eutil.MustWaitForOperatorGaugeMetricGreaterThan(t, kubernetes, nil, "rebalance_time_seconds", nil, 0, 2*time.Minute)
 }
 
+// TestRebalanceFailureNotReportedAsSuccess freezes the indexer, then adds a query node.
+// The index node set is unchanged, so after the index step times out /pools/default
+// still says balanced. The operator must not report it as a success.
+func TestRebalanceFailureNotReportedAsSuccess(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := constants.Size1
+	indexer := `for p in /proc/[0-9]*; do [ "$(cat $p/comm)" = indexer ] && kill -%s ${p#/proc/}; done; true`
+
+	// One data/index node and one query node, auto-failover held off so the server leaves the frozen node in.
+	cluster := clusterOptions().WithMixedEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(3600)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	frozenPod := couchbaseutil.CreateMemberName(cluster.Name, 0)
+
+	// Freeze the indexer and add a query node, the rebalance must now fail on the index service.
+	e2eutil.MustExecShellInPod(t, kubernetes, frozenPod, fmt.Sprintf(indexer, "STOP"))
+	cluster = e2eutil.MustResizeClusterNoWait(t, 1, clusterSize+1, kubernetes, cluster)
+
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceIncompleteEvent(cluster), 10*time.Minute)
+	e2eutil.MustNotObserveClusterEventFor(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 3*time.Minute)
+
+	// Thaw the indexer, the retried rebalance should now succeed.
+	e2eutil.MustExecShellInPod(t, kubernetes, frozenPod, fmt.Sprintf(indexer, "CONT"))
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 10*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+}
+
 // TestPodRecoveryTimestampMetrics verifies that the pod recovery timestamp
 // metrics are updated after a successful pod recovery with persistent volumes.
 func TestPodRecoveryTimestampMetrics(t *testing.T) {

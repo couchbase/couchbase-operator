@@ -153,7 +153,31 @@ func (c *Cluster) getStatusFromTarget(target interface{}, members couchbaseutil.
 		return nil, err
 	}
 
-	return c.getStatusFromClusterInfo(info, members)
+	status, err := c.getStatusFromClusterInfo(info, members)
+	if err != nil {
+		return nil, err
+	}
+
+	tasks := &couchbaseutil.TaskList{}
+	if err := couchbaseutil.ListTasks(tasks).RetryFor(timeout).On(c.api, target); err != nil {
+		return nil, err
+	}
+
+	applyRebalanceError(status, tasks)
+
+	return status, nil
+}
+
+// applyRebalanceError marks the cluster unbalanced while the last rebalance failed,
+// /pools/default can still say balanced when a service agent died.
+func applyRebalanceError(status *Status, tasks *couchbaseutil.TaskList) {
+	task, err := tasks.GetTask(couchbaseutil.TaskTypeRebalance)
+	if err != nil || task.ErrorMessage == "" || status.Balancing {
+		return
+	}
+
+	status.Balanced = false
+	status.RebalanceReasons = append(status.RebalanceReasons, task.ErrorMessage)
 }
 
 // getDownNodes returns a list of names for nodes that are down.

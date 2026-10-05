@@ -395,6 +395,9 @@ type Task struct {
 	Timeout   bool               `json:"masterRequestTimedOut"`
 	NodesInfo RebalanceNodesInfo `json:"nodesInfo"`
 
+	// ErrorMessage is set while the last rebalance or failover has failed.
+	ErrorMessage string `json:"errorMessage"`
+
 	// Replication attributes.
 	Source string `json:"source"`
 	Target string `json:"target"`
