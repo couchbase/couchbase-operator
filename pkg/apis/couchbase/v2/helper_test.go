@@ -247,7 +247,7 @@ func TestServerGroupLabel(t *testing.T) {
 }
 
 func TestBucketMigrationConditions(t *testing.T) {
-	cluster := &CouchbaseCluster{}
+	cluster := &CouchbaseCluster{Status: ClusterStatus{ClusterID: "f50608c895e226375ef4a3a6fb76229f"}}
 
 	cluster.Status.SetBucketEvictionMigrationCondition()
 

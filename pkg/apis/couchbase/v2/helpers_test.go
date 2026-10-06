@@ -529,3 +529,22 @@ func TestCouchbaseEncryptionKeyCanEncryptBucket(t *testing.T) {
 	}
 }
 
+// TestHasNeverRun checks a cluster only counts as never run until it has a cluster ID.
+func TestHasNeverRun(t *testing.T) {
+	if !(&CouchbaseCluster{}).HasNeverRun() {
+		t.Errorf("expected a cluster without a cluster ID to have never run")
+	}
+
+	if (&CouchbaseCluster{Status: ClusterStatus{ClusterID: "f50608c895e226375ef4a3a6fb76229f"}}).HasNeverRun() {
+		t.Errorf("expected a cluster with a cluster ID to have run")
+	}
+
+	// A cluster that has never run can always hibernate, one that has run still needs to be stable.
+	if ok, reason := (&CouchbaseCluster{}).CanHibernate(); !ok {
+		t.Errorf("expected a cluster that has never run to be able to hibernate, got %q", reason)
+	}
+
+	if ok, _ := (&CouchbaseCluster{Status: ClusterStatus{ClusterID: "f50608c895e226375ef4a3a6fb76229f"}}).CanHibernate(); ok {
+		t.Errorf("expected a cluster that has run but isn't balanced to wait before it hibernates")
+	}
+}

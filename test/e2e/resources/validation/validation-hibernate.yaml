@@ -25,6 +25,7 @@ spec:
         - search
         - eventing
 status:
+  clusterId: 0000000000000000000000005eed0001
   currentVersion: 7.2.2
   size: 0
   conditions:
@@ -59,6 +60,7 @@ spec:
         - search
         - eventing
 status:
+  clusterId: 0000000000000000000000005eed0002
   currentVersion: 7.2.2
   size: 0
   conditions:
@@ -88,6 +90,7 @@ spec:
         - search
         - eventing
 status:
+  clusterId: 0000000000000000000000005eed0003
   currentVersion: 7.2.2
   size: 0
   conditions:
@@ -138,6 +141,7 @@ spec:
         - search
         - eventing
 status:
+  clusterId: 0000000000000000000000005eed0004
   currentVersion: 7.2.2
   size: 0
   conditions:
@@ -167,6 +171,7 @@ spec:
         - search
         - eventing
 status:
+  clusterId: 0000000000000000000000005eed0005
   currentVersion: 7.2.2
   size: 0
   conditions:
@@ -176,3 +181,31 @@ status:
       reason: ClusterScaling
       status: "True"
       type: Scaling
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cluster-never-built
+  namespace: default
+spec:
+  hibernate: true
+  image: couchbase/server:7.6.0
+  servers:
+    - size: 1
+      name: all_services
+      services:
+        - data
+        - index
+        - analytics
+        - query
+        - search
+        - eventing
+status:
+  size: 0
+  conditions:
+    - lastTransitionTime: "2025-02-12T13:49:09Z"
+      lastUpdateTime: "2025-02-12T13:49:09Z"
+      message: Cluster hibernating
+      reason: Hibernating
+      status: "True"
+      type: Hibernating

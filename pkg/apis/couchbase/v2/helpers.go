@@ -1891,8 +1891,19 @@ func (l CloudNativeGatewayDataAPIProxyServiceList) StringSlice() []string {
 	return out
 }
 
+// HasNeverRun reports whether the cluster has never been set up. The cluster ID is only set once
+// the first member is set up, so a cluster without one has no data yet.
+func (c *CouchbaseCluster) HasNeverRun() bool {
+	return c.Status.ClusterID == ""
+}
+
 // canHibernate checks if the cluster be hibernated. If we cannot hibernate, this method should return false and a reason why.
 func (c *CouchbaseCluster) CanHibernate() (bool, string) {
+	// Never been set up, so there's no data and nothing to wait for.
+	if c.HasNeverRun() {
+		return true, ""
+	}
+
 	// Check if cluster is migrating
 	if c.IsMigrationCluster() {
 		return false, "Cluster is a migration cluster"

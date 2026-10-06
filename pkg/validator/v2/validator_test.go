@@ -1559,3 +1559,31 @@ func TestCheckConstraintXDCRRemoteClusterAuthMethod(t *testing.T) {
 		})
 	}
 }
+
+// TestCheckChangeConstraintsHibernate checks a hibernated cluster's spec can't be changed once it
+// has run, but can while it has never been set up, since there's nothing to protect yet.
+func TestCheckChangeConstraintsHibernate(t *testing.T) {
+	cluster := func(clusterID string, size int) *couchbasev2.CouchbaseCluster {
+		c := &couchbasev2.CouchbaseCluster{
+			Spec: couchbasev2.ClusterSpec{
+				Hibernate: true,
+				Servers:   []couchbasev2.ServerConfig{{Name: "all", Size: size}},
+			},
+			Status: couchbasev2.ClusterStatus{ClusterID: clusterID},
+		}
+
+		c.Status.SetHibernatingCondition("Cluster hibernating")
+
+		return c
+	}
+
+	const ran = "f50608c895e226375ef4a3a6fb76229f"
+
+	if err := checkChangeConstraintsHibernate(cluster("", 1), cluster("", 2)); err != nil {
+		t.Errorf("expected a never set up hibernated cluster to be changeable, got %v", err)
+	}
+
+	if err := checkChangeConstraintsHibernate(cluster(ran, 1), cluster(ran, 2)); err == nil {
+		t.Errorf("expected a hibernated cluster that has run to reject changes")
+	}
+}

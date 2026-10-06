@@ -276,3 +276,44 @@ func checkIfWarningPresent(expectedWarningSubstrings, actualWarnings []string) b
 
 	return true
 }
+
+// TestCheckFieldsCouchbaseClusterHibernation checks the hibernation warning is only given to a
+// cluster that has run. A new cluster hibernates straight away, so it doesn't need one.
+func TestCheckFieldsCouchbaseClusterHibernation(t *testing.T) {
+	// A spec with no other warnings, and hibernation turned on.
+	spec := v2.ClusterSpec{
+		ClusterSettings: v2.ClusterConfig{
+			AutoFailoverMaxCount: 2,
+			Indexer: &v2.CouchbaseClusterIndexerSettings{
+				StorageMode: v2.CouchbaseClusterIndexStorageSettingStandard,
+			},
+		},
+		AntiAffinity: true,
+		Hibernate:    true,
+	}
+
+	testcases := []struct {
+		name             string
+		clusterID        string
+		expectedWarnings []string
+	}{
+		{
+			name:             "cluster that has never been set up hibernates straight away, so no warning",
+			expectedWarnings: []string{},
+		},
+		{
+			name:             "cluster that has run and isn't stable yet is warned",
+			clusterID:        "f50608c895e226375ef4a3a6fb76229f",
+			expectedWarnings: []string{"Hibernation will occur once the cluster is stable"},
+		},
+	}
+
+	for _, testcase := range testcases {
+		cluster := v2.CouchbaseCluster{Spec: spec, Status: v2.ClusterStatus{ClusterID: testcase.clusterID}}
+		result := checkFieldsCouchbaseCluster(cluster)
+
+		if len(result) != len(testcase.expectedWarnings) || !checkIfWarningPresent(testcase.expectedWarnings, result) {
+			t.Errorf("%v failed. Expected warnings %v, got %v", testcase.name, testcase.expectedWarnings, result)
+		}
+	}
+}

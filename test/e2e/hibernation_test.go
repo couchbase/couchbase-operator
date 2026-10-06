@@ -11,10 +11,13 @@ licenses/APL2.txt.
 package e2e
 
 import (
+	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	utilconstants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -24,6 +27,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // TestHibernateEphemeralImmediate tests the somewhat pointless killing
@@ -159,6 +163,64 @@ func TestHibernateOccursAfterUpgrade(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		RollingUpgradeSequence(clusterSize, 1),
 		eventschema.Optional{Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}}},
+		eventschema.Event{Reason: k8sutil.EventReasonHibernationStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonHibernationEnded},
+		e2eutil.ClusterCreateSequence(clusterSize),
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestHibernateNewCluster tests that a cluster created with hibernation enabled goes straight
+// into hibernation without being built, and is built normally once hibernation is turned off.
+func TestHibernateNewCluster(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := constants.Size3
+
+	// Create the cluster already hibernated.
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Hibernate = true
+	cluster = e2eutil.MustNewClusterFromSpecAsync(t, kubernetes, cluster)
+
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionHibernating, v1.ConditionTrue, cluster, 2*time.Minute)
+
+	// Nothing should be built while it's hibernated, give the operator time to do so if it was going to.
+	time.Sleep(time.Minute)
+
+	pods, err := kubernetes.KubeClient.CoreV1().Pods(kubernetes.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: utilconstants.LabelCluster + "=" + cluster.Name})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	if len(pods.Items) != 0 {
+		e2eutil.Die(t, fmt.Errorf("expected no pods for a cluster created hibernated, got %d", len(pods.Items)))
+	}
+
+	hibernated, err := kubernetes.CRClient.CouchbaseV2().CouchbaseClusters(kubernetes.Namespace).Get(context.Background(), cluster.Name, metav1.GetOptions{})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	if hibernated.Status.ClusterID != "" {
+		e2eutil.Die(t, fmt.Errorf("expected no cluster ID for a cluster created hibernated, got %s", hibernated.Status.ClusterID))
+	}
+
+	// Turn hibernation off, the cluster should then be built as normal.
+	patchset := jsonpatch.NewPatchSet().Remove("/spec/hibernate")
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster entered hibernation
+	// * Cluster left hibernation
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonHibernationStarted},
 		eventschema.Event{Reason: k8sutil.EventReasonHibernationEnded},
 		e2eutil.ClusterCreateSequence(clusterSize),
