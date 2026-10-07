@@ -20,10 +20,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/iam"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/couchbase/couchbase-operator/pkg/config"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,11 +54,12 @@ type roleStatementEntry struct {
 	Condition map[string]map[string]string
 }
 type AWSUtil struct {
-	Sess     *session.Session
-	iam      *iam.IAM
-	cleanups []func() error
-	Policy   *iam.Policy
-	Role     *iam.Role
+	Cfg       aws.Config
+	pathStyle bool
+	iam       *iam.Client
+	cleanups  []func() error
+	Policy    *iamtypes.Policy
+	Role      *iamtypes.Role
 }
 
 type AWSHelperOptions struct {
@@ -89,14 +93,16 @@ func (o *AWSHelperOptions) WithEndpointCert(cert []byte) *AWSHelperOptions {
 func (o *AWSHelperOptions) Create() *AWSUtil {
 	token := ""
 
-	config := &aws.Config{
-		Region:      aws.String(o.region),
-		Credentials: credentials.NewStaticCredentials(o.accessKey, o.secretID, token),
+	opts := []func(*awsconfig.LoadOptions) error{
+		awsconfig.WithRegion(o.region),
+		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(o.accessKey, o.secretID, token)),
 	}
 
+	helper := AWSUtil{}
+
 	if o.endpoint != "" {
-		config.Endpoint = &o.endpoint
-		config.S3ForcePathStyle = aws.Bool(true)
+		opts = append(opts, awsconfig.WithBaseEndpoint(o.endpoint))
+		helper.pathStyle = true
 	}
 
 	if o.cert != nil {
@@ -109,13 +115,65 @@ func (o *AWSHelperOptions) Create() *AWSUtil {
 			},
 		}
 		client := http.Client{Transport: t, Timeout: 15 * time.Second}
-		config.HTTPClient = &client
+		opts = append(opts, awsconfig.WithHTTPClient(&client))
 	}
 
-	helper := AWSUtil{}
-	helper.Sess = session.Must(session.NewSession(config))
+	cfg, err := awsconfig.LoadDefaultConfig(context.Background(), opts...)
+	if err != nil {
+		panic(err)
+	}
+
+	helper.Cfg = cfg
 
 	return &helper
+}
+
+// S3WaitTimeout is the longest we wait for a bucket to appear or disappear.
+const S3WaitTimeout = 5 * time.Minute
+
+// EmptyS3Bucket deletes every object in the bucket. aws-sdk-go-v2 has no BatchDelete.
+func EmptyS3Bucket(ctx context.Context, svc *s3.Client, bucket string) error {
+	pages := s3.NewListObjectsV2Paginator(svc, &s3.ListObjectsV2Input{
+		Bucket: aws.String(bucket),
+	})
+
+	for pages.HasMorePages() {
+		page, err := pages.NextPage(ctx)
+		if err != nil {
+			return err
+		}
+
+		if len(page.Contents) == 0 {
+			continue
+		}
+
+		ids := make([]s3types.ObjectIdentifier, 0, len(page.Contents))
+		for _, obj := range page.Contents {
+			ids = append(ids, s3types.ObjectIdentifier{Key: obj.Key})
+		}
+
+		out, err := svc.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+			Bucket: aws.String(bucket),
+			Delete: &s3types.Delete{Objects: ids},
+		})
+		if err != nil {
+			return err
+		}
+
+		// Per-key failures come back in a 200 response.
+		if len(out.Errors) > 0 {
+			return fmt.Errorf("failed to delete %d objects, first %q: %s", len(out.Errors), aws.ToString(out.Errors[0].Key), aws.ToString(out.Errors[0].Message))
+		}
+	}
+
+	return nil
+}
+
+// S3 returns an S3 client, using path style addressing when a custom endpoint is set.
+func (helper *AWSUtil) S3() *s3.Client {
+	return s3.NewFromConfig(helper.Cfg, func(o *s3.Options) {
+		o.UsePathStyle = helper.pathStyle
+	})
 }
 
 func (helper *AWSUtil) SetupBackupIAM(namespace, accountid, oidcProvider, s3Bucket string) error {
@@ -142,12 +200,12 @@ func MustSetupBackupIAM(t *testing.T, kubernetes *types.Cluster, aws *AWSUtil, a
 func (helper *AWSUtil) attachPolicyToRole() error {
 	svc := helper.getIAM()
 
-	_, err := svc.AttachRolePolicy(&iam.AttachRolePolicyInput{
+	_, err := svc.AttachRolePolicy(context.Background(), &iam.AttachRolePolicyInput{
 		PolicyArn: helper.Policy.Arn,
 		RoleName:  helper.Role.RoleName,
 	})
 	dettachPolicy := func() error {
-		_, err := svc.DetachRolePolicy(&iam.DetachRolePolicyInput{
+		_, err := svc.DetachRolePolicy(context.Background(), &iam.DetachRolePolicyInput{
 			PolicyArn: helper.Policy.Arn,
 			RoleName:  helper.Role.RoleName,
 		})
@@ -160,9 +218,9 @@ func (helper *AWSUtil) attachPolicyToRole() error {
 	return err
 }
 
-func (helper *AWSUtil) getIAM() *iam.IAM {
+func (helper *AWSUtil) getIAM() *iam.Client {
 	if helper.iam == nil {
-		helper.iam = iam.New(helper.Sess)
+		helper.iam = iam.NewFromConfig(helper.Cfg)
 	}
 
 	return helper.iam
@@ -192,7 +250,7 @@ func (helper *AWSUtil) createPolicy(s3Bucket string) error {
 		return err
 	}
 
-	result, err := svc.CreatePolicy(&iam.CreatePolicyInput{
+	result, err := svc.CreatePolicy(context.Background(), &iam.CreatePolicyInput{
 		PolicyDocument: aws.String(string(b)),
 		PolicyName:     aws.String("certification-test-policy-" + RandomString(6)),
 	})
@@ -201,7 +259,7 @@ func (helper *AWSUtil) createPolicy(s3Bucket string) error {
 	}
 
 	deletePolicy := func() error {
-		_, err := svc.DeletePolicy(&iam.DeletePolicyInput{
+		_, err := svc.DeletePolicy(context.Background(), &iam.DeletePolicyInput{
 			PolicyArn: result.Policy.Arn,
 		})
 
@@ -241,7 +299,7 @@ func (helper *AWSUtil) createRole(namespace string, accountid string, oidcProvid
 		return err
 	}
 
-	result, err := svc.CreateRole(&iam.CreateRoleInput{
+	result, err := svc.CreateRole(context.Background(), &iam.CreateRoleInput{
 		AssumeRolePolicyDocument: aws.String(string(b)),
 		RoleName:                 aws.String("certification-test-role-" + RandomString(6)),
 	})
@@ -250,7 +308,7 @@ func (helper *AWSUtil) createRole(namespace string, accountid string, oidcProvid
 	}
 
 	deleteRole := func() error {
-		_, err := svc.DeleteRole(&iam.DeleteRoleInput{
+		_, err := svc.DeleteRole(context.Background(), &iam.DeleteRoleInput{
 			RoleName: result.Role.RoleName,
 		})
 

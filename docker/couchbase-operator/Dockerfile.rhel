@@ -6,7 +6,10 @@
 # will be governed by the Apache License, Version 2.0, included in the file
 # licenses/APL2.txt.
 
-FROM docker.io/redhat/ubi8-micro
+# Pinned by tag and digest to avoid supply chain attacks. Override at build
+# time with --build-arg BASE_IMAGE=... if a different base is needed.
+ARG BASE_IMAGE=docker.io/redhat/ubi8-micro:8.10-1779859061@sha256:41d80530c06076f7f96094e998b28a22009b9247fe207d6b62b7f5aa61656ea7
+FROM ${BASE_IMAGE}
 LABEL maintainer="docker@couchbase.com"
 ARG WORKDIR=/tmp/src/github.com/couchbase/couchbase-operator
 
