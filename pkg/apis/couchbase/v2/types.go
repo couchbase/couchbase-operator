@@ -719,16 +719,17 @@ type CouchbaseSnapshotBackupRunSpec struct {
 	// Buckets, Scopes and Collections record the names that existed at capture time, so
 	// a restore can detect one with no matching CR and require acknowledgement before
 	// proceeding, rather than silently losing it to ordinary reconciliation right after
-	// restore completes.
+	// restore completes. They come from the bucket, scope and collection CRs at backup time.
 	// Buckets is the set of bucket names captured in this run.
 	// +optional
 	Buckets []string `json:"buckets,omitempty"`
 
-	// Scopes is the set of scope names captured in this run.
+	// Scopes is the set of scopes captured in this run, each as bucket.scope.
 	// +optional
 	Scopes []string `json:"scopes,omitempty"`
 
-	// Collections is the set of collection names captured in this run.
+	// Collections is the set of collections captured in this run, each as
+	// bucket.scope.collection.
 	// +optional
 	Collections []string `json:"collections,omitempty"`
 
@@ -814,6 +815,11 @@ type CouchbaseSnapshotBackupRunSnapshot struct {
 
 	// SnapshotName is the VolumeSnapshot object holding the capture.
 	SnapshotName string `json:"snapshotName"`
+
+	// MountPath is where this volume is mounted in the pod, for example /mnt/data. Restore
+	// uses it to put each snapshot back as the right volume.
+	// +optional
+	MountPath string `json:"mountPath,omitempty"`
 }
 
 type CouchbaseSnapshotBackupRunPhase string
@@ -872,14 +878,13 @@ type CouchbaseSnapshotBackupRestoreSpec struct {
 // CouchbaseSnapshotBackupRestoreTarget describes the restore's destination and the explicit
 // acknowledgements required before a destructive or lossy action is allowed to proceed.
 type CouchbaseSnapshotBackupRestoreTarget struct {
-	// Name is the target CouchbaseCluster's name. If no CouchbaseCluster with this name
-	// exists yet, the request is rejected, create the target first, hibernated and with
-	// zero pods, before restoring into it.
+	// Name is the CouchbaseCluster to restore into, in the same namespace. Create it first.
+	// A new cluster should be created with hibernate set to true. A cluster that already
+	// has data can be used too, but needs acknowledgeDataLoss, since its data is replaced.
 	Name string `json:"name"`
 
-	// AcknowledgeDataLoss must be true when the target already exists and is running.
-	// Restoring into a running cluster deletes its current pods and volumes first, this
-	// is irreversible.
+	// AcknowledgeDataLoss must be true if the target cluster already has data, whether it's
+	// running or hibernated. The restore replaces that data, and this can't be undone.
 	// +optional
 	AcknowledgeDataLoss *bool `json:"acknowledgeDataLoss,omitempty"`
 
@@ -889,12 +894,6 @@ type CouchbaseSnapshotBackupRestoreTarget struct {
 	// immediately after the restore completes.
 	// +optional
 	AcknowledgeBucketGap *bool `json:"acknowledgeBucketGap,omitempty"`
-
-	// ServerSecretName is the TLS certificate secret for the target cluster. Required
-	// only when the target is a new, differently named cluster, since the restored data
-	// won't already have a certificate valid for it.
-	// +optional
-	ServerSecretName string `json:"serverSecretName,omitempty"`
 }
 
 // CouchbaseSnapshotBackupRestoreStatus reports restore progress and outcome.

@@ -332,7 +332,8 @@ func (c *Cluster) snapshotBackupResourceNames() (bucketNames, scopeNames, collec
 		}
 
 		for _, scope := range scopes {
-			scopeNames = append(scopeNames, scope.CouchbaseName())
+			scopeName := bucket.GetCouchbaseName() + "." + scope.CouchbaseName()
+			scopeNames = append(scopeNames, scopeName)
 
 			collections, err := c.gatherCollections(scope)
 			if err != nil {
@@ -340,7 +341,7 @@ func (c *Cluster) snapshotBackupResourceNames() (bucketNames, scopeNames, collec
 			}
 
 			for _, collection := range collections {
-				collectionNames = append(collectionNames, collection.CouchbaseName())
+				collectionNames = append(collectionNames, scopeName+"."+collection.CouchbaseName())
 			}
 		}
 	}
@@ -501,8 +502,9 @@ func (c *Cluster) captureIndividualSnapshots(backup *couchbasev2.CouchbaseBackup
 	className := backup.Spec.SnapshotBackup.VolumeSnapshotClassName
 
 	type volumeToSnapshot struct {
-		member string
-		pvc    string
+		member    string
+		pvc       string
+		mountPath string
 	}
 
 	var volumes []volumeToSnapshot
@@ -517,7 +519,7 @@ func (c *Cluster) captureIndividualSnapshots(backup *couchbasev2.CouchbaseBackup
 				continue
 			}
 
-			volumes = append(volumes, volumeToSnapshot{member: member.Name(), pvc: pvc.Name})
+			volumes = append(volumes, volumeToSnapshot{member: member.Name(), pvc: pvc.Name, mountPath: pvc.Annotations[constants.AnnotationVolumeMountPath]})
 		}
 	}
 
@@ -539,6 +541,7 @@ func (c *Cluster) captureIndividualSnapshots(backup *couchbasev2.CouchbaseBackup
 				Member:       volume.member,
 				VolumeName:   volume.pvc,
 				SnapshotName: snapshotName,
+				MountPath:    volume.mountPath,
 			}
 
 			return nil
@@ -728,8 +731,8 @@ func isOwnedByGroupSnapshot(owners []metav1.OwnerReference, groupSnapshotName st
 }
 
 // snapshotBackupRunEntries turns a group snapshot's snapshots into the list recorded on the
-// run. memberForPVC returns the member a PVC belongs to, from its node label.
-func snapshotBackupRunEntries(snapshots []snapshotv1.VolumeSnapshot, memberForPVC func(string) string) []couchbasev2.CouchbaseSnapshotBackupRunSnapshot {
+// run. memberForPVC returns the member a PVC belongs to, and mountPathForPVC where it's mounted.
+func snapshotBackupRunEntries(snapshots []snapshotv1.VolumeSnapshot, memberForPVC, mountPathForPVC func(string) string) []couchbasev2.CouchbaseSnapshotBackupRunSnapshot {
 	var entries []couchbasev2.CouchbaseSnapshotBackupRunSnapshot
 
 	for _, snapshot := range snapshots {
@@ -742,6 +745,7 @@ func snapshotBackupRunEntries(snapshots []snapshotv1.VolumeSnapshot, memberForPV
 			Member:       memberForPVC(pvc),
 			VolumeName:   pvc,
 			SnapshotName: snapshot.Name,
+			MountPath:    mountPathForPVC(pvc),
 		})
 	}
 
@@ -1063,7 +1067,7 @@ func (c *Cluster) validateSnapshotBackupRun(run *couchbasev2.CouchbaseSnapshotBa
 
 		// A group snapshot's snapshots are only known now, so record them for restore.
 		if run.Status.GroupSnapshot {
-			run.Status.Snapshots = snapshotBackupRunEntries(snapshots, c.memberForPVC)
+			run.Status.Snapshots = snapshotBackupRunEntries(snapshots, c.memberForPVC, c.mountPathForPVC)
 		}
 	case couchbasev2.CouchbaseSnapshotBackupRunPhaseInvalid:
 		run.Status.Phase = check.phase
@@ -1096,6 +1100,15 @@ func (c *Cluster) validateSnapshotBackupRun(run *couchbasev2.CouchbaseSnapshotBa
 func (c *Cluster) memberForPVC(name string) string {
 	if pvc, ok := c.k8s.PersistentVolumeClaims.Get(name); ok {
 		return pvc.Labels[constants.LabelNode]
+	}
+
+	return ""
+}
+
+// mountPathForPVC returns where a PVC is mounted in its pod, from its path annotation.
+func (c *Cluster) mountPathForPVC(name string) string {
+	if pvc, ok := c.k8s.PersistentVolumeClaims.Get(name); ok {
+		return pvc.Annotations[constants.AnnotationVolumeMountPath]
 	}
 
 	return ""

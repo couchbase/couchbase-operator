@@ -62,7 +62,7 @@ func CheckConstraints(v *types.Validator, resource runtime.Object) ([]string, er
 	case *couchbasev2.CouchbaseBackupRestore:
 		return []string{}, validationv2.CheckConstraintsBackupRestore(v, t)
 	case *couchbasev2.CouchbaseSnapshotBackupRestore:
-		return []string{}, validationv2.CheckConstraintsSnapshotBackupRestore(v, t)
+		return validationv2.CheckConstraintsSnapshotBackupRestore(v, t)
 	case *couchbasev2.CouchbaseCollection:
 		return validationv2.CheckConstraintsCollection(v, t)
 	case *couchbasev2.CouchbaseCollectionGroup:
@@ -103,6 +103,10 @@ func CheckImmutableFields(current, updated runtime.Object) error {
 	case *couchbasev2.CouchbaseBackup:
 		if t2, ok := updated.(*couchbasev2.CouchbaseBackup); ok {
 			return validationv2.CheckImmutableFieldsBackup(t, t2)
+		}
+	case *couchbasev2.CouchbaseSnapshotBackupRestore:
+		if t2, ok := updated.(*couchbasev2.CouchbaseSnapshotBackupRestore); ok {
+			return validationv2.CheckImmutableFieldsSnapshotBackupRestore(t, t2)
 		}
 	case *couchbasev2.CouchbaseAutoscaler:
 		if t2, ok := updated.(*couchbasev2.CouchbaseAutoscaler); ok {

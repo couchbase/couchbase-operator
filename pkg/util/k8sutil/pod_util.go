@@ -834,6 +834,30 @@ func getPathsToPersist(member couchbaseutil.Member, mounts *couchbasev2.VolumeMo
 	return mountPaths, nil
 }
 
+// SnapshotMountPaths returns where each volume in mounts is mounted in the pod, leaving out
+// logs, since a snapshot backup doesn't take those.
+func SnapshotMountPaths(mounts *couchbasev2.VolumeMounts) []string {
+	if mounts == nil || mounts.DefaultClaim == "" {
+		return nil
+	}
+
+	paths := []string{pathForVolumeMountName(defaultVolumeMount)}
+
+	if mounts.DataClaim != "" {
+		paths = append(paths, pathForVolumeMountName(dataVolumeMount))
+	}
+
+	if mounts.IndexClaim != "" {
+		paths = append(paths, pathForVolumeMountName(indexVolumeMount))
+	}
+
+	for index := range mounts.AnalyticsClaims {
+		paths = append(paths, pathForVolumeMountName(volumeMountName(fmt.Sprintf("%s-%02d", analyticsVolumeMount, index))))
+	}
+
+	return paths
+}
+
 func GetAnalyticsVolumePaths(mounts *couchbasev2.VolumeMounts) []string {
 	paths := []string{}
 

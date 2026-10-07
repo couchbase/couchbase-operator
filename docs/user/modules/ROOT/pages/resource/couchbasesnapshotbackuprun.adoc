@@ -45,6 +45,7 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbasesnapshotbackupruns-status-reason,reason>>: ""
   <<couchbasesnapshotbackupruns-status-snapshots,snapshots>>:
   - <<couchbasesnapshotbackupruns-status-snapshots-member,member>>: ""
+    <<couchbasesnapshotbackupruns-status-snapshots-mountpath,mountPath>>: ""
     <<couchbasesnapshotbackupruns-status-snapshots-snapshotname,snapshotName>>: ""
     <<couchbasesnapshotbackupruns-status-snapshots-volumename,volumeName>>: ""
   <<couchbasesnapshotbackupruns-status-starttime,startTime>>: ""
@@ -118,6 +119,7 @@ Buckets, Scopes and Collections record the names that existed at capture time, s
 a restore can detect one with no matching CR and require acknowledgement before
 proceeding, rather than silently losing it to ordinary reconciliation right after
 restore completes.
+They come from the bucket, scope and collection CRs at backup time.
 Buckets is the set of bucket names captured in this run.
 
 === couchbasesnapshotbackupruns.spec.clusterSpec
@@ -157,7 +159,8 @@ cluster.
 
 ==== Description
 
-Collections is the set of collection names captured in this run.
+Collections is the set of collections captured in this run, each as
+bucket.scope.collection.
 
 === couchbasesnapshotbackupruns.spec.maxSkew
 
@@ -202,7 +205,7 @@ as MaxSkew.
 
 ==== Description
 
-Scopes is the set of scope names captured in this run.
+Scopes is the set of scopes captured in this run, each as bucket.scope.
 
 === couchbasesnapshotbackupruns.spec.serverVersion
 
@@ -384,6 +387,18 @@ to restore each volume from.
 ==== Description
 
 Member is the name of the pod/member this volume belonged to.
+
+=== couchbasesnapshotbackupruns.status.snapshots.mountPath
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+MountPath is where this volume is mounted in the pod, for example /mnt/data.
+Restore
+uses it to put each snapshot back as the right volume.
 
 === couchbasesnapshotbackupruns.status.snapshots.snapshotName
 

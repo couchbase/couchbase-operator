@@ -723,3 +723,46 @@ func TestIsPodPendingAnyEjection(t *testing.T) {
 		t.Errorf("condition with status False: IsPodPendingAnyEjection = true, want false")
 	}
 }
+
+// TestSnapshotMountPaths checks the mount paths a snapshot backup takes match the paths the pod
+// mounts, and that logs, which aren't snapshotted, are left out.
+func TestSnapshotMountPaths(t *testing.T) {
+	testcases := []struct {
+		name     string
+		mounts   *couchbasev2.VolumeMounts
+		expected []string
+	}{
+		{
+			name:     "no volume mounts",
+			expected: nil,
+		},
+		{
+			name:     "logs only",
+			mounts:   &couchbasev2.VolumeMounts{LogsClaim: "couchbase"},
+			expected: nil,
+		},
+		{
+			name:     "default only",
+			mounts:   &couchbasev2.VolumeMounts{DefaultClaim: "couchbase"},
+			expected: []string{"/opt/couchbase/var/lib/couchbase"},
+		},
+		{
+			name: "default, data, index and two analytics",
+			mounts: &couchbasev2.VolumeMounts{
+				DefaultClaim:    "couchbase",
+				DataClaim:       "couchbase",
+				IndexClaim:      "couchbase",
+				AnalyticsClaims: []string{"couchbase", "couchbase"},
+			},
+			expected: []string{"/opt/couchbase/var/lib/couchbase", "/mnt/data", "/mnt/index", "/mnt/analytics-00", "/mnt/analytics-01"},
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			if got := SnapshotMountPaths(testcase.mounts); !reflect.DeepEqual(got, testcase.expected) {
+				t.Errorf("expected %v, got %v", testcase.expected, got)
+			}
+		})
+	}
+}

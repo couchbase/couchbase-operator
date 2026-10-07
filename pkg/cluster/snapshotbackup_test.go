@@ -439,7 +439,7 @@ func TestListSnapshotBackupRunSnapshots(t *testing.T) {
 }
 
 // TestSnapshotBackupRunEntries checks that a group snapshot's snapshots are recorded on the
-// run with the member, volume, and snapshot name for each one.
+// run with the member, volume, snapshot name, and mount path for each one.
 func TestSnapshotBackupRunEntries(t *testing.T) {
 	snapshot := func(name, pvc string) snapshotv1.VolumeSnapshot {
 		return snapshotv1.VolumeSnapshot{
@@ -452,17 +452,23 @@ func TestSnapshotBackupRunEntries(t *testing.T) {
 
 	members := map[string]string{
 		"cb-0000-default-00": "cb-0000",
-		"cb-0001-default-00": "cb-0001",
+		"cb-0000-data-00":    "cb-0000",
+	}
+
+	mountPaths := map[string]string{
+		"cb-0000-default-00": "/opt/couchbase/var/lib/couchbase",
+		"cb-0000-data-00":    "/mnt/data",
 	}
 
 	entries := snapshotBackupRunEntries(
-		[]snapshotv1.VolumeSnapshot{snapshot("member-1", "cb-0000-default-00"), snapshot("member-2", "cb-0001-default-00")},
+		[]snapshotv1.VolumeSnapshot{snapshot("member-1", "cb-0000-default-00"), snapshot("member-2", "cb-0000-data-00")},
 		func(pvc string) string { return members[pvc] },
+		func(pvc string) string { return mountPaths[pvc] },
 	)
 
 	expected := []couchbasev2.CouchbaseSnapshotBackupRunSnapshot{
-		{Member: "cb-0000", VolumeName: "cb-0000-default-00", SnapshotName: "member-1"},
-		{Member: "cb-0001", VolumeName: "cb-0001-default-00", SnapshotName: "member-2"},
+		{Member: "cb-0000", VolumeName: "cb-0000-default-00", SnapshotName: "member-1", MountPath: "/opt/couchbase/var/lib/couchbase"},
+		{Member: "cb-0000", VolumeName: "cb-0000-data-00", SnapshotName: "member-2", MountPath: "/mnt/data"},
 	}
 
 	if !reflect.DeepEqual(entries, expected) {

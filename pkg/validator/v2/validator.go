@@ -17,6 +17,7 @@ import (
 	"reflect"
 	"regexp"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -3736,20 +3737,18 @@ func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.Couc
 	return nil
 }
 
-// CheckConstraintsSnapshotBackupRestore validates a CouchbaseSnapshotBackupRestore. This is a
-// skeleton, only checks that need nothing but the object's own spec are implemented here.
-// Checks that need to look up other cluster state are not implemented yet, each left as a comment.
-//
-//   - Whether the target CouchbaseCluster exists at all, and whether it is running or
-//     hibernated, determines which of the three restore behaviours applies (reject,
-//     fill and wake the cluster up, or destructive rollback).
-//   - Whether the VolumeSnapshot and VolumeGroupSnapshot CRDs are installed on the
-//     cluster at all cannot be checked yet.
-//   - Whether the referenced run's recorded buckets/scopes/collections are all covered by
-//     existing CRs is not checked yet.
-func CheckConstraintsSnapshotBackupRestore(v *types.Validator, restore *couchbasev2.CouchbaseSnapshotBackupRestore) error {
+// CheckConstraintsSnapshotBackupRestore validates a CouchbaseSnapshotBackupRestore before it's
+// accepted, so a restore that can't work, or that would lose data without the user agreeing,
+// never starts. It checks the snapshot add on is installed, the run to restore from is a
+// Complete run of the named backup, and the target cluster exists, with acknowledgeDataLoss
+// set if it already has data. It also checks the target can run the backed up data, by its
+// server version and volumes, and warns when the target has a different number of nodes.
+func CheckConstraintsSnapshotBackupRestore(v *types.Validator, restore *couchbasev2.CouchbaseSnapshotBackupRestore) ([]string, error) {
 	checks := []func(*types.Validator, *couchbasev2.CouchbaseSnapshotBackupRestore) error{
 		checkConstraintSnapshotBackupRestoreNameLength,
+		checkSnapshotBackupRestoreRun,
+		checkSnapshotBackupRestoreTarget,
+		checkSnapshotBackupRestoreFits,
 	}
 
 	var errs []error
@@ -3768,10 +3767,10 @@ func CheckConstraintsSnapshotBackupRestore(v *types.Validator, restore *couchbas
 	}
 
 	if errs != nil {
-		return errors.CompositeValidationError(errs...)
+		return nil, errors.CompositeValidationError(errs...)
 	}
 
-	return nil
+	return snapshotBackupRestoreWarnings(v, restore)
 }
 
 func checkConstraintSnapshotBackupRestoreNameLength(_ *types.Validator, restore *couchbasev2.CouchbaseSnapshotBackupRestore) error {
@@ -3781,6 +3780,439 @@ func checkConstraintSnapshotBackupRestoreNameLength(_ *types.Validator, restore 
 	}
 
 	return nil
+}
+
+// checkSnapshotBackupRestoreRun checks the run to restore from exists, came from the named
+// backup, and finished as Complete, so a restore never starts from a backup that isn't usable.
+func checkSnapshotBackupRestoreRun(v *types.Validator, restore *couchbasev2.CouchbaseSnapshotBackupRestore) error {
+	spec := restore.Spec
+
+	if spec.BackupName == "" || spec.RunName == "" || spec.Target.Name == "" {
+		return fmt.Errorf("spec.backupName, spec.runName and spec.target.name must all be set")
+	}
+
+	if err := checkSnapshotAPIsInstalled(v, "a snapshot backup restore", false); err != nil {
+		return err
+	}
+
+	run, found, err := v.Abstraction.GetCouchbaseSnapshotBackupRun(restore.Namespace, spec.RunName)
+	if err != nil {
+		return err
+	}
+
+	if !found {
+		return fmt.Errorf("spec.runName %s doesn't exist in namespace %s", spec.RunName, restore.Namespace)
+	}
+
+	if run.Spec.SourceBackup != spec.BackupName {
+		return fmt.Errorf("spec.runName %s was taken by backup %s, not spec.backupName %s", spec.RunName, run.Spec.SourceBackup, spec.BackupName)
+	}
+
+	if run.Status.Phase != couchbasev2.CouchbaseSnapshotBackupRunPhaseComplete {
+		return fmt.Errorf("spec.runName %s is %s, only a Complete run can be restored", spec.RunName, run.Status.Phase)
+	}
+
+	// A run taken as a group snapshot also needs the group snapshot API to restore.
+	if run.Status.GroupSnapshot {
+		return checkSnapshotAPIsInstalled(v, "a snapshot backup restore", true)
+	}
+
+	return nil
+}
+
+// checkSnapshotBackupRestoreTarget checks the cluster to restore into exists, and that the user
+// has agreed to lose its data if it has any. A cluster that has ever run has a cluster ID, and
+// still has its data even when hibernated, since hibernating keeps the volumes.
+func checkSnapshotBackupRestoreTarget(v *types.Validator, restore *couchbasev2.CouchbaseSnapshotBackupRestore) error {
+	target := restore.Spec.Target
+
+	cluster, err := getCouchbaseClusterByName(v, restore.Namespace, target.Name)
+	if err != nil {
+		return err
+	}
+
+	if cluster == nil {
+		return fmt.Errorf("spec.target.name %s doesn't exist, create the cluster first with spec.hibernate set to true", target.Name)
+	}
+
+	hasData := cluster.Status.ClusterID != ""
+	acknowledged := target.AcknowledgeDataLoss != nil && *target.AcknowledgeDataLoss
+
+	if hasData && !acknowledged {
+		return fmt.Errorf("spec.target.acknowledgeDataLoss must be true, cluster %s already has data and the restore replaces it", target.Name)
+	}
+
+	return nil
+}
+
+// checkSnapshotBackupRestoreFits checks the target cluster can run the backed up data, its server
+// version must be one the data can be upgraded to, and its volumes must match the run's. Every
+// backed up bucket, scope and collection also needs a CR, or the operator deletes it again.
+func checkSnapshotBackupRestoreFits(v *types.Validator, restore *couchbasev2.CouchbaseSnapshotBackupRestore) error {
+	run, cluster, err := getSnapshotBackupRestoreRunAndTarget(v, restore)
+	if err != nil || run == nil || cluster == nil {
+		// A missing run or cluster is already reported by the other checks.
+		return err
+	}
+
+	if err := checkSnapshotBackupRestoreVersion(run, cluster); err != nil {
+		return err
+	}
+
+	if err := checkSnapshotBackupRestoreVolumes(run, cluster); err != nil {
+		return err
+	}
+
+	return checkSnapshotBackupRestoreCoverage(v, restore, run, cluster)
+}
+
+// checkSnapshotBackupRestoreVersion checks the target's server version can start on the backed
+// up data. Starting a newer server on old data is an upgrade, so the normal upgrade rules apply,
+// and an older server can't read the data at all.
+func checkSnapshotBackupRestoreVersion(run *couchbasev2.CouchbaseSnapshotBackupRun, cluster *couchbasev2.CouchbaseCluster) error {
+	runVersion := run.Spec.ServerVersion
+
+	targetVersion, err := k8sutil.CouchbaseVersion(cluster.Spec.CouchbaseImage())
+	if err != nil {
+		return err
+	}
+
+	// A version we can't read can't be checked, so trust the user, like a cluster upgrade does.
+	if !couchbaseutil.VersionKnown(runVersion) || !couchbaseutil.VersionKnown(targetVersion) {
+		return nil
+	}
+
+	runBefore72, err := couchbaseutil.VersionBefore(runVersion, "7.2.0")
+	if err != nil {
+		return err
+	}
+
+	targetAfter72, err := couchbaseutil.VersionAfter(targetVersion, "7.2.0")
+	if err != nil {
+		return err
+	}
+
+	if runBefore72 && targetAfter72 {
+		return fmt.Errorf("cluster %s runs %s, data backed up from %s before 7.2.0 can't be restored onto 7.2.0 or later", cluster.Name, targetVersion, runVersion)
+	}
+
+	if err := couchbaseutil.CheckUpgradePath(runVersion, targetVersion); err != nil {
+		return fmt.Errorf("cluster %s can't run data backed up from %s: %w", cluster.Name, runVersion, err)
+	}
+
+	return nil
+}
+
+// checkSnapshotBackupRestoreVolumes checks every backed up member's volumes match the volumes of
+// one of the target's server classes, so each snapshot has a matching volume to go back into.
+// Runs taken before mount paths were recorded can't be checked.
+func checkSnapshotBackupRestoreVolumes(run *couchbasev2.CouchbaseSnapshotBackupRun, cluster *couchbasev2.CouchbaseCluster) error {
+	memberPaths := map[string][]string{}
+
+	for _, snapshot := range run.Status.Snapshots {
+		if snapshot.MountPath == "" {
+			return nil
+		}
+
+		memberPaths[snapshot.Member] = append(memberPaths[snapshot.Member], snapshot.MountPath)
+	}
+
+	targetLayouts := map[string]bool{}
+
+	for i := range cluster.Spec.Servers {
+		paths := k8sutil.SnapshotMountPaths(cluster.Spec.Servers[i].GetVolumeMounts())
+		sort.Strings(paths)
+		targetLayouts[strings.Join(paths, ", ")] = true
+	}
+
+	members := make([]string, 0, len(memberPaths))
+	for member := range memberPaths {
+		members = append(members, member)
+	}
+
+	sort.Strings(members)
+
+	for _, member := range members {
+		paths := memberPaths[member]
+		sort.Strings(paths)
+
+		if layout := strings.Join(paths, ", "); !targetLayouts[layout] {
+			return fmt.Errorf("member %s was backed up with volumes [%s], but no server class in cluster %s has the same volumes", member, layout, cluster.Name)
+		}
+	}
+
+	return nil
+}
+
+// checkSnapshotBackupRestoreCoverage checks every backed up bucket, scope and collection has a CR
+// the target cluster picks up. Without one, the operator deletes it again straight after the
+// restore, so a gap is only allowed with acknowledgeBucketGap. Only what the operator manages is
+// checked, since nothing else gets deleted.
+func checkSnapshotBackupRestoreCoverage(v *types.Validator, restore *couchbasev2.CouchbaseSnapshotBackupRestore, run *couchbasev2.CouchbaseSnapshotBackupRun, cluster *couchbasev2.CouchbaseCluster) error {
+	if !cluster.Spec.Buckets.Managed {
+		return nil
+	}
+
+	coverage, err := snapshotBackupRestoreCoveredNames(v, cluster)
+	if err != nil {
+		return err
+	}
+
+	var missing []string
+
+	missing = append(missing, coverage.uncovered(run.Spec.Buckets, nil)...)
+	missing = append(missing, coverage.uncovered(run.Spec.Scopes, coverage.managedScopes)...)
+	missing = append(missing, coverage.uncovered(run.Spec.Collections, coverage.managedCollections)...)
+
+	acknowledged := restore.Spec.Target.AcknowledgeBucketGap != nil && *restore.Spec.Target.AcknowledgeBucketGap
+
+	if len(missing) > 0 && !acknowledged {
+		return fmt.Errorf("these have no CR that cluster %s picks up, so they'd be deleted straight after the restore, add CRs for them or set spec.target.acknowledgeBucketGap: %s", cluster.Name, strings.Join(missing, ", "))
+	}
+
+	return nil
+}
+
+// snapshotBackupRestoreCoverage is what the target cluster's CRs cover, by full name: bucket,
+// bucket.scope and bucket.scope.collection.
+type snapshotBackupRestoreCoverage struct {
+	// covered is every name that has a CR.
+	covered map[string]bool
+	// managedScopes is the buckets whose scopes the operator manages.
+	managedScopes map[string]bool
+	// managedCollections is the bucket.scope names whose collections the operator manages.
+	managedCollections map[string]bool
+}
+
+// uncovered returns the names that have no CR. With parents given, a name is only checked if
+// its parent is in it, since the operator only deletes what it manages. The _default and
+// _system scopes, and _default collections, always exist, so they're never reported.
+func (c *snapshotBackupRestoreCoverage) uncovered(names []string, parents map[string]bool) []string {
+	var missing []string
+
+	for _, name := range names {
+		if isBuiltInScopeOrCollection(name) {
+			continue
+		}
+
+		parts := strings.Split(name, ".")
+
+		if parents != nil && !parents[strings.Join(parts[:len(parts)-1], ".")] {
+			continue
+		}
+
+		if !c.covered[name] {
+			missing = append(missing, name)
+		}
+	}
+
+	return missing
+}
+
+// isBuiltInScopeOrCollection reports whether a bucket.scope or bucket.scope.collection name is
+// one Couchbase always has, the _default and _system scopes, anything in _system, and _default
+// collections.
+func isBuiltInScopeOrCollection(name string) bool {
+	parts := strings.Split(name, ".")
+
+	switch len(parts) {
+	case 2:
+		return parts[1] == couchbasev2.DefaultScopeOrCollection || parts[1] == couchbasev2.SystemScope
+	case 3:
+		return parts[1] == couchbasev2.SystemScope || parts[2] == couchbasev2.DefaultScopeOrCollection
+	}
+
+	return false
+}
+
+// snapshotBackupRestoreCoveredNames finds every bucket, scope and collection the target cluster's
+// CRs cover. It uses the same walk over scopes and collections as the duplicate name checks, so
+// explicit references, label selectors and groups are all followed.
+func snapshotBackupRestoreCoveredNames(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) (*snapshotBackupRestoreCoverage, error) {
+	coverage := &snapshotBackupRestoreCoverage{
+		covered:            map[string]bool{},
+		managedScopes:      map[string]bool{},
+		managedCollections: map[string]bool{},
+	}
+
+	namespace := cluster.Namespace
+	selector := cluster.Spec.Buckets.Selector
+
+	buckets, err := v.Abstraction.GetCouchbaseBuckets(namespace, selector)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range buckets.Items {
+		if err := coverage.addBucket(v, namespace, buckets.Items[i].GetCouchbaseName(), buckets.Items[i].Spec.Scopes); err != nil {
+			return nil, err
+		}
+	}
+
+	ephemeralBuckets, err := v.Abstraction.GetCouchbaseEphemeralBuckets(namespace, selector)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range ephemeralBuckets.Items {
+		if err := coverage.addBucket(v, namespace, ephemeralBuckets.Items[i].GetCouchbaseName(), ephemeralBuckets.Items[i].Spec.Scopes); err != nil {
+			return nil, err
+		}
+	}
+
+	memcachedBuckets, err := v.Abstraction.GetCouchbaseMemcachedBuckets(namespace, selector)
+	if err != nil {
+		return nil, err
+	}
+
+	// Memcached buckets have no scopes.
+	for i := range memcachedBuckets.Items {
+		coverage.covered[memcachedBuckets.Items[i].GetCouchbaseName()] = true
+	}
+
+	return coverage, nil
+}
+
+// addBucket records a bucket, and if it manages its scopes, every scope and collection it has.
+func (c *snapshotBackupRestoreCoverage) addBucket(v *types.Validator, namespace, bucket string, scopes *couchbasev2.ScopeSelector) error {
+	c.covered[bucket] = true
+
+	if scopes == nil || !scopes.Managed {
+		return nil
+	}
+
+	c.managedScopes[bucket] = true
+
+	scopeNames := nameFirstDefinitionMap{}
+
+	if err := checkBucketScopesUniqueExplicit(v, namespace, "bucket", bucket, scopes, scopeNames); err != nil {
+		return err
+	}
+
+	if err := checkBucketScopesUniqueImplicit(v, namespace, "bucket", bucket, scopes, scopeNames); err != nil {
+		return err
+	}
+
+	for scope, definedBy := range scopeNames {
+		scopeName := bucket + "." + scope
+		c.covered[scopeName] = true
+
+		if err := c.addCollections(v, namespace, scopeName, definedBy); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// addCollections records a scope's collections, if the scope manages them. definedBy is the
+// Scope or ScopeGroup CR the scope comes from, which holds its collections.
+func (c *snapshotBackupRestoreCoverage) addCollections(v *types.Validator, namespace, scopeName string, definedBy nameFirstDefinition) error {
+	var collections *couchbasev2.CollectionSelector
+
+	switch definedBy.kind {
+	case couchbasev2.ScopeCRDResourceKind:
+		scope, found, err := v.Abstraction.GetCouchbaseScope(namespace, definedBy.name)
+		if err != nil || !found {
+			return err
+		}
+
+		collections = scope.Spec.Collections
+	case couchbasev2.ScopeGroupCRDResourceKind:
+		scopeGroup, found, err := v.Abstraction.GetCouchbaseScopeGroup(namespace, definedBy.name)
+		if err != nil || !found {
+			return err
+		}
+
+		collections = scopeGroup.Spec.Collections
+	}
+
+	if collections == nil || !collections.Managed {
+		return nil
+	}
+
+	c.managedCollections[scopeName] = true
+
+	collectionNames := nameFirstDefinitionMap{}
+
+	if err := checkScopeCollectionsUniqueExplicit(v, namespace, "scope", scopeName, collections.Resources, collectionNames); err != nil {
+		return err
+	}
+
+	if err := checkScopeCollectionsUniqueImplicit(v, namespace, "scope", scopeName, collections.Selector, collectionNames); err != nil {
+		return err
+	}
+
+	for collection := range collectionNames {
+		c.covered[scopeName+"."+collection] = true
+	}
+
+	return nil
+}
+
+// snapshotBackupRestoreWarnings warns about things a restore allows but the user may not expect,
+// like restoring a target with a different number of nodes, which the restore then has to scale,
+// and a target using a different admin secret than the run, since the restored data keeps its old
+// password.
+func snapshotBackupRestoreWarnings(v *types.Validator, restore *couchbasev2.CouchbaseSnapshotBackupRestore) ([]string, error) {
+	run, cluster, err := getSnapshotBackupRestoreRunAndTarget(v, restore)
+	if err != nil || run == nil || cluster == nil {
+		return nil, err
+	}
+
+	var warnings []string
+
+	targetNodes := 0
+	for _, server := range cluster.Spec.Servers {
+		targetNodes += server.Size
+	}
+
+	runNodes := run.Spec.NodeCount
+
+	switch {
+	case runNodes > targetNodes:
+		warnings = append(warnings, fmt.Sprintf("the run has %d nodes but cluster %s asks for %d, all %d are restored and then scaled down to %d", runNodes, cluster.Name, targetNodes, runNodes, targetNodes))
+	case runNodes < targetNodes:
+		warnings = append(warnings, fmt.Sprintf("the run has %d nodes but cluster %s asks for %d, the other %d start empty and join with a rebalance", runNodes, cluster.Name, targetNodes, targetNodes-runNodes))
+	}
+
+	if run.Spec.AdminSecretName != "" && run.Spec.AdminSecretName != cluster.Spec.Security.AdminSecret {
+		warnings = append(warnings, fmt.Sprintf("the run was taken with admin secret %s but cluster %s uses %s, the restored data expects the password from when the backup was taken", run.Spec.AdminSecretName, cluster.Name, cluster.Spec.Security.AdminSecret))
+	}
+
+	return warnings, nil
+}
+
+// getSnapshotBackupRestoreRunAndTarget returns the run and the target cluster a restore names.
+// Either is nil if it doesn't exist.
+func getSnapshotBackupRestoreRunAndTarget(v *types.Validator, restore *couchbasev2.CouchbaseSnapshotBackupRestore) (*couchbasev2.CouchbaseSnapshotBackupRun, *couchbasev2.CouchbaseCluster, error) {
+	run, found, err := v.Abstraction.GetCouchbaseSnapshotBackupRun(restore.Namespace, restore.Spec.RunName)
+	if err != nil || !found {
+		return nil, nil, err
+	}
+
+	cluster, err := getCouchbaseClusterByName(v, restore.Namespace, restore.Spec.Target.Name)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return run, cluster, nil
+}
+
+// getCouchbaseClusterByName returns the named cluster, or nil if it doesn't exist.
+func getCouchbaseClusterByName(v *types.Validator, namespace, name string) (*couchbasev2.CouchbaseCluster, error) {
+	clusters, err := v.Abstraction.GetCouchbaseClusters(namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range clusters.Items {
+		if clusters.Items[i].Name == name {
+			return &clusters.Items[i], nil
+		}
+	}
+
+	return nil, nil
 }
 
 func checkConstraintRestoreAdditionalArgs(v *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
@@ -5087,7 +5519,7 @@ func checkConstraintsSnapshotBackup(v *types.Validator, backup *couchbasev2.Couc
 
 	snapshotBackup := backup.Spec.SnapshotBackup
 
-	if err := checkSnapshotAPIsInstalled(v, snapshotBackup); err != nil {
+	if err := checkSnapshotAPIsInstalled(v, "spec.snapshotBackup", snapshotBackup.VolumeGroupSnapshotClassName != nil); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -5128,12 +5560,12 @@ func checkConstraintsSnapshotBackup(v *types.Validator, backup *couchbasev2.Couc
 	return nil
 }
 
-// checkSnapshotAPIsInstalled rejects a snapshot backup if the cluster doesn't have the
-// snapshot add on installed. Without it, every snapshot would fail later with an unclear error.
-func checkSnapshotAPIsInstalled(v *types.Validator, snapshotBackup *couchbasev2.CouchbaseSnapshotBackupSpec) error {
+// checkSnapshotAPIsInstalled rejects a request if the cluster doesn't have the snapshot add on
+// installed. Without it, every snapshot would fail later with an unclear error.
+func checkSnapshotAPIsInstalled(v *types.Validator, field string, needGroup bool) error {
 	groupVersions := []string{"snapshot.storage.k8s.io/v1"}
 
-	if snapshotBackup.VolumeGroupSnapshotClassName != nil {
+	if needGroup {
 		groupVersions = append(groupVersions, "groupsnapshot.storage.k8s.io/v1beta1")
 	}
 
@@ -5144,7 +5576,7 @@ func checkSnapshotAPIsInstalled(v *types.Validator, snapshotBackup *couchbasev2.
 		}
 
 		if !served {
-			return fmt.Errorf("spec.snapshotBackup needs %s, which isn't installed on this Kubernetes cluster, install the CSI external snapshotter first", groupVersion)
+			return fmt.Errorf("%s needs %s, which isn't installed on this Kubernetes cluster, install the CSI external snapshotter first", field, groupVersion)
 		}
 	}
 
@@ -6756,6 +7188,20 @@ func CheckImmutableFieldsBackup(prev, curr *couchbasev2.CouchbaseBackup) error {
 
 	if errs != nil {
 		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+// CheckImmutableFieldsSnapshotBackupRestore stops a restore's spec being changed after it's
+// created, so a restore can't be pointed at a different run or cluster partway through.
+func CheckImmutableFieldsSnapshotBackupRestore(prev, curr *couchbasev2.CouchbaseSnapshotBackupRestore) error {
+	if checkAnnotationSkipValidation(curr.Annotations) {
+		return nil
+	}
+
+	if !reflect.DeepEqual(prev.Spec, curr.Spec) {
+		return fmt.Errorf("spec can't be changed after a snapshot backup restore is created, delete it and create a new one")
 	}
 
 	return nil

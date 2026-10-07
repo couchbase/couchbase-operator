@@ -59,6 +59,8 @@ type KubeAbstraction interface { //nolint: interfacebloat
 	GetCouchbaseBackups(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseBackupList, error)
 	// GetCouchbaseBackups returns all backups for a specified selector.
 	GetCouchbaseBackupRestores(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseBackupRestoreList, error)
+	// GetCouchbaseSnapshotBackupRun returns the named snapshot backup run, and whether it exists.
+	GetCouchbaseSnapshotBackupRun(string, string) (*couchbasev2.CouchbaseSnapshotBackupRun, bool, error)
 	// GetCouchbaseCollection returns the named collection.
 	GetCouchbaseCollection(string, string) (*couchbasev2.CouchbaseCollection, bool, error)
 	// GetCouchbaseCollectionGroup returns the named collection group.
@@ -285,6 +287,19 @@ func (ab *kubeAbstractionImpl) GetCouchbaseBackupRestores(namespace string, sele
 	}
 
 	return ab.cache.GetBackupRestores(namespace, selector)
+}
+
+func (ab *kubeAbstractionImpl) GetCouchbaseSnapshotBackupRun(namespace, name string) (*couchbasev2.CouchbaseSnapshotBackupRun, bool, error) {
+	run, err := ab.couchbaseClient.CouchbaseV2().CouchbaseSnapshotBackupRuns(namespace).Get(context.Background(), name, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return nil, false, nil
+	}
+
+	if err != nil {
+		return nil, false, err
+	}
+
+	return run, true, nil
 }
 
 func (ab *kubeAbstractionImpl) GetCouchbaseCollection(namespace, name string) (*couchbasev2.CouchbaseCollection, bool, error) {

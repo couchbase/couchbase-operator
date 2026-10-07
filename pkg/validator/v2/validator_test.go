@@ -1741,3 +1741,402 @@ func TestCheckConstraintsSnapshotBackup(t *testing.T) {
 		})
 	}
 }
+
+// TestCheckConstraintsSnapshotBackupRestore checks a restore is only accepted when the snapshot
+// add on is installed, the run is a Complete run of the named backup, the target cluster exists,
+// with acknowledgeDataLoss set if it already has data, and the target can run the backed up data.
+// It also checks backed up buckets, scopes and collections need CRs, and the warnings for a target
+// with a different number of nodes or a different admin secret.
+func TestCheckConstraintsSnapshotBackupRestore(t *testing.T) {
+	const namespace = "default"
+
+	yes := true
+	snapshotAPI := []string{"snapshot.storage.k8s.io/v1"}
+	bothSnapshotAPIs := []string{"snapshot.storage.k8s.io/v1", "groupsnapshot.storage.k8s.io/v1beta1"}
+
+	const (
+		defaultPath = "/opt/couchbase/var/lib/couchbase"
+		dataPath    = "/mnt/data"
+		indexPath   = "/mnt/index"
+	)
+
+	// run makes a run of 3 nodes on 7.6.8, each backed up with default, data and index volumes.
+	run := func(sourceBackup string, phase couchbasev2.CouchbaseSnapshotBackupRunPhase, group bool) *couchbasev2.CouchbaseSnapshotBackupRun {
+		var snapshots []couchbasev2.CouchbaseSnapshotBackupRunSnapshot
+
+		for _, member := range []string{"cb-0000", "cb-0001", "cb-0002"} {
+			for _, path := range []string{defaultPath, dataPath, indexPath} {
+				snapshots = append(snapshots, couchbasev2.CouchbaseSnapshotBackupRunSnapshot{Member: member, MountPath: path})
+			}
+		}
+
+		return &couchbasev2.CouchbaseSnapshotBackupRun{
+			ObjectMeta: metav1.ObjectMeta{Name: "my-backup-run", Namespace: namespace},
+			Spec:       couchbasev2.CouchbaseSnapshotBackupRunSpec{SourceBackup: sourceBackup, ServerVersion: "7.6.8", NodeCount: 3},
+			Status:     couchbasev2.CouchbaseSnapshotBackupRunStatus{Phase: phase, GroupSnapshot: group, Snapshots: snapshots},
+		}
+	}
+
+	// cluster makes a 3 node target on 7.6.8 with default, data and index volumes.
+	cluster := func(clusterID string) *couchbasev2.CouchbaseCluster {
+		return &couchbasev2.CouchbaseCluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "target", Namespace: namespace},
+			Spec: couchbasev2.ClusterSpec{
+				Image: "couchbase/server:7.6.8",
+				Servers: []couchbasev2.ServerConfig{{
+					Name: "data-index",
+					Size: 3,
+					VolumeMounts: &couchbasev2.VolumeMounts{
+						DefaultClaim: "couchbase",
+						DataClaim:    "couchbase",
+						IndexClaim:   "couchbase",
+					},
+				}},
+			},
+			Status: couchbasev2.ClusterStatus{ClusterID: clusterID},
+		}
+	}
+
+	completeRun := run("my-backup", couchbasev2.CouchbaseSnapshotBackupRunPhaseComplete, false)
+	newCluster := cluster("")
+	usedCluster := cluster("f50608c895e226375ef4a3a6fb76229f")
+
+	// changedCluster makes a new target with one change.
+	changedCluster := func(change func(*couchbasev2.CouchbaseCluster)) *couchbasev2.CouchbaseCluster {
+		target := cluster("")
+		change(target)
+
+		return target
+	}
+
+	withImage := func(image string) *couchbasev2.CouchbaseCluster {
+		return changedCluster(func(c *couchbasev2.CouchbaseCluster) { c.Spec.Image = image })
+	}
+
+	withSize := func(size int) *couchbasev2.CouchbaseCluster {
+		return changedCluster(func(c *couchbasev2.CouchbaseCluster) { c.Spec.Servers[0].Size = size })
+	}
+
+	// changedRun makes a Complete run with one change.
+	changedRun := func(change func(*couchbasev2.CouchbaseSnapshotBackupRun)) *couchbasev2.CouchbaseSnapshotBackupRun {
+		r := run("my-backup", couchbasev2.CouchbaseSnapshotBackupRunPhaseComplete, false)
+		change(r)
+
+		return r
+	}
+
+	// A run that backed up bucket travel, its scope inventory and that scope's collection hotels,
+	// plus the scopes and collections Couchbase always has.
+	runWithData := changedRun(func(r *couchbasev2.CouchbaseSnapshotBackupRun) {
+		r.Spec.Buckets = []string{"travel"}
+		r.Spec.Scopes = []string{"travel._default", "travel._system", "travel.inventory"}
+		r.Spec.Collections = []string{"travel._default._default", "travel.inventory.hotels"}
+	})
+
+	managedBuckets := changedCluster(func(c *couchbasev2.CouchbaseCluster) { c.Spec.Buckets.Managed = true })
+
+	// bucket makes the travel bucket CR, which picks up the inventory scope if it manages scopes.
+	bucket := func(manageScopes bool) *couchbasev2.CouchbaseBucket {
+		return &couchbasev2.CouchbaseBucket{
+			ObjectMeta: metav1.ObjectMeta{Name: "travel", Namespace: namespace},
+			Spec: couchbasev2.CouchbaseBucketSpec{
+				Scopes: &couchbasev2.ScopeSelector{
+					Managed:   manageScopes,
+					Resources: []couchbasev2.ScopeLocalObjectReference{{Kind: couchbasev2.CouchbaseScopeKindScope, Name: "inventory"}},
+				},
+			},
+		}
+	}
+
+	scope := &couchbasev2.CouchbaseScope{
+		ObjectMeta: metav1.ObjectMeta{Name: "inventory", Namespace: namespace},
+		Spec: couchbasev2.CouchbaseScopeSpec{
+			CouchbaseScopeSpecCommon: couchbasev2.CouchbaseScopeSpecCommon{
+				Collections: &couchbasev2.CollectionSelector{
+					Managed:   true,
+					Resources: []couchbasev2.CollectionLocalObjectReference{{Kind: couchbasev2.CouchbaseCollectionKindCollection, Name: "hotels"}},
+				},
+			},
+		},
+	}
+
+	collection := &couchbasev2.CouchbaseCollection{
+		ObjectMeta: metav1.ObjectMeta{Name: "hotels", Namespace: namespace},
+	}
+
+	testcases := []struct {
+		name           string
+		runName        string
+		acknowledge    *bool
+		acknowledgeGap *bool
+		objects        []runtime.Object
+		// served lists the snapshot APIs the cluster has. Left out means only the snapshot API.
+		served          []string
+		expectedErr     string
+		expectedWarning string
+	}{
+		{
+			name:    "restore into a new cluster needs no acknowledgement",
+			objects: []runtime.Object{completeRun, newCluster},
+		},
+		{
+			name:        "restore into a cluster with data and the acknowledgement is valid",
+			acknowledge: &yes,
+			objects:     []runtime.Object{completeRun, usedCluster},
+		},
+		{
+			name:        "restore into a cluster with data needs the acknowledgement",
+			objects:     []runtime.Object{completeRun, usedCluster},
+			expectedErr: "acknowledgeDataLoss must be true",
+		},
+		{
+			name:        "snapshot API not installed",
+			objects:     []runtime.Object{completeRun, newCluster},
+			served:      []string{},
+			expectedErr: "isn't installed",
+		},
+		{
+			name:        "run name not set",
+			runName:     "-",
+			objects:     []runtime.Object{completeRun, newCluster},
+			expectedErr: "must all be set",
+		},
+		{
+			name:        "run doesn't exist",
+			objects:     []runtime.Object{newCluster},
+			expectedErr: "doesn't exist in namespace",
+		},
+		{
+			name:        "run from a different backup",
+			objects:     []runtime.Object{run("other-backup", couchbasev2.CouchbaseSnapshotBackupRunPhaseComplete, false), newCluster},
+			expectedErr: "was taken by backup other-backup",
+		},
+		{
+			name:        "run that isn't Complete",
+			objects:     []runtime.Object{run("my-backup", couchbasev2.CouchbaseSnapshotBackupRunPhaseInvalid, false), newCluster},
+			expectedErr: "only a Complete run can be restored",
+		},
+		{
+			name:        "group snapshot run without the group snapshot API",
+			objects:     []runtime.Object{run("my-backup", couchbasev2.CouchbaseSnapshotBackupRunPhaseComplete, true), newCluster},
+			expectedErr: "groupsnapshot.storage.k8s.io/v1beta1",
+		},
+		{
+			name:    "group snapshot run with the group snapshot API is valid",
+			objects: []runtime.Object{run("my-backup", couchbasev2.CouchbaseSnapshotBackupRunPhaseComplete, true), newCluster},
+			served:  bothSnapshotAPIs,
+		},
+		{
+			name:        "target cluster doesn't exist",
+			objects:     []runtime.Object{completeRun},
+			expectedErr: "create the cluster first",
+		},
+		{
+			name:    "target on a newer version on the upgrade path is valid",
+			objects: []runtime.Object{completeRun, withImage("couchbase/server:8.0.1")},
+		},
+		{
+			name:        "target on an older version can't read the data",
+			objects:     []runtime.Object{completeRun, withImage("couchbase/server:7.6.4")},
+			expectedErr: "Downgrades are not supported",
+		},
+		{
+			name:        "data from before 7.2.0 can't go onto 7.2.0 or later",
+			objects:     []runtime.Object{changedRun(func(r *couchbasev2.CouchbaseSnapshotBackupRun) { r.Spec.ServerVersion = "7.1.1" }), withImage("couchbase/server:7.2.4")},
+			expectedErr: "before 7.2.0 can't be restored onto 7.2.0 or later",
+		},
+		{
+			name:        "target missing the index volume",
+			objects:     []runtime.Object{completeRun, changedCluster(func(c *couchbasev2.CouchbaseCluster) { c.Spec.Servers[0].VolumeMounts.IndexClaim = "" })},
+			expectedErr: "no server class in cluster target has the same volumes",
+		},
+		{
+			name: "run without mount paths skips the volume check",
+			objects: []runtime.Object{
+				changedRun(func(r *couchbasev2.CouchbaseSnapshotBackupRun) {
+					for i := range r.Status.Snapshots {
+						r.Status.Snapshots[i].MountPath = ""
+					}
+				}),
+				changedCluster(func(c *couchbasev2.CouchbaseCluster) { c.Spec.Servers[0].VolumeMounts.IndexClaim = "" }),
+			},
+		},
+		{
+			name:            "target with more nodes than the run warns",
+			objects:         []runtime.Object{completeRun, withSize(5)},
+			expectedWarning: "the other 2 start empty and join with a rebalance",
+		},
+		{
+			name:            "target with fewer nodes than the run warns",
+			objects:         []runtime.Object{completeRun, withSize(2)},
+			expectedWarning: "all 3 are restored and then scaled down to 2",
+		},
+		{
+			name:    "every bucket, scope and collection has a CR, built in ones need none",
+			objects: []runtime.Object{runWithData, managedBuckets, bucket(true), scope, collection},
+		},
+		{
+			name:        "bucket with no CR",
+			objects:     []runtime.Object{runWithData, managedBuckets},
+			expectedErr: "acknowledgeBucketGap: travel",
+		},
+		{
+			name:           "bucket with no CR is allowed with acknowledgeBucketGap",
+			acknowledgeGap: &yes,
+			objects:        []runtime.Object{runWithData, managedBuckets},
+		},
+		{
+			name:        "scope with no CR in a bucket that manages scopes",
+			objects:     []runtime.Object{runWithData, managedBuckets, bucket(true), collection},
+			expectedErr: "acknowledgeBucketGap: travel.inventory",
+		},
+		{
+			name:        "collection with no CR in a scope that manages collections",
+			objects:     []runtime.Object{runWithData, managedBuckets, bucket(true), scope},
+			expectedErr: "acknowledgeBucketGap: travel.inventory.hotels",
+		},
+		{
+			name:    "scope with no CR in a bucket that doesn't manage scopes",
+			objects: []runtime.Object{runWithData, managedBuckets, bucket(false)},
+		},
+		{
+			name:    "buckets aren't checked when the cluster doesn't manage them",
+			objects: []runtime.Object{runWithData, newCluster},
+		},
+		{
+			name: "different admin secret warns",
+			objects: []runtime.Object{
+				changedRun(func(r *couchbasev2.CouchbaseSnapshotBackupRun) { r.Spec.AdminSecretName = "old-auth" }),
+				changedCluster(func(c *couchbasev2.CouchbaseCluster) { c.Spec.Security.AdminSecret = "new-auth" }),
+			},
+			expectedWarning: "the restored data expects the password from when the backup was taken",
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			client := k8sfake.NewSimpleClientset()
+
+			served := testcase.served
+			if served == nil {
+				served = snapshotAPI
+			}
+
+			discovery := client.Discovery().(*discoveryfake.FakeDiscovery)
+			for _, groupVersion := range served {
+				discovery.Resources = append(discovery.Resources, &metav1.APIResourceList{GroupVersion: groupVersion})
+			}
+
+			v := types.New(client, couchbasefake.NewSimpleClientset(testcase.objects...), &types.ValidatorOptions{})
+
+			runName := "my-backup-run"
+			if testcase.runName == "-" {
+				runName = ""
+			}
+
+			restore := &couchbasev2.CouchbaseSnapshotBackupRestore{
+				ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: namespace},
+				Spec: couchbasev2.CouchbaseSnapshotBackupRestoreSpec{
+					BackupName: "my-backup",
+					RunName:    runName,
+					Target: couchbasev2.CouchbaseSnapshotBackupRestoreTarget{
+						Name:                 "target",
+						AcknowledgeDataLoss:  testcase.acknowledge,
+						AcknowledgeBucketGap: testcase.acknowledgeGap,
+					},
+				},
+			}
+
+			warnings, err := CheckConstraintsSnapshotBackupRestore(v, restore)
+
+			checkSnapshotBackupRestoreResult(t, warnings, err, testcase.expectedErr, testcase.expectedWarning)
+		})
+	}
+}
+
+// checkSnapshotBackupRestoreResult checks a restore validation gave the error, or the warning,
+// that the test case expected.
+func checkSnapshotBackupRestoreResult(t *testing.T, warnings []string, err error, expectedErr, expectedWarning string) {
+	t.Helper()
+
+	if expectedErr != "" {
+		if err == nil || !strings.Contains(err.Error(), expectedErr) {
+			t.Errorf("expected an error containing %q, got %v", expectedErr, err)
+		}
+
+		return
+	}
+
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+
+	switch {
+	case expectedWarning == "" && len(warnings) != 0:
+		t.Errorf("expected no warnings, got %v", warnings)
+	case expectedWarning != "" && (len(warnings) != 1 || !strings.Contains(warnings[0], expectedWarning)):
+		t.Errorf("expected a warning containing %q, got %v", expectedWarning, warnings)
+	}
+}
+
+// TestCheckImmutableFieldsSnapshotBackupRestore checks a restore's spec can't be changed once
+// it's created.
+func TestCheckImmutableFieldsSnapshotBackupRestore(t *testing.T) {
+	yes := true
+
+	restore := func(change func(*couchbasev2.CouchbaseSnapshotBackupRestoreSpec)) *couchbasev2.CouchbaseSnapshotBackupRestore {
+		r := &couchbasev2.CouchbaseSnapshotBackupRestore{
+			ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: "default"},
+			Spec: couchbasev2.CouchbaseSnapshotBackupRestoreSpec{
+				BackupName: "my-backup",
+				RunName:    "my-backup-run",
+				Target:     couchbasev2.CouchbaseSnapshotBackupRestoreTarget{Name: "target"},
+			},
+		}
+
+		if change != nil {
+			change(&r.Spec)
+		}
+
+		return r
+	}
+
+	testcases := []struct {
+		name      string
+		change    func(*couchbasev2.CouchbaseSnapshotBackupRestoreSpec)
+		expectErr bool
+	}{
+		{
+			name: "unchanged spec",
+		},
+		{
+			name:      "different run",
+			change:    func(s *couchbasev2.CouchbaseSnapshotBackupRestoreSpec) { s.RunName = "other-run" },
+			expectErr: true,
+		},
+		{
+			name:      "different target",
+			change:    func(s *couchbasev2.CouchbaseSnapshotBackupRestoreSpec) { s.Target.Name = "other" },
+			expectErr: true,
+		},
+		{
+			name:      "acknowledgeDataLoss added",
+			change:    func(s *couchbasev2.CouchbaseSnapshotBackupRestoreSpec) { s.Target.AcknowledgeDataLoss = &yes },
+			expectErr: true,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			err := CheckImmutableFieldsSnapshotBackupRestore(restore(nil), restore(testcase.change))
+
+			if testcase.expectErr && err == nil {
+				t.Errorf("expected an error, got none")
+			}
+
+			if !testcase.expectErr && err != nil {
+				t.Errorf("expected no error, got %v", err)
+			}
+		})
+	}
+}
