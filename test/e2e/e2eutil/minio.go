@@ -182,7 +182,7 @@ func (minio *Minio) createPod() error {
 			Containers: []v1.Container{
 				{
 					Name:  minio.name,
-					Image: "minio/minio",
+					Image: "pgsty/minio:latest",
 					Args:  args,
 					VolumeMounts: []v1.VolumeMount{
 						{
