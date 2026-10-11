@@ -30,6 +30,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -52,6 +53,14 @@ func (c *Cluster) createPod(ctx context.Context, m couchbaseutil.Member, serverS
 
 		c.logFailedMember("Member creation failed", m.Name())
 		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(m.Name(), c.cluster))
+
+		// AlreadyExists means a live member owns the name: removing it here would
+		// delete a running node, and with deleteVolumes its data.
+		if apierrors.IsAlreadyExists(err) {
+			c.log.Error(err, "Member already exists, refusing to remove it as part of failed creation",
+				"cluster", c.namespacedName(), "name", m.Name())
+			return
+		}
 
 		if rerr := c.removePod(m.Name(), deleteVolumes); rerr != nil {
 			c.log.Info("Unable to remove failed member", "cluster", c.namespacedName(), "error", rerr)
@@ -367,10 +376,6 @@ func (c *Cluster) reconcilePods() error {
 		image := extractCouchbaseImage(actual)
 		if image == "" {
 			image = c.cluster.Spec.ServerClassCouchbaseImage(serverClass)
-		}
-
-		if pvcState != nil && pvcState.Image != "" {
-			image = pvcState.Image
 		}
 
 		requested, err := k8sutil.CreateCouchbasePodSpec(member, c.cluster, *serverClass, serverGroup, pvcState, image, c.config.GetPodReadinessConfig())

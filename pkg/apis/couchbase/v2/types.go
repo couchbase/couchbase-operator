@@ -3487,7 +3487,7 @@ const (
 )
 
 // This defines the default upgrade process for couchbase pods. Defaults to SwapRebalance.
-// +kubebuilder:validation:Enum=SwapRebalance;DeltaRecovery;InPlaceUpgrade
+// +kubebuilder:validation:Enum=SwapRebalance;DeltaRecovery;InPlaceUpgrade;Offline
 type UpgradeProcess string
 
 const (
@@ -3501,6 +3501,11 @@ const (
 	DeltaRecovery UpgradeProcess = "DeltaRecovery"
 
 	InPlaceUpgrade UpgradeProcess = "InPlaceUpgrade"
+
+	// OfflineUpgrade upgrades on an image change by hibernating the cluster and
+	// waking it on the new image, with no rebalance. Honours
+	// previousVersionPodCount.
+	OfflineUpgrade UpgradeProcess = "Offline"
 )
 
 // RollbackMethod selects how a rollback replaces nodes.  The default creates the
@@ -6334,6 +6339,12 @@ type ClusterStatus struct {
 
 	// RebalanceAttempts is the number of consecutive reconciliation loops that the operator has failed to rebalance after exhausting all retries.
 	RebalanceAttempts int `json:"rebalanceAttempts,omitempty"`
+
+	// HibernatedWithMemcachedBuckets records whether the cluster had memcached
+	// buckets when it hibernated, for upgrade checks to 8.0.0+ while it can't be
+	// asked. Unset while hibernated means unknown.
+	// +optional
+	HibernatedWithMemcachedBuckets *bool `json:"hibernatedWithMemcachedBuckets,omitempty"`
 }
 
 // ServerClassStatus summarizes memory allocations to make configuration easier.

@@ -51,26 +51,6 @@ func VersionEqual(version, required string) (bool, error) {
 	return v1.Equal(v2), nil
 }
 
-func VersionsWithinTwoMajorVersions(oldVersion string, newVersion string) (bool, error) {
-	old, err := NewVersion(oldVersion)
-	if err != nil {
-		return false, err
-	}
-
-	newV, err := NewVersion(newVersion)
-	if err != nil {
-		return false, err
-	}
-
-	gap := newV.semver[0] - old.semver[0]
-
-	if gap >= 2 {
-		return false, nil
-	}
-
-	return true, nil
-}
-
 // VersionBefore determines whether the configured version is less than
 // the required version.
 func VersionBefore(version, required string) (bool, error) {

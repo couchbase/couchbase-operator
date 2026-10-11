@@ -546,6 +546,7 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbaseclusters-status-currentversion,currentVersion>>: ""
   <<couchbaseclusters-status-groups,groups>>:
   - ""
+  <<couchbaseclusters-status-hibernatedwithmemcachedbuckets,hibernatedWithMemcachedBuckets>>: false
   <<couchbaseclusters-status-lastupdatetime,lastUpdateTime>>: ""
   <<couchbaseclusters-status-members,members>>:
     <<couchbaseclusters-status-members-ready,ready>>:
@@ -6393,7 +6394,7 @@ UpgradeOrderType defines the order in which spec.upgrade.upgradeOrderSequence wi
 
 *Default*: `SwapRebalance`
 
-*Enumerations*: `SwapRebalance, DeltaRecovery, InPlaceUpgrade`
+*Enumerations*: `SwapRebalance, DeltaRecovery, InPlaceUpgrade, Offline`
 
 ==== Description
 
@@ -6435,7 +6436,7 @@ to "RollingUpgrade".
 
 *Type*: `string`
 
-*Enumerations*: `SwapRebalance, DeltaRecovery, InPlaceUpgrade`
+*Enumerations*: `SwapRebalance, DeltaRecovery, InPlaceUpgrade, Offline`
 
 ==== Description
 
@@ -7747,6 +7748,19 @@ updated when the upgrade has completed.
 ==== Description
 
 Groups describes all the groups managed by the cluster.
+
+=== couchbaseclusters.status.hibernatedWithMemcachedBuckets
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+HibernatedWithMemcachedBuckets records whether the cluster had memcached
+buckets when it hibernated, for upgrade checks to 8.0.0+ while it can't be
+asked.
+Unset while hibernated means unknown.
 
 === couchbaseclusters.status.lastUpdateTime
 

@@ -2228,27 +2228,6 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 	return nil
 }
 
-func (r *ReconcileMachine) checkIfValidUpgradePath() error {
-	currentVersion, err := r.c.clusterVersion()
-	if err != nil {
-		return err
-	}
-
-	newVersionImage := r.c.cluster.Spec.CouchbaseImage()
-
-	newVersion, err := couchbaseutil.NewVersionFromImage(newVersionImage)
-	if err != nil {
-		return err
-	}
-
-	// An unresolved digest tells us nothing to validate against.
-	if !couchbaseutil.VersionKnown(newVersion.String()) {
-		return nil
-	}
-
-	return couchbaseutil.CheckUpgradePath(currentVersion, newVersion.Version())
-}
-
 // handleUpgradeStabilization manages the stabilization-period guards for upgrade.
 // Returns true if the upgrade should be blocked (waiting for stabilization).
 func (r *ReconcileMachine) handleUpgradeStabilization(c *Cluster) bool {
@@ -2305,12 +2284,6 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	// Abort if we need to create nodes, as we can't continue the upgrade until we have the right number of nodes.
 	if CheckNodesToCreate(c.cluster, r.clusteredMembers, arbiterNodesSupported) {
 		return nil
-	}
-
-	// check if the upgrade is a valid upgrade path
-
-	if err := r.checkIfValidUpgradePath(); err != nil {
-		return err
 	}
 
 	blockers, err := c.getUpgradeBlockers()
@@ -2398,6 +2371,7 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 func (r *ReconcileMachine) tryInPlaceUpgrade(c *Cluster, candidates couchbaseutil.MemberSet, zoneChangeDetected bool, pvcChangeDetected bool, targetVersion string) (bool, error) {
 	allCandidatesRecoverable := true
 	swapRebalanceIndexNodes := false
+	inplaceUpgradeUnsafe := false
 	indexCandidates := couchbaseutil.MemberSet{}
 	nonIndexCandidates := couchbaseutil.MemberSet{}
 
@@ -2407,22 +2381,46 @@ func (r *ReconcileMachine) tryInPlaceUpgrade(c *Cluster, candidates couchbaseuti
 			break
 		}
 
-		if c.cluster.ShouldRevertCandidateToSwapRebalance(candidate) {
+		// Candidates arrive already stamped with the target version, so take
+		// the running version from c.members.
+		sourceVersion := candidate.Version()
+		if member, ok := c.members[candidate.Name()]; ok {
+			sourceVersion = member.Version()
+		}
+
+		// Index nodes must swap onto 7.6.0/7.6.1 (MB-62547); swap if unsure.
+		mandatorySwap, err := c.cluster.ShouldMandatorySwapCandidate(candidate, sourceVersion, targetVersion)
+		if err != nil {
+			c.log.Info("Could not evaluate index swap-rebalance rule. Reverting candidate to SwapRebalance.",
+				"cluster", c.namespacedName(), "name", candidate.Name(), "error", err.Error())
+			mandatorySwap = true
+		}
+
+		if c.cluster.ShouldRevertCandidateToSwapRebalance(candidate) || mandatorySwap {
 			swapRebalanceIndexNodes = true
 			indexCandidates.Add(candidate)
 		} else {
 			nonIndexCandidates.Add(candidate)
 		}
+
+		// In place reuses the volume, so a rollback must swap instead.
+		if err := couchbaseutil.CheckInPlaceUpgradePath(sourceVersion, targetVersion); err != nil {
+			c.log.Info("Candidate cannot upgrade in place. Reverting to SwapRebalance.",
+				"cluster", c.namespacedName(), "name", candidate.Name(), "reason", err.Error())
+			inplaceUpgradeUnsafe = true
+		}
 	}
 
 	switch {
-	case allCandidatesRecoverable && !zoneChangeDetected && !swapRebalanceIndexNodes && !pvcChangeDetected:
+	case allCandidatesRecoverable && !zoneChangeDetected && !swapRebalanceIndexNodes && !pvcChangeDetected && !inplaceUpgradeUnsafe:
 		c.log.Info("Upgrading pods with InPlaceUpgrade", "cluster", c.namespacedName(), "names", candidates.Names(), "target-version", targetVersion)
 		return true, r.handleInPlaceUpgrade(c, candidates, targetVersion)
 	case allCandidatesRecoverable && zoneChangeDetected:
 		c.log.Info("Pods with PVCs need zone changes. InPlaceUpgrade cannot change zones. Reverting to SwapRebalance.", "cluster", c.namespacedName())
 	case allCandidatesRecoverable && pvcChangeDetected:
 		c.log.Info("Pods have PVC changes and online volume expansion is disabled. Reverting to SwapRebalance.", "cluster", c.namespacedName())
+	case allCandidatesRecoverable && inplaceUpgradeUnsafe:
+		// Reasons logged per candidate above.
 	case allCandidatesRecoverable && swapRebalanceIndexNodes:
 		c.log.Info("Upgrade candidates with index service will use SwapRebalance, non-index candidates will use InPlaceUpgrade",
 			"cluster", c.namespacedName(),

@@ -2093,6 +2093,22 @@ func applyCPURequestsAndLimits(cluster *couchbasev2.CouchbaseCluster, c *v1.Cont
 	}
 }
 
+// refreshEtcScript gives the volume's etc the image's files, keeping the node's
+// couchdb/local.ini, as a package upgrade does. Stale files break a new binary
+// (K8S-3889, K8S-4304); before 7.2 local.ini holds the data paths (MB-54228).
+// No existence tests: NFS can report an I/O error as missing (K8S-2432).
+const refreshEtcScript = `
+set -e
+mkdir -p /mnt/etc
+
+# Delete the old etc but local.ini. It is spared by name, never moved, so a
+# failed run can't lose it; find stops the script on any I/O error.
+find /mnt/etc -mindepth 1 ! -path /mnt/etc/couchdb/local.ini ! -path /mnt/etc/couchdb -delete
+
+# Copy the image's etc in; -n skips the local.ini already there.
+cp -an /opt/couchbase/etc /mnt/
+`
+
 // Init container is same as runtime container except it used
 // to copy the etc dir into a persisted volume which will be
 // shared with with the Pod's main container.
@@ -2113,22 +2129,7 @@ func couchbaseInitContainer(cluster *couchbasev2.CouchbaseCluster, claimName str
 
 	initContainer.Ports = []v1.ContainerPort{}
 	initContainer.Name = fmt.Sprintf("%s-init", constants.CouchbaseContainerName)
-	// NOTE: we originally did a [[ ! -e /mnt/etc ]] but alas some people insist on
-	// using NFS, which will return false on an EIO, say, and just end up resetting
-	// the configuration.  By doing an unconditional non-clobbering copy, we will
-	// never overwrite if the file exists, and also probably hit an error condition
-	// that will cause the init process to fail if NFS is playing silly buggers.
-	copyStr := "cp -na /opt/couchbase/etc /mnt/"
-
-	// We can't assume that the etc directory from older versions is compatible. When upgrading to 8.0 and onwards, we will
-	// clean the /opt/couchbase/etc directory of the existing default volume (mounted at /mnt/etc on the init container)
-	// and replace it with the default etc directory from the new image.
-	targetVersion, _ := couchbaseutil.CouchbaseImageVersion(image)
-	if after80, _ := couchbaseutil.VersionAfter(targetVersion, "8.0.0"); after80 {
-		copyStr = "rm -rf /mnt/etc && cp -a /opt/couchbase/etc /mnt/"
-	}
-
-	initContainer.Args = []string{"bash", "-c", copyStr}
+	initContainer.Args = []string{"bash", "-c", refreshEtcScript}
 	initContainer.VolumeMounts = []v1.VolumeMount{
 		{
 			Name:      claimName,

@@ -83,6 +83,55 @@ func (l reconcileFuncList) run(c *Cluster) error {
 	return nil
 }
 
+// reconcileHibernation puts the cluster to sleep, wakes it (on the new image
+// if spec.image changed while asleep), or starts an offline upgrade by putting
+// it to sleep. Afterwards the Hibernating condition says whether it is asleep.
+func (c *Cluster) reconcileHibernation() error {
+	switch {
+	case c.cluster.Spec.Hibernate:
+		return c.hibernate()
+
+	case c.cluster.HasCondition(couchbasev2.ClusterConditionHibernating):
+		// Waking: move to the new image if it changed while hibernated.
+		c.raiseEvent(k8sutil.HibernationEndedEvent(c.cluster))
+
+		if err := c.applyPendingHibernationUpgrade(); err != nil {
+			return err
+		}
+
+		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionHibernating)
+		c.cluster.Status.HibernatedWithMemcachedBuckets = nil
+
+	case c.cluster.GetUpgradeProcess() == couchbasev2.OfflineUpgrade:
+		// Upgrade by hibernating now and waking on the new image next cycle.
+		candidates, blocked, err := c.offlineUpgradeCandidates()
+		if err != nil {
+			return err
+		}
+
+		if len(candidates) > 0 && !blocked {
+			// A wake rebuilds members from their volumes, so without them it
+			// builds an empty cluster. Leave it to the online upgrade.
+			if !c.cluster.IsSupportable() {
+				c.log.Info("[WARN] Offline upgrade needs volumes on every server class, upgrading online", "cluster", c.namespacedName())
+				return nil
+			}
+
+			// A node that can't boot the target leaves nothing up after the wake.
+			if blockers, err := c.getUpgradeBlockers(); err != nil || len(blockers) > 0 {
+				c.log.Info("[WARN] Cluster can't be upgraded", "cluster", c.namespacedName(), "blockers", blockers, "error", err)
+				return nil
+			}
+
+			// hibernate() waits for a stable cluster: only stop once it has
+			// hibernated, or the reconcilers that settle it never run.
+			return c.hibernate()
+		}
+	}
+
+	return nil
+}
+
 // reconcile is the main function for the whole cluster lifecycle.  It works like this:
 //
 //   - Deletes any completed pods, these are not considered as members, but do pollute the
@@ -111,17 +160,14 @@ func (c *Cluster) reconcile() error {
 
 	c.scheduler = scheduler
 
-	// Hibernation trumps all.
-	if c.cluster.Spec.Hibernate {
-		if hibernated, err := c.hibernate(); hibernated {
-			return err
-		}
-	} else if c.cluster.HasCondition(couchbasev2.ClusterConditionHibernating) {
-		// If the cluster has the hibernating condition but the flag is not set, the cluster is leaving hibernation.
-		c.raiseEvent(k8sutil.HibernationEndedEvent(c.cluster))
+	// Hibernation trumps all: an asleep cluster has no pods to reconcile.
+	if err := c.reconcileHibernation(); err != nil {
+		return err
 	}
 
-	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionHibernating)
+	if c.cluster.HasCondition(couchbasev2.ClusterConditionHibernating) {
+		return nil
+	}
 
 	// Run pre-creation reconcilers.  These are all the things we need to correctly
 	// provision a Couchbase pod such as requisite services or any secrets/configmaps

@@ -809,6 +809,11 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.HibernatedWithMemcachedBuckets != nil {
+		in, out := &in.HibernatedWithMemcachedBuckets, &out.HibernatedWithMemcachedBuckets
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

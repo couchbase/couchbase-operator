@@ -4,9 +4,67 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
+
+// TestShouldMandatorySwapCandidate covers the index swap rule into 7.6.0/7.6.1
+// (MB-62547). Candidates carry the target version, as getUpgradeCandidates
+// hands them out, so reading the version off the member would never swap.
+func TestShouldMandatorySwapCandidate(t *testing.T) {
+	cluster := &CouchbaseCluster{
+		Spec: ClusterSpec{
+			Servers: []ServerConfig{
+				{Name: "index", Services: []Service{IndexService, DataService}},
+				{Name: "query", Services: []Service{QueryService}},
+			},
+		},
+	}
+
+	tests := []struct {
+		name          string
+		config        string
+		sourceVersion string
+		targetVersion string
+		want          bool
+		expectErr     bool
+	}{
+		{name: "index node into the defective window", config: "index", sourceVersion: "7.2.0", targetVersion: "7.6.1", want: true},
+		{name: "index node from 7.1.x", config: "index", sourceVersion: "7.1.4", targetVersion: "7.6.0", want: true},
+		{name: "index node past the fixed release", config: "index", sourceVersion: "7.2.0", targetVersion: "7.6.2", want: false},
+		{name: "index node already on 7.6", config: "index", sourceVersion: "7.6.0", targetVersion: "7.6.1", want: false},
+		{name: "no version change", config: "index", sourceVersion: "7.6.1", targetVersion: "7.6.1", want: false},
+		{name: "class without the index service", config: "query", sourceVersion: "7.2.0", targetVersion: "7.6.1", want: false},
+		{name: "unknown server class", config: "missing", sourceVersion: "7.2.0", targetVersion: "7.6.1", want: false},
+		{name: "unusable source version", config: "index", sourceVersion: "unknown", targetVersion: "7.6.1", expectErr: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Stamped with the target, exactly as the upgrade path delivers it.
+			candidate := couchbaseutil.NewMember("default", "cb", "cb-0000", test.targetVersion, test.config, false, "couchbase/server:"+test.targetVersion)
+
+			got, err := cluster.ShouldMandatorySwapCandidate(candidate, test.sourceVersion, test.targetVersion)
+			if test.expectErr {
+				if err == nil {
+					t.Errorf("expected an error, got nil")
+				}
+
+				return
+			}
+
+			if err != nil {
+				t.Errorf("did not expect an error, got: %v", err)
+				return
+			}
+
+			if got != test.want {
+				t.Errorf("expected mandatory swap=%v, got %v", test.want, got)
+			}
+		})
+	}
+}
 
 func TestAsMatcher(t *testing.T) {
 	tests := []struct {

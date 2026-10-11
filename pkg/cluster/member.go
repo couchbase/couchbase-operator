@@ -93,6 +93,182 @@ func (c *Cluster) updateMembers() error {
 	return nil
 }
 
+// applyPendingHibernationUpgrade re-stamps members and their PVCs to the target
+// image on wake, so they boot the new version. Idempotent.
+func (c *Cluster) applyPendingHibernationUpgrade() error {
+	candidates, blocked, err := c.offlineUpgradeCandidates()
+	if err != nil {
+		return err
+	}
+
+	if blocked {
+		c.log.Info("[WARN] Skipping hibernation upgrade: would exceed two cluster versions",
+			"cluster", c.namespacedName(), "target", c.cluster.Spec.CouchbaseImage())
+		return nil
+	}
+
+	// A plain wake.
+	if len(candidates) == 0 {
+		return nil
+	}
+
+	// Wake on the old image instead; the upgrade is retried once unblocked.
+	if blockers, err := c.getUpgradeBlockers(); err != nil || len(blockers) > 0 {
+		c.log.Info("[WARN] Skipping hibernation upgrade", "cluster", c.namespacedName(), "blockers", blockers, "error", err)
+		return nil
+	}
+
+	newImage := c.cluster.Spec.CouchbaseImage()
+
+	newVersion, err := k8sutil.CouchbaseVersion(newImage)
+	if err != nil {
+		return err
+	}
+
+	// Report it like an online upgrade; reportUpgradeComplete finishes it.
+	status := &couchbasev2.UpgradeStatus{
+		TargetCount: len(c.members) - len(candidates),
+		TotalCount:  len(c.members),
+	}
+
+	if err := c.reportUpgrade(status); err != nil {
+		return err
+	}
+
+	for _, m := range candidates {
+		name := m.Name()
+
+		m.SetImage(newImage)
+		m.SetVersion(newVersion)
+
+		if err := c.restampPVCImage(name, newImage, newVersion); err != nil {
+			return err
+		}
+
+		c.log.Info("Hibernation upgrade: member re-stamped to target image",
+			"cluster", c.namespacedName(), "name", name, "image", newImage, "version", newVersion)
+	}
+
+	return nil
+}
+
+// offlineUpgradeCandidates returns the members to re-stamp, honouring
+// previousVersionPodCount and the upgrade order. blocked means the cluster
+// would span more than two versions. The trigger and the wake share it, so
+// held members never re-trigger an upgrade.
+func (c *Cluster) offlineUpgradeCandidates() (couchbaseutil.MemberList, bool, error) {
+	newImage := c.cluster.Spec.CouchbaseImage()
+
+	newVersion, err := k8sutil.CouchbaseVersion(newImage)
+	if err != nil {
+		return nil, false, err
+	}
+
+	total := len(c.members)
+	if total == 0 {
+		return nil, false, nil
+	}
+
+	// Key by image when the version is unresolvable so two distinct digests
+	// don't collapse into one key.
+	versionKey := func(version, image string) string {
+		if !couchbaseutil.VersionKnown(version) {
+			return image
+		}
+
+		return version
+	}
+
+	versions := map[string]struct{}{versionKey(newVersion, newImage): {}}
+	for _, m := range c.members {
+		versions[versionKey(m.Version(), m.GetImage())] = struct{}{}
+	}
+
+	if len(versions) > 2 {
+		return nil, true, nil
+	}
+
+	// Pods to keep on the previous version (PVPC), capped at the member count.
+	keepOld := 0
+	if c.cluster.Spec.Upgrade != nil {
+		keepOld = c.cluster.Spec.Upgrade.PreviousVersionPodCount
+	}
+
+	if keepOld > total {
+		keepOld = total
+	}
+
+	numToUpgrade := total - keepOld
+
+	// Order only members not yet on the target: ordering every member isn't
+	// stable across a hibernate/wake, so a held member would re-trigger forever.
+	needsUpgrade := couchbaseutil.MemberSet{}
+
+	for _, m := range c.members {
+		if m.GetImage() == newImage {
+			continue
+		}
+
+		// A rollback can't boot on volumes the newer version wrote, so leave
+		// it to the online swap. Unknown versions can't be compared; keep them.
+		if downgrade, err := couchbaseutil.VersionBefore(newVersion, m.Version()); err == nil && downgrade {
+			continue
+		}
+
+		needsUpgrade.Add(m)
+	}
+
+	// Members already on the target use up the quota.
+	remaining := numToUpgrade - (total - len(needsUpgrade))
+	if remaining <= 0 {
+		return nil, false, nil
+	}
+
+	// Every order group, so one wake upgrades them all and PVPC holds back the last.
+	ordered := c.sortCandidatesByUpgradeOrder(needsUpgrade)
+
+	if len(ordered) > remaining {
+		ordered = ordered[:remaining]
+	}
+
+	return ordered, false, nil
+}
+
+// restampPVCImage sets the image/version annotations on a member's PVCs so later
+// reconciles reconstruct it at the new version via PVCToMemberset. Idempotent.
+func (c *Cluster) restampPVCImage(memberName, image, version string) error {
+	for _, pvc := range c.k8s.PersistentVolumeClaims.List() {
+		if name, ok := pvc.Labels[constants.LabelNode]; !ok || name != memberName {
+			continue
+		}
+
+		// An unnamed version is never persisted; drop the stale one instead.
+		_, hasVersion := pvc.Annotations[constants.CouchbaseVersionAnnotationKey]
+		if pvc.Annotations[constants.PVCImageAnnotation] == image &&
+			(pvc.Annotations[constants.CouchbaseVersionAnnotationKey] == version || !couchbaseutil.VersionKnown(version) && !hasVersion) {
+			continue
+		}
+
+		updated := pvc.DeepCopy()
+		if updated.Annotations == nil {
+			updated.Annotations = map[string]string{}
+		}
+
+		updated.Annotations[constants.PVCImageAnnotation] = image
+		if couchbaseutil.VersionKnown(version) {
+			updated.Annotations[constants.CouchbaseVersionAnnotationKey] = version
+		} else {
+			delete(updated.Annotations, constants.CouchbaseVersionAnnotationKey)
+		}
+
+		if _, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Update(c.ctx, updated, metav1.UpdateOptions{}); err != nil {
+			return fmt.Errorf("failed to re-stamp PVC %s for hibernation upgrade: %w", updated.Name, err)
+		}
+	}
+
+	return nil
+}
+
 func (c *Cluster) newMember(id int, serverSpecName, image string) (couchbaseutil.Member, error) {
 	version, err := k8sutil.CouchbaseVersion(image)
 	if err != nil {

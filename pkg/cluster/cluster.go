@@ -1062,30 +1062,35 @@ func (c *Cluster) UpdateCRSpecAnnotation() error {
 	return err
 }
 
-// Selects any member that can be recovered and attempts to restart it.
+// recoverClusterDown recreates every recoverable member at once when no pods
+// exist (e.g. a hibernation wake), so they reach quorum together.
 func (c *Cluster) recoverClusterDown() (bool, error) {
+	recovered := false
+
 	// Use Names() as that returns a deterministic/sorted list for testing.
 	for _, name := range c.members.Names() {
 		m := c.members[name]
-		if c.isPodRecoverable(m) {
-			pod, podExists := c.k8s.Pods.Get(name)
-			if podExists && pod.DeletionTimestamp == nil && k8sutil.HasPendingInitializationCondition(pod) {
-				c.log.V(1).Info("Down pod already exists, skipping recreation", "cluster", c.namespacedName(), "name", name)
-				continue
-			}
-
-			if err := c.recreatePod(m, false); err != nil {
-				return false, fmt.Errorf("node %s could not be recovered: %w", m.Name(), err)
-			}
-
-			c.log.Info("Pod recovering", "cluster", c.namespacedName(), "name", m.Name())
-			c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name(), c.cluster))
-
-			return true, nil
+		if !c.isPodRecoverable(m) {
+			continue
 		}
+
+		pod, podExists := c.k8s.Pods.Get(name)
+		if podExists && pod.DeletionTimestamp == nil && k8sutil.HasPendingInitializationCondition(pod) {
+			c.log.V(1).Info("Down pod already exists, skipping recreation", "cluster", c.namespacedName(), "name", name)
+			continue
+		}
+
+		if err := c.recreatePod(m, false); err != nil {
+			return recovered, fmt.Errorf("node %s could not be recovered: %w", m.Name(), err)
+		}
+
+		c.log.Info("Pod recovering", "cluster", c.namespacedName(), "name", m.Name())
+		c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name(), c.cluster))
+
+		recovered = true
 	}
 
-	return false, nil
+	return recovered, nil
 }
 
 // getClusterPods returns all pods related to the cluster, excluding any anciliary
@@ -1453,19 +1458,35 @@ func (c *Cluster) logStatus(status *MemberState) {
 	c.scheduler.LogStatus(c.namespacedName())
 }
 
-// hibernate checks if the cluster can enter hibernation and if so, hibernates it.
-func (c *Cluster) hibernate() (bool, error) {
+// hibernate deletes every pod and sets the Hibernating condition, once the
+// cluster can enter hibernation. Until then it does nothing.
+func (c *Cluster) hibernate() error {
 	// If the cluster isn't already hibernating, we should check that we can enter hibernation and warn if it's not possible.
 	if !c.cluster.HasCondition(couchbasev2.ClusterConditionHibernating) {
 		canHibernate, reason := c.cluster.CanHibernate()
 
 		if !canHibernate {
 			c.log.Info("[WARN] Hibernation requested. Cluster will enter hibernation once it is stable", "reason", reason)
-			return false, nil
+			return nil
 		} else {
 			c.log.Info("Cluster hibernation requested", "cluster", c.namespacedName())
 			c.raiseEvent(k8sutil.HibernationStartedEvent(c.cluster))
 		}
+
+		// Buckets can't be listed while hibernated, so record memcached ones now.
+		// A cluster that never ran has none, and no server to ask. Unsure means
+		// assume some: that only blocks an upgrade to 8.0+.
+		hasMemcachedBuckets := false
+
+		if !c.cluster.HasNeverRun() {
+			var err error
+			if hasMemcachedBuckets, err = c.hasMemcachedBuckets(); err != nil {
+				c.log.Info("[WARN] Could not list buckets before hibernating, assuming memcached buckets", "cluster", c.namespacedName(), "error", err.Error())
+				hasMemcachedBuckets = true
+			}
+		}
+
+		c.cluster.Status.HibernatedWithMemcachedBuckets = &hasMemcachedBuckets
 	}
 
 	members := podsToMemberSet(c.getClusterPods())
@@ -1474,11 +1495,11 @@ func (c *Cluster) hibernate() (bool, error) {
 		c.log.Info("Hibernating pod", "cluster", c.namespacedName(), "name", member.Name())
 
 		if err := c.removePod(member.Name(), false); err != nil {
-			return true, err
+			return err
 		}
 
 		if err := c.clusterRemoveMember(member.Name()); err != nil {
-			return true, err
+			return err
 		}
 	}
 
@@ -1487,12 +1508,12 @@ func (c *Cluster) hibernate() (bool, error) {
 	c.cluster.Status.SetHibernatingCondition("Cluster hibernating")
 
 	if err := c.updateCRStatus(); err != nil {
-		return true, err
+		return err
 	}
 
 	c.log.Info("Cluster is hibernating", "cluster", c.namespacedName())
 
-	return true, nil
+	return nil
 }
 
 func (c *Cluster) checkUpdateTime(operatorStartTime time.Time) error {

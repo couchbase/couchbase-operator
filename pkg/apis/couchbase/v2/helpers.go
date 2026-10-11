@@ -883,6 +883,14 @@ func (cs *ClusterStatus) SetHibernatingCondition(message string) {
 	cs.setClusterCondition(c)
 }
 
+// HibernatedWithMemcached is true when the cluster is hibernated and not known
+// to be free of memcached buckets, e.g. hibernated before they were recorded.
+func (c *CouchbaseCluster) HibernatedWithMemcached() bool {
+	has := c.Status.HibernatedWithMemcachedBuckets
+
+	return c.HasCondition(ClusterConditionHibernating) && (has == nil || *has)
+}
+
 func (cs *ClusterStatus) SetErrorCondition(message string) {
 	c := newClusterCondition(ClusterConditionError, v1.ConditionTrue, "ErrorEncountered", message)
 	cs.setClusterCondition(c)
@@ -2112,6 +2120,18 @@ func (c *CouchbaseCluster) ShouldRevertCandidateToSwapRebalance(candidate couchb
 	candidateConfig := c.Spec.GetServerConfigByName(candidate.Config())
 
 	return candidateConfig != nil && candidateConfig.HasServiceWithout(IndexService, DataService)
+}
+
+// ShouldMandatorySwapCandidate reports whether an index candidate must swap
+// rebalance from sourceVersion to targetVersion (MB-62547). sourceVersion is
+// passed in because candidates are already stamped with the target.
+func (c *CouchbaseCluster) ShouldMandatorySwapCandidate(candidate couchbaseutil.Member, sourceVersion, targetVersion string) (bool, error) {
+	candidateConfig := c.Spec.GetServerConfigByName(candidate.Config())
+	if candidateConfig == nil || !candidateConfig.HasService(IndexService) {
+		return false, nil
+	}
+
+	return couchbaseutil.IndexUpgradeRequiresSwap(sourceVersion, targetVersion)
 }
 
 // +kubebuilder:object:generate=false

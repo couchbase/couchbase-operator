@@ -5797,7 +5797,7 @@ func TestHibernationChangeConstraints(t *testing.T) {
 			name:           "ChangesDuringHibernationAreInvalid",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Add("/spec/servers/0/size", 2)},
 			shouldFail:     true,
-			expectedErrors: []string{"cluster spec cannot be changed during hibernation"},
+			expectedErrors: []string{"only spec.image"},
 		},
 		{
 			name:       "ChangesDuringHibernationOfNeverBuiltClusterAreValid",

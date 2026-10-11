@@ -286,11 +286,14 @@ func (c *Cluster) selectCandidatesByNodesOrder(candidates couchbaseutil.MemberSe
 	// Hold the orchestrator back so that it can be upgraded last.
 	var orchestrator couchbaseutil.Member
 
-	clusterInfo := &couchbaseutil.TerseClusterInfo{}
-	if err := couchbaseutil.GetTerseClusterInfo(clusterInfo).On(c.api, c.readyMembers()); err != nil {
-		c.log.Error(err, "failed to get cluster info", "cluster", c.namespacedName())
-	} else {
-		candidates, orchestrator = separateCandidatesAndOrchestrator(candidates, clusterInfo.Orchestrator)
+	// Nobody to ask while hibernated; skip rather than log an error each cycle.
+	if ready := c.readyMembers(); len(ready) > 0 {
+		clusterInfo := &couchbaseutil.TerseClusterInfo{}
+		if err := couchbaseutil.GetTerseClusterInfo(clusterInfo).On(c.api, ready); err != nil {
+			c.log.Error(err, "failed to get cluster info", "cluster", c.namespacedName())
+		} else {
+			candidates, orchestrator = separateCandidatesAndOrchestrator(candidates, clusterInfo.Orchestrator)
+		}
 	}
 
 	// Go through the rest in alphabetical order
@@ -835,7 +838,8 @@ func (c *Cluster) reportUpgradeComplete(state *MemberState) error {
 	// already runs the target image, so it is no longer an upgrade candidate, but it isn't serving
 	// until async initialization has run and it has been rebalanced back in: until then it shows
 	// as failed over or pending add back.  The state is from the start of this reconcile, so a
-	// rebalance that completed during it is only seen on the next one.
+	// rebalance that completed during it is only seen on the next one.  An offline upgrade
+	// re-stamps every member up front, so a woken pod also looks upgraded before it has started.
 	if len(c.getPendingInitPods()) > 0 || !state.settled() {
 		return nil
 	}
@@ -922,30 +926,41 @@ func (c *Cluster) getUpgradeBlockers() ([]string, error) {
 		return nil, err
 	}
 
-	if startBefore8, err := couchbaseutil.VersionBefore(startVersion, "8.0.0"); err != nil {
+	if crosses, err := couchbaseutil.UpgradeCrosses(startVersion, targetVersion, constants.MemcachedBucketsRemovedVersion); err != nil {
 		return nil, err
-	} else if !startBefore8 {
+	} else if !crosses {
 		return nil, nil
 	}
 
-	if targetAfter8, err := couchbaseutil.VersionAfter(targetVersion, "8.0.0"); err != nil {
-		return nil, err
-	} else if !targetAfter8 {
-		return nil, nil
+	// Nothing to ask while hibernated, so use what hibernate() recorded.
+	hasMemcachedBuckets := c.cluster.HibernatedWithMemcached()
+	if !c.cluster.HasCondition(couchbasev2.ClusterConditionHibernating) {
+		if hasMemcachedBuckets, err = c.hasMemcachedBuckets(); err != nil {
+			return nil, err
+		}
 	}
 
+	if hasMemcachedBuckets {
+		return []string{"cluster has memcached buckets, please remove them before upgrading"}, nil
+	}
+
+	return nil, nil
+}
+
+// hasMemcachedBuckets asks the cluster, so it needs the cluster up.
+func (c *Cluster) hasMemcachedBuckets() (bool, error) {
 	buckets := couchbaseutil.BucketStatusList{}
-	if err = couchbaseutil.ListBucketStatuses(&buckets).On(c.api, c.readyMembers()); err != nil {
-		return nil, err
+	if err := couchbaseutil.ListBucketStatuses(&buckets).On(c.api, c.readyMembers()); err != nil {
+		return false, err
 	}
 
 	for _, bucket := range buckets {
 		if bucket.BucketType == couchbasev2.BucketTypeMemcached {
-			return []string{"cluster has memcached buckets, please remove them before upgrading"}, nil
+			return true, nil
 		}
 	}
 
-	return nil, nil
+	return false, nil
 }
 
 // applyPreviousVersionToNewPods modifies the additions slice in-place to set the old version

@@ -13,6 +13,8 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -227,4 +229,88 @@ func TestHibernateNewCluster(t *testing.T) {
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestOfflineUpgradePreviousVersionPodCount upgrades with upgradeProcess
+// Offline, holding one pod on the old version, then releases it. Each step must
+// be a hibernate/wake on the same pods and volumes: no swaps, no data loss.
+func TestOfflineUpgradePreviousVersionPodCount(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).Upgradable()
+
+	clusterSize := constants.Size3
+	numOfDocs := 100
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+	cluster := clusterOptionsUpgrade().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{UpgradeProcess: couchbasev2.OfflineUpgrade, PreviousVersionPodCount: 1}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+
+	podNames := func() []string {
+		pods, err := kubernetes.KubeClient.CoreV1().Pods(kubernetes.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: utilconstants.LabelCluster + "=" + cluster.Name})
+		if err != nil {
+			e2eutil.Die(t, err)
+		}
+
+		names := []string{}
+		for _, pod := range pods.Items {
+			names = append(names, pod.Name)
+		}
+
+		sort.Strings(names)
+
+		return names
+	}
+	originalPods := podNames()
+
+	// Checks the cluster upgraded offline: settled, data intact, same pods, and
+	// the expected number of hibernations.
+	mustHaveUpgradedOffline := func(hibernations int, images map[string]int) {
+		e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 15*time.Minute)
+		e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 5*time.Minute, couchbasev2.ClusterConditionUpgrading)
+		e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, images)
+		e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
+
+		if pods := podNames(); !reflect.DeepEqual(pods, originalPods) {
+			e2eutil.Die(t, fmt.Errorf("expected pods %v to be reused, got %v", originalPods, pods))
+		}
+
+		events, err := e2eutil.GetCouchbaseEvents(kubernetes.KubeClient, cluster)
+		if err != nil {
+			e2eutil.Die(t, err)
+		}
+
+		count := 0
+		for _, event := range events {
+			if event.Reason == k8sutil.EventReasonHibernationStarted {
+				count++
+			}
+		}
+
+		if count != hibernations {
+			e2eutil.Die(t, fmt.Errorf("expected %d hibernations, got %d", hibernations, count))
+		}
+	}
+
+	// The image change hibernates and wakes all but one pod on the new version.
+	// Hibernation lasts one reconcile, so wait for the mixed cluster instead.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionMixedMode, v1.ConditionTrue, cluster, 15*time.Minute)
+	mustHaveUpgradedOffline(1, map[string]int{f.CouchbaseServerImageUpgrade: 1, f.CouchbaseServerImage: clusterSize - 1})
+
+	// Releasing the held pod upgrades it with a second hibernation.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/upgrade/previousVersionPodCount", 0), time.Minute)
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 15*time.Minute, couchbasev2.ClusterConditionMixedMode)
+	mustHaveUpgradedOffline(2, map[string]int{f.CouchbaseServerImage: clusterSize})
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
 }

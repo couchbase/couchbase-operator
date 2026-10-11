@@ -115,6 +115,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkoutConstraintNoArbiterClassBelow76,
 		checkConstraintMoreThanTwoDataNodesMultiNodeClusterInPlaceUpgrade,
 		checkConstraintClusterSupportable,
+		checkConstraintOfflineUpgradeHasVolumes,
 		checkConstraintServiceEnabledForVolumeMount,
 		checkConstraintDefaultAndLogVolumesMututallyExclusive,
 		checkConstraintServiceMountsUsedWithDefaultMount,
@@ -1626,6 +1627,16 @@ func checkConstraintTwoDataNodesForDeltaRecovery(_ *types.Validator, cluster *co
 	}
 
 	return nil, nil
+}
+
+// checkConstraintOfflineUpgradeHasVolumes checks Offline has volumes to wake
+// from: without them the wake builds an empty cluster.
+func checkConstraintOfflineUpgradeHasVolumes(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if cluster.GetUpgradeProcess() == couchbasev2.OfflineUpgrade && !cluster.IsSupportable() {
+		return fmt.Errorf("upgradeProcess Offline requires 'spec.servers.volumeMounts' on all server classes, all classes with stateful services must have the 'default' mount defined")
+	}
+
+	return nil
 }
 
 // checkConstraintClusterSupportable checks that if you have one supportable class, they all are.
@@ -3883,17 +3894,12 @@ func checkSnapshotBackupRestoreVersion(run *couchbasev2.CouchbaseSnapshotBackupR
 		return nil
 	}
 
-	runBefore72, err := couchbaseutil.VersionBefore(runVersion, "7.2.0")
+	crosses72, err := couchbaseutil.UpgradeCrosses(runVersion, targetVersion, "7.2.0")
 	if err != nil {
 		return err
 	}
 
-	targetAfter72, err := couchbaseutil.VersionAfter(targetVersion, "7.2.0")
-	if err != nil {
-		return err
-	}
-
-	if runBefore72 && targetAfter72 {
+	if crosses72 {
 		return fmt.Errorf("cluster %s runs %s, data backed up from %s before 7.2.0 can't be restored onto 7.2.0 or later", cluster.Name, targetVersion, runVersion)
 	}
 
@@ -6778,7 +6784,10 @@ func checkDefaultBucketStorageBackendConstraint(v *types.Validator, prev, curr *
 }
 
 func checkClusterUpgradePrerequisites(v *types.Validator, prev, curr *couchbasev2.CouchbaseCluster) error {
-	if !curr.Spec.Buckets.Managed {
+	// Unmanaged buckets can't be listed here, but while hibernated status
+	// records whether there may be memcached ones.
+	asleepWithMemcached := prev.HibernatedWithMemcached()
+	if !curr.Spec.Buckets.Managed && !asleepWithMemcached {
 		return nil
 	}
 
@@ -6797,16 +6806,14 @@ func checkClusterUpgradePrerequisites(v *types.Validator, prev, curr *couchbasev
 		return err
 	}
 
-	if startBefore8, err := couchbaseutil.VersionBefore(startVersion, "8.0.0"); err != nil {
+	if crosses, err := couchbaseutil.UpgradeCrosses(startVersion, targetVersion, constants.MemcachedBucketsRemovedVersion); err != nil {
 		return err
-	} else if !startBefore8 {
+	} else if !crosses {
 		return nil
 	}
 
-	if targetAfter8, err := couchbaseutil.VersionAfter(targetVersion, "8.0.0"); err != nil {
-		return err
-	} else if !targetAfter8 {
-		return nil
+	if asleepWithMemcached {
+		return fmt.Errorf("cluster may have memcached buckets, which are not supported in Couchbase Server version 8.0.0 and above, please wake the cluster and remove any before upgrading")
 	}
 
 	buckets, err := v.Abstraction.GetCouchbaseMemcachedBuckets(curr.Namespace, curr.Spec.Buckets.Selector)
@@ -6846,20 +6853,13 @@ func checkClusterVersionUpgradePath(prev, curr *couchbasev2.CouchbaseCluster) er
 		return err
 	}
 
-	versionBefore72, err := couchbaseutil.VersionBefore(oldVersion, "7.2.0")
-	if err != nil {
-		return err
-	}
+	// Offline rules apply when the cluster is or will be hibernated. Online
+	// rules apply too until it is, and after a mixed wake.
+	asleep := prev.HasCondition(couchbasev2.ClusterConditionHibernating)
+	if asleep || curr.Spec.Hibernate || curr.GetUpgradeProcess() == couchbasev2.OfflineUpgrade {
+		wakesMixed := curr.Spec.Upgrade != nil && curr.Spec.Upgrade.PreviousVersionPodCount > 0
 
-	versionAfter72, err := couchbaseutil.VersionAfter(newVersion, "7.2.0")
-	if err != nil {
-		return err
-	}
-
-	inPlaceUpgrade := (curr.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade || curr.GetUpgradeProcess() == couchbasev2.DeltaRecovery)
-
-	if inPlaceUpgrade && versionBefore72 && versionAfter72 {
-		return fmt.Errorf("in-place upgrades not supported from pre-7.2.0 to versions 7.2.0 and above")
+		return couchbaseutil.CheckHibernationUpgradePath(oldVersion, newVersion, curr.IsIndexerEnabled(), wakesMixed || !asleep)
 	}
 
 	return couchbaseutil.CheckUpgradePath(oldVersion, newVersion)
@@ -7305,14 +7305,39 @@ func checkConstraintK8sSecurityContext(_ *types.Validator, cluster *couchbasev2.
 	return nil
 }
 
-// checkForClusterChangesDuringHibernation validates whether there have been any changes to a cluster while hibernate is enabled.
-// A cluster that has never been set up has nothing to protect, so it can still be changed.
+// checkChangeConstraintsHibernate only allows spec.image and a decrease of
+// previousVersionPodCount while hibernated; both are applied on wake.
 func checkChangeConstraintsHibernate(current, updated *couchbasev2.CouchbaseCluster) error {
-	if current.Spec.Hibernate && updated.Spec.Hibernate && current.HasCondition(couchbasev2.ClusterConditionHibernating) && !current.HasNeverRun() {
-		current.Spec.Hibernate = updated.Spec.Hibernate
-		if !reflect.DeepEqual(updated.Spec, current.Spec) {
-			return fmt.Errorf("cluster spec cannot be changed during hibernation")
-		}
+	// The condition, not spec.hibernate: Offline hibernates without the flag.
+	if !current.HasCondition(couchbasev2.ClusterConditionHibernating) {
+		return nil
+	}
+
+	// Never set up, so there is nothing to protect.
+	if current.HasNeverRun() {
+		return nil
+	}
+
+	// Waking in the same edit may carry any change.
+	if current.Spec.Hibernate && !updated.Spec.Hibernate {
+		return nil
+	}
+
+	// Normalise the allowed fields; any other difference is rejected.
+	curSpec := current.Spec.DeepCopy()
+	updSpec := updated.Spec.DeepCopy()
+
+	curSpec.Hibernate = updSpec.Hibernate
+	curSpec.Image = updSpec.Image
+
+	// Increasing it would need new old-version nodes.
+	if curSpec.Upgrade != nil && updSpec.Upgrade != nil &&
+		updSpec.Upgrade.PreviousVersionPodCount <= curSpec.Upgrade.PreviousVersionPodCount {
+		curSpec.Upgrade.PreviousVersionPodCount = updSpec.Upgrade.PreviousVersionPodCount
+	}
+
+	if !reflect.DeepEqual(updSpec, curSpec) {
+		return fmt.Errorf("while the cluster is hibernating only spec.image and a decrease of spec.upgrade.previousVersionPodCount are allowed")
 	}
 
 	return nil

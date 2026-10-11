@@ -280,6 +280,8 @@ const (
 	MinimumCNGVersionWithCBAuthSupport = "0.2.0"
 	// MinimumVersionForMagmaDefaultBackend is the minimum version of Couchbase Server to set magma as the default bucket storage backend.
 	MinimumVersionForMagmaDefaultBackend = "8.0.0"
+	// MemcachedBucketsRemovedVersion is the first Couchbase Server version without memcached buckets.
+	MemcachedBucketsRemovedVersion = "8.0.0"
 
 	// MinimumVersionForEncryptionKeyUsedBy is the minimum version of Couchbase Server that reports the
 	// usedBy field on GET /settings/encryptionKeys (MB-68887). usedBy lists the DEKs a key still

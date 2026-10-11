@@ -1562,34 +1562,6 @@ func TestCheckConstraintXDCRRemoteClusterAuthMethod(t *testing.T) {
 	}
 }
 
-// TestCheckChangeConstraintsHibernate checks a hibernated cluster's spec can't be changed once it
-// has run, but can while it has never been set up, since there's nothing to protect yet.
-func TestCheckChangeConstraintsHibernate(t *testing.T) {
-	cluster := func(clusterID string, size int) *couchbasev2.CouchbaseCluster {
-		c := &couchbasev2.CouchbaseCluster{
-			Spec: couchbasev2.ClusterSpec{
-				Hibernate: true,
-				Servers:   []couchbasev2.ServerConfig{{Name: "all", Size: size}},
-			},
-			Status: couchbasev2.ClusterStatus{ClusterID: clusterID},
-		}
-
-		c.Status.SetHibernatingCondition("Cluster hibernating")
-
-		return c
-	}
-
-	const ran = "f50608c895e226375ef4a3a6fb76229f"
-
-	if err := checkChangeConstraintsHibernate(cluster("", 1), cluster("", 2)); err != nil {
-		t.Errorf("expected a never set up hibernated cluster to be changeable, got %v", err)
-	}
-
-	if err := checkChangeConstraintsHibernate(cluster(ran, 1), cluster(ran, 2)); err == nil {
-		t.Errorf("expected a hibernated cluster that has run to reject changes")
-	}
-}
-
 // TestCheckConstraintsSnapshotBackup checks the admission rules for a backup that uses
 // spec.snapshotBackup. None of these backups set archive settings like the full and
 // incremental schedules or size, so they also show those archive checks are skipped.
@@ -2256,4 +2228,236 @@ func TestNamesUniqueSameResourceReachedTwice(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCheckClusterVersionUpgradePathOffline(t *testing.T) {
+	offline := couchbasev2.OfflineUpgrade
+
+	cluster := func(image string, indexNodes bool, process *couchbasev2.UpgradeProcess) *couchbasev2.CouchbaseCluster {
+		services := []couchbasev2.Service{couchbasev2.DataService}
+		if indexNodes {
+			services = append(services, couchbasev2.IndexService)
+		}
+		c := &couchbasev2.CouchbaseCluster{
+			Spec: couchbasev2.ClusterSpec{
+				Image:          image,
+				Servers:        []couchbasev2.ServerConfig{{Name: "data", Size: 3, Services: services}},
+				UpgradeProcess: process,
+			},
+		}
+		return c
+	}
+
+	t.Run("Offline process applies offline rules on a running cluster", func(t *testing.T) {
+		// 7.1 -> 7.6.0 with index nodes: online allows it (via swap), but the
+		// offline path must reject (a wake cannot swap; plasma migration).
+		prev := cluster("couchbase/server:7.1.0", true, &offline)
+		curr := cluster("couchbase/server:7.6.0", true, &offline)
+		err := checkClusterVersionUpgradePath(prev, curr)
+		if err == nil || !strings.Contains(err.Error(), "7.6.2 or later") {
+			t.Errorf("expected Offline 7.1->7.6.0 with index nodes to be rejected, got: %v", err)
+		}
+	})
+
+	t.Run("same jump without Offline process uses online rules (allowed)", func(t *testing.T) {
+		prev := cluster("couchbase/server:7.1.0", true, nil)
+		curr := cluster("couchbase/server:7.6.0", true, nil)
+		if err := checkClusterVersionUpgradePath(prev, curr); err != nil {
+			t.Errorf("expected online 7.1->7.6.0 to be allowed, got: %v", err)
+		}
+	})
+
+	t.Run("Offline process allows a valid offline jump", func(t *testing.T) {
+		prev := cluster("couchbase/server:7.1.0", false, &offline)
+		curr := cluster("couchbase/server:7.6.2", false, &offline)
+		if err := checkClusterVersionUpgradePath(prev, curr); err != nil {
+			t.Errorf("expected Offline 7.1->7.6.2 to be allowed, got: %v", err)
+		}
+	})
+
+	t.Run("hibernate and image in one edit applies offline rules", func(t *testing.T) {
+		prev := cluster("couchbase/server:7.1.0", true, nil)
+		curr := cluster("couchbase/server:7.6.0", true, nil)
+		curr.Spec.Hibernate = true
+		err := checkClusterVersionUpgradePath(prev, curr)
+		if err == nil || !strings.Contains(err.Error(), "7.6.2 or later") {
+			t.Errorf("expected hibernate + 7.1->7.6.0 with index nodes to be rejected, got: %v", err)
+		}
+	})
+}
+
+func TestCheckConstraintOfflineUpgradeHasVolumes(t *testing.T) {
+	offline := couchbasev2.OfflineUpgrade
+
+	c := &couchbasev2.CouchbaseCluster{
+		Spec: couchbasev2.ClusterSpec{
+			Servers:        []couchbasev2.ServerConfig{{Name: "data", Size: 3, Services: []couchbasev2.Service{couchbasev2.DataService}}},
+			UpgradeProcess: &offline,
+		},
+	}
+
+	if err := checkConstraintOfflineUpgradeHasVolumes(nil, c); err == nil {
+		t.Errorf("expected Offline without volumes to be rejected")
+	}
+
+	c.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{DefaultClaim: "default"}
+	if err := checkConstraintOfflineUpgradeHasVolumes(nil, c); err != nil {
+		t.Errorf("expected Offline with volumes to be allowed, got: %v", err)
+	}
+}
+
+func TestCheckClusterUpgradePrerequisitesHibernatedMemcached(t *testing.T) {
+	cluster := func(image string) *couchbasev2.CouchbaseCluster {
+		hasMemcached := true
+		c := &couchbasev2.CouchbaseCluster{Spec: couchbasev2.ClusterSpec{Hibernate: true, Image: image}}
+		c.Status.SetHibernatingCondition("test")
+		c.Status.HibernatedWithMemcachedBuckets = &hasMemcached
+		return c
+	}
+
+	// Unmanaged buckets, so only the recorded condition knows about them.
+	if err := checkClusterUpgradePrerequisites(nil, cluster("couchbase/server:7.6.4"), cluster("couchbase/server:8.0.0")); err == nil {
+		t.Errorf("expected 7.6.4->8.0.0 to be rejected while hibernated with memcached buckets")
+	}
+
+	if err := checkClusterUpgradePrerequisites(nil, cluster("couchbase/server:7.6.4"), cluster("couchbase/server:7.6.5")); err != nil {
+		t.Errorf("expected 7.6.4->7.6.5 to be allowed, got: %v", err)
+	}
+
+	clean, none := cluster("couchbase/server:7.6.4"), false
+	clean.Status.HibernatedWithMemcachedBuckets = &none
+	if err := checkClusterUpgradePrerequisites(nil, clean, cluster("couchbase/server:8.0.0")); err != nil {
+		t.Errorf("expected 7.6.4->8.0.0 to be allowed when hibernated without memcached buckets, got: %v", err)
+	}
+
+	// Hibernated before buckets were recorded: unknown, so assume some.
+	legacy := cluster("couchbase/server:7.6.4")
+	legacy.Status.HibernatedWithMemcachedBuckets = nil
+	if err := checkClusterUpgradePrerequisites(nil, legacy, cluster("couchbase/server:8.0.0")); err == nil {
+		t.Errorf("expected 7.6.4->8.0.0 to be rejected for a cluster hibernated before buckets were recorded")
+	}
+}
+
+func TestCheckChangeConstraintsHibernate(t *testing.T) {
+	hibernating := func() *couchbasev2.CouchbaseCluster {
+		c := &couchbasev2.CouchbaseCluster{
+			Spec: couchbasev2.ClusterSpec{
+				Hibernate: true,
+				Image:     "couchbase/server:7.6.0",
+				Servers:   []couchbasev2.ServerConfig{{Name: "data", Size: 3}},
+				Upgrade:   &couchbasev2.UpgradeSpec{PreviousVersionPodCount: 2},
+			},
+		}
+		c.Status.ClusterID = "f50608c895e226375ef4a3a6fb76229f"
+		c.Status.SetHibernatingCondition("test")
+		return c
+	}
+
+	t.Run("never set up cluster accepts any change", func(t *testing.T) {
+		cur, upd := hibernating(), hibernating()
+		cur.Status.ClusterID = ""
+		upd.Spec.Servers[0].Size = 5
+		if err := checkChangeConstraintsHibernate(cur, upd); err != nil {
+			t.Errorf("expected a never set up hibernated cluster to be changeable, got: %v", err)
+		}
+	})
+
+	t.Run("top-level image change is allowed", func(t *testing.T) {
+		cur, upd := hibernating(), hibernating()
+		upd.Spec.Image = "couchbase/server:8.0.0"
+		if err := checkChangeConstraintsHibernate(cur, upd); err != nil {
+			t.Errorf("expected image change during hibernation to be allowed, got: %v", err)
+		}
+	})
+
+	t.Run("per-server-class image change is rejected", func(t *testing.T) {
+		// spec.servers[].image is deprecated and the offline wake only honours
+		// the top-level spec.image, so a per-class change must be rejected.
+		cur, upd := hibernating(), hibernating()
+		upd.Spec.Servers[0].Image = "couchbase/server:8.0.0"
+		err := checkChangeConstraintsHibernate(cur, upd)
+		if err == nil || !strings.Contains(err.Error(), "only spec.image") {
+			t.Errorf("expected per-class image change during hibernation to be rejected, got: %v", err)
+		}
+	})
+
+	t.Run("non-image change is rejected", func(t *testing.T) {
+		cur, upd := hibernating(), hibernating()
+		upd.Spec.Servers[0].Size = 5
+		err := checkChangeConstraintsHibernate(cur, upd)
+		if err == nil || !strings.Contains(err.Error(), "only spec.image") {
+			t.Errorf("expected size change during hibernation to be rejected, got: %v", err)
+		}
+	})
+
+	t.Run("previousVersionPodCount decrease is allowed", func(t *testing.T) {
+		cur, upd := hibernating(), hibernating()
+		upd.Spec.Upgrade.PreviousVersionPodCount = 0
+		if err := checkChangeConstraintsHibernate(cur, upd); err != nil {
+			t.Errorf("expected previousVersionPodCount decrease during hibernation to be allowed, got: %v", err)
+		}
+	})
+
+	t.Run("image change plus previousVersionPodCount decrease is allowed", func(t *testing.T) {
+		cur, upd := hibernating(), hibernating()
+		upd.Spec.Image = "couchbase/server:8.0.0"
+		upd.Spec.Upgrade.PreviousVersionPodCount = 1
+		if err := checkChangeConstraintsHibernate(cur, upd); err != nil {
+			t.Errorf("expected image change + PVPC decrease during hibernation to be allowed, got: %v", err)
+		}
+	})
+
+	t.Run("previousVersionPodCount increase is rejected", func(t *testing.T) {
+		cur, upd := hibernating(), hibernating()
+		upd.Spec.Upgrade.PreviousVersionPodCount = 3
+		err := checkChangeConstraintsHibernate(cur, upd)
+		if err == nil || !strings.Contains(err.Error(), "only spec.image") {
+			t.Errorf("expected previousVersionPodCount increase during hibernation to be rejected, got: %v", err)
+		}
+	})
+
+	t.Run("operator-driven Offline hibernation is protected too", func(t *testing.T) {
+		// spec.hibernate is never set for an Offline upgrade: the operator
+		// hibernates the cluster itself and only sets the condition.
+		cur, upd := hibernating(), hibernating()
+		cur.Spec.Hibernate, upd.Spec.Hibernate = false, false
+		upd.Spec.Servers[0].Size = 5
+
+		err := checkChangeConstraintsHibernate(cur, upd)
+		if err == nil || !strings.Contains(err.Error(), "only spec.image") {
+			t.Errorf("expected size change during an Offline hibernation to be rejected, got: %v", err)
+		}
+	})
+
+	t.Run("upgradeProcess change is rejected while hibernating", func(t *testing.T) {
+		// Not needed: an Offline hibernation wakes on the next reconcile.
+		cur, upd := hibernating(), hibernating()
+		cur.Spec.Hibernate, upd.Spec.Hibernate = false, false
+		cur.Spec.Upgrade.UpgradeProcess = couchbasev2.OfflineUpgrade
+		upd.Spec.Upgrade.UpgradeProcess = couchbasev2.InPlaceUpgrade
+
+		err := checkChangeConstraintsHibernate(cur, upd)
+		if err == nil || !strings.Contains(err.Error(), "only spec.image") {
+			t.Errorf("expected upgradeProcess change during hibernation to be rejected, got: %v", err)
+		}
+	})
+
+	t.Run("no constraint applies when not hibernating", func(t *testing.T) {
+		cur, upd := hibernating(), hibernating()
+		cur.Status = couchbasev2.ClusterStatus{}
+		upd.Status = couchbasev2.ClusterStatus{}
+		upd.Spec.Servers[0].Size = 5
+		if err := checkChangeConstraintsHibernate(cur, upd); err != nil {
+			t.Errorf("expected no constraint when not hibernating, got: %v", err)
+		}
+	})
+
+	t.Run("changes allowed when disabling hibernation", func(t *testing.T) {
+		cur, upd := hibernating(), hibernating()
+		upd.Spec.Hibernate = false
+		upd.Spec.Servers[0].Size = 5
+		if err := checkChangeConstraintsHibernate(cur, upd); err != nil {
+			t.Errorf("expected changes allowed when leaving hibernation, got: %v", err)
+		}
+	})
 }

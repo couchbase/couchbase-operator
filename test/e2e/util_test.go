@@ -491,6 +491,7 @@ func registerTests() {
 		framework.NewTestDef(TestHibernateSupportableImmediate).WithTags(TagSuiteP0, TagFeatureHibernation),
 		framework.NewTestDef(TestHibernateOccursAfterUpgrade).WithTags(TagSuiteP0, TagFeatureHibernation),
 		framework.NewTestDef(TestHibernateNewCluster).WithTags(TagSuiteP0, TagFeatureHibernation),
+		framework.NewTestDef(TestOfflineUpgradePreviousVersionPodCount).WithTags(TagSuiteP0, TagFeatureHibernation, TagFeatureUpgrade),
 		framework.NewTestDef(TestCreateDurableBucket).WithTags(TagSuiteP0, TagSuitePlatform),
 		framework.NewTestDef(TestEditDurableBucket).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestEditEphemeralBucketKVThrottle).WithTags(TagSuiteP1),
