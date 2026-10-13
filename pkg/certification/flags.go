@@ -93,6 +93,10 @@ type certifyOptions struct {
 
 	// verifyFile is the certification output to verify checksum against
 	verifyFile string
+
+	// resultFiles maps locally downloaded JUnit results to their path in the
+	// output archive.
+	resultFiles map[string]string
 }
 
 // Shared test flags are flags which affect the behavior of both

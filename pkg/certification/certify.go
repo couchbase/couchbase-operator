@@ -11,8 +11,10 @@ licenses/APL2.txt.
 package certification
 
 import (
+	"archive/tar"
 	"bufio"
 	"bytes"
+	"compress/bzip2"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
@@ -55,6 +57,10 @@ const (
 
 	// artifactsName is the name used by resources used to extract artifacts.
 	artifactsName = "artifacts"
+
+	// artifactsDownloadAttempts is how many times to try copying an archive from
+	// the artifacts pod.
+	artifactsDownloadAttempts = 3
 
 	// serviceAccount is the default service account to use.
 	serviceAccount = "couchbase-operator-certification"
@@ -915,12 +921,9 @@ func (o *certifyOptions) waitArtifactsPodReady() error {
 	return nil
 }
 
-// downloadArtifacts basically does what `kubectl cp` does, executes tar in the container
-// and streams the contents out via stdout.  We buffer the archive stream and write it
-// out locally.
-func (o *certifyOptions) downloadArtifacts() error {
-	util.PrintLine("Copying artifacts from artifact pod ...")
-
+// execArtifactsPod executes a command in the artifacts pod and returns whatever
+// was streamed to stdout, even on error.
+func (o *certifyOptions) execArtifactsPod(command ...string) ([]byte, error) {
 	execRequest := o.client.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(artifactsName).
@@ -930,28 +933,124 @@ func (o *certifyOptions) downloadArtifacts() error {
 
 	execRequest.VersionedParams(&corev1.PodExecOptions{
 		Container: certificationName,
-		Command: []string{
-			"tar",
-			"-cj",
-			"/artifacts",
-		},
-		Stdout: true,
+		Command:   command,
+		Stdout:    true,
 	}, scheme.ParameterCodec)
 
 	exec, err := remotecommand.NewSPDYExecutor(o.config, "POST", execRequest.URL())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var stdout bytes.Buffer
 
 	ctx := context.TODO()
 
-	if err := exec.StreamWithContext(ctx, remotecommand.StreamOptions{Stdout: &stdout}); err != nil {
+	err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{Stdout: &stdout})
+
+	return stdout.Bytes(), err
+}
+
+// verifyArchive reads a bzip2 compressed tar archive to the end, returning an
+// error if it is truncated or corrupt.
+func verifyArchive(data []byte) error {
+	reader := tar.NewReader(bzip2.NewReader(bytes.NewReader(data)))
+
+	for {
+		if _, err := reader.Next(); err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+
+			return err
+		}
+
+		if _, err := io.Copy(io.Discard, reader); err != nil {
+			return err
+		}
+	}
+}
+
+// downloadArchive executes a command in the artifacts pod that streams a bzip2
+// compressed tar archive to stdout.  Large exec streams can end early without
+// reporting an error, so the archive is verified and the download retried if it
+// is incomplete.  The last attempt's data is returned, even on error.
+func (o *certifyOptions) downloadArchive(command ...string) ([]byte, error) {
+	var data []byte
+
+	var err error
+
+	for attempt := 1; attempt <= artifactsDownloadAttempts; attempt++ {
+		if data, err = o.execArtifactsPod(command...); err == nil {
+			if err = verifyArchive(data); err == nil {
+				return data, nil
+			}
+		}
+
+		util.PrintError(fmt.Sprintf("Download attempt %d/%d failed ...", attempt, artifactsDownloadAttempts), err)
+	}
+
+	return data, err
+}
+
+// downloadResults copies the JUnit results on their own before the artifacts, so
+// they are still available if the much larger artifacts archive cannot be copied.
+func (o *certifyOptions) downloadResults() error {
+	util.PrintLine("Copying results from artifact pod ...")
+
+	data, err := o.downloadArchive("sh", "-c", "cd / && tar -cj artifacts/*.xml")
+	if err != nil {
 		return err
 	}
 
-	return os.WriteFile(o.archiveName.archiveName(), stdout.Bytes(), 0644)
+	dir, err := os.MkdirTemp("", "results")
+	if err != nil {
+		return err
+	}
+
+	o.resultFiles = map[string]string{}
+
+	reader := tar.NewReader(bzip2.NewReader(bytes.NewReader(data)))
+
+	for {
+		header, err := reader.Next()
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+
+		if err != nil {
+			return err
+		}
+
+		name := filepath.Base(header.Name)
+
+		content, err := io.ReadAll(reader)
+		if err != nil {
+			return err
+		}
+
+		if err := os.WriteFile(filepath.Join(dir, name), content, 0644); err != nil {
+			return err
+		}
+
+		o.resultFiles[filepath.Join(dir, name)] = "artifacts/" + name
+	}
+}
+
+// downloadArtifacts basically does what `kubectl cp` does, executes tar in the container
+// and streams the contents out via stdout.  We buffer the archive stream and write it
+// out locally.
+func (o *certifyOptions) downloadArtifacts() error {
+	util.PrintLine("Copying artifacts from artifact pod ...")
+
+	data, err := o.downloadArchive("tar", "-cj", "/artifacts")
+
+	// Write whatever was copied even on failure, a partial archive still holds some logs.
+	if writeErr := os.WriteFile(o.archiveName.archiveName(), data, 0644); writeErr != nil {
+		return writeErr
+	}
+
+	return err
 }
 
 // startProfiling begins periodic profiling of the certification container
@@ -1152,10 +1251,17 @@ func (o *certifyOptions) prepareOutput() {
 		Archival:    archiver.Tar{},
 	}
 
-	files, err := archiver.FilesFromDisk(ctx, nil, map[string]string{
+	archiveFiles := map[string]string{
 		tempFile.Name():    "stdout.txt",
 		tempArchive.Name(): "results.tar.bz",
-	})
+	}
+
+	// Results copied separately are kept even if results.tar.bz is incomplete.
+	for diskPath, archivePath := range o.resultFiles {
+		archiveFiles[diskPath] = archivePath
+	}
+
+	files, err := archiver.FilesFromDisk(ctx, nil, archiveFiles)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -1226,11 +1332,9 @@ func (o *certifyOptions) prepareOutput() {
 
 	fmt.Println("Results Checksum: " + base64.StdEncoding.EncodeToString(hash.Sum(nil)))
 
-	files, err = archiver.FilesFromDisk(ctx, nil, map[string]string{
-		tempFile.Name():     "stdout.txt",
-		tempArchive.Name():  "results.tar.bz",
-		tempHashFile.Name(): "checksum.txt",
-	})
+	archiveFiles[tempHashFile.Name()] = "checksum.txt"
+
+	files, err = archiver.FilesFromDisk(ctx, nil, archiveFiles)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -1477,7 +1581,11 @@ func (o *certifyOptions) certify(flags *genericclioptions.ConfigFlags, args []st
 		return err
 	}
 
-	// Extract the artifacts from the artifacts volume.
+	// Extract the results and artifacts from the artifacts volume.
+	if err := o.downloadResults(); err != nil {
+		util.PrintError("Error copying results from artifact pod ...", err)
+	}
+
 	if err := o.downloadArtifacts(); err != nil {
 		return err
 	}
