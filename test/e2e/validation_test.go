@@ -4625,6 +4625,7 @@ func TestBucketMigrationPost76Validation(t *testing.T) {
 			name: "TestBucketMigrationToCouchstoreWithoutRoutines",
 			mutations: patchMap{
 				"bucket2": jsonpatch.NewPatchSet().
+					Remove("/spec/historyRetention").
 					Replace("/spec/storageBackend", "couchstore")},
 			expectedWarnings: []string{"because spec.buckets.enableBucketMigrationRoutines is not true"},
 			shouldFail:       false,
@@ -6198,7 +6199,10 @@ func TestBucketStorageBackendValidationApply(t *testing.T) {
 			name: "TestValidateMagmaToCouchstoreDisabledMigrationRoutines",
 			mutations: patchMap{
 				"cluster0": jsonpatch.NewPatchSet().Remove(`/spec/buckets/enableBucketMigrationRoutines`),
-				"bucket1":  jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "couchstore").Add("/spec/numVBuckets", 1024),
+				"bucket1": jsonpatch.NewPatchSet().
+					Remove("/spec/historyRetention").
+					Replace("/spec/storageBackend", "couchstore").
+					Add("/spec/numVBuckets", 1024),
 			},
 			shouldFail:       false,
 			expectedWarnings: []string{`because spec.buckets.enableBucketMigrationRoutines is not true`},
