@@ -980,8 +980,9 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 		b.MagmaKeyTreeDataBlockSize = status.MagmaKeyTreeDataBlockSize
 
 		// Continuous backup is magma only, so it is read back here alongside the other magma
-		// settings. A nil enabled means the server predates the feature rather than that it is
-		// turned off.
+		// settings. A nil enabled means the server does not report the feature at all. Note that
+		// some servers before 8.1.0 (e.g. 8.0.2) still report enabled=false, so callers must
+		// ignore these fields when the cluster does not support continuous backup.
 		//
 		// The rest are only read back while the feature is on, mirroring what the operator puts on
 		// the requested side of the comparison. The server keeps reporting a location and a

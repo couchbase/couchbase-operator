@@ -763,6 +763,8 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []bucketUpdate, []co
 
 	atLeast80 := c.SupportsVersionFeatures("8.0.0")
 
+	supportedContinuousBackup := c.SupportsVersionFeatures(continuousBackupMinVersion)
+
 	create := []couchbaseutil.Bucket{}
 	update := []bucketUpdate{}
 	updateDuringMigration := []couchbaseutil.Bucket{}
@@ -793,6 +795,19 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []bucketUpdate, []co
 				if !atLeast80 {
 					r.NumVBuckets = nil
 					a.NumVBuckets = nil
+				}
+
+				// Servers before 8.1.0 can still report continuous backup settings (e.g. 8.0.2
+				// returns continuousBackupEnabled=false), but the operator does not manage them
+				// there, so ignore them to avoid a permanent diff.
+				if !supportedContinuousBackup {
+					a.ContinuousBackupEnabled = nil
+					a.ContinuousBackupLocation = nil
+					a.ContinuousBackupInterval = nil
+					a.ContinuousBackupRetentionPeriod = nil
+					a.ContinuousBackupKmKeyURL = nil
+					a.ContinuousBackupKmCredID = nil
+					a.ContinuousBackupCloudStorageCredID = nil
 				}
 
 				// Normalize a.NoRestart when CBS reports no per-node overrides (nil).
