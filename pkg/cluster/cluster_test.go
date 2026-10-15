@@ -17,6 +17,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	cbfake "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned/fake"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -203,6 +204,82 @@ func TestUpdateCRStatusNoChangeSkipsWrite(t *testing.T) {
 
 	if sawUpdate {
 		t.Error("expected no update to be issued when status is unchanged")
+	}
+}
+
+// newReplacedClusterTest builds a Cluster for a cluster that was deleted, and a new cluster with the
+// same name but a different UID on the server, as if it was made again while the old one was still
+// being reconciled.
+func newReplacedClusterTest() (*Cluster, *cbfake.Clientset) {
+	stored := &couchbasev2.CouchbaseCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: fakeClusterName, Namespace: fakeClusterNamespace, UID: "new-cluster"},
+		Spec:       couchbasev2.ClusterSpec{Image: "couchbase/server:7.6.8"},
+	}
+
+	cbClient := cbfake.NewSimpleClientset(stored)
+
+	c := &Cluster{
+		k8s: &client.Client{CouchbaseClient: cbClient},
+		cluster: &couchbasev2.CouchbaseCluster{
+			ObjectMeta: metav1.ObjectMeta{Name: fakeClusterName, Namespace: fakeClusterNamespace, UID: "old-cluster"},
+			Spec:       couchbasev2.ClusterSpec{Image: "couchbase/server:7.6.11"},
+			Status:     couchbasev2.ClusterStatus{ClusterID: "f50608c895e226375ef4a3a6fb76229f", Size: 3},
+		},
+		log: logf.Log.WithName("test"),
+	}
+
+	return c, cbClient
+}
+
+// TestUpdateCRStatusSkipsReplacedCluster checks the old cluster's status, like its cluster ID, isn't
+// written onto a new cluster with the same name.
+func TestUpdateCRStatusSkipsReplacedCluster(t *testing.T) {
+	c, cbClient := newReplacedClusterTest()
+
+	var sawWrite bool
+
+	cbClient.PrependReactor("*", "couchbaseclusters", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		if action.GetVerb() == "update" || action.GetVerb() == "patch" {
+			sawWrite = true
+		}
+
+		return false, nil, nil
+	})
+
+	if err := c.updateCRStatus(); err != nil {
+		t.Fatalf("updateCRStatus returned an error: %v", err)
+	}
+
+	if sawWrite {
+		t.Error("expected no write to the new cluster")
+	}
+
+	got, err := cbClient.CouchbaseV2().CouchbaseClusters(fakeClusterNamespace).Get(t.Context(), fakeClusterName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to fetch cluster: %v", err)
+	}
+
+	if got.Status.ClusterID != "" {
+		t.Errorf("expected the new cluster to have no cluster ID, got %q", got.Status.ClusterID)
+	}
+}
+
+// TestUpdateCRSpecAnnotationSkipsReplacedCluster checks the old cluster's spec isn't written into a new
+// cluster's lastReconciledSpec annotation.
+func TestUpdateCRSpecAnnotationSkipsReplacedCluster(t *testing.T) {
+	c, cbClient := newReplacedClusterTest()
+
+	if err := c.UpdateCRSpecAnnotation(); err != nil {
+		t.Fatalf("UpdateCRSpecAnnotation returned an error: %v", err)
+	}
+
+	got, err := cbClient.CouchbaseV2().CouchbaseClusters(fakeClusterNamespace).Get(t.Context(), fakeClusterName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to fetch cluster: %v", err)
+	}
+
+	if _, ok := got.Annotations[constants.AnnotationLastReconciledSpec]; ok {
+		t.Errorf("expected the new cluster to have no lastReconciledSpec annotation, got %v", got.Annotations)
 	}
 }
 

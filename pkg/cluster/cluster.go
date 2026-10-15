@@ -927,6 +927,13 @@ func (c *Cluster) updateCRStatus() error {
 		return errors.NewStackTracedError(err)
 	}
 
+	// The cluster may have been deleted and made again with the same name while we were still
+	// reconciling the old one. Its status isn't ours to write, so we leave it alone.
+	if cluster.UID != c.cluster.UID {
+		c.log.Info("Cluster was replaced by a new one with the same name, not updating its status", "cluster", c.namespacedName())
+		return nil
+	}
+
 	// Ignore the case where nothing needs to be updated
 	if reflect.DeepEqual(c.cluster.Status, cluster.Status) {
 		return nil
@@ -1009,6 +1016,12 @@ func (c *Cluster) UpdateCRSpecAnnotation() error {
 
 	if err != nil {
 		return errors.NewStackTracedError(err)
+	}
+
+	// Same as for status, a new cluster with the same name must not get the old cluster's spec.
+	if cluster.UID != c.cluster.UID {
+		c.log.Info("Cluster was replaced by a new one with the same name, not updating its spec annotation", "cluster", c.namespacedName())
+		return nil
 	}
 
 	lastReconciledSpec := cluster.GetSpecFromAnnotation()
