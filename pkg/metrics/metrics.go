@@ -166,7 +166,7 @@ var (
 
 	// UpgradeDurationMSMetric
 	// name: upgrade_duration
-	// help: The time taken to perform an upgrade
+	// help: The time taken to perform the last upgrade
 	// unit: milliseconds
 	// added: 2.7.0
 	// stability: committed
@@ -608,7 +608,7 @@ func initMetrics() {
 
 	UpgradeDurationMSMetric = *prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name:      "upgrade_duration",
-		Help:      "The time taken to perform an upgrade",
+		Help:      "The time taken to perform the last upgrade",
 		Namespace: MetricNamespace,
 		Subsystem: MetricSubsystem,
 	}, addOptionalLabels([]string{"name"}))

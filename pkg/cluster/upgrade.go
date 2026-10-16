@@ -778,7 +778,7 @@ func (c *Cluster) reportUpgrade(status *couchbasev2.UpgradeStatus) error {
 			return err
 		}
 
-		if err := c.state.Insert(persistence.UpgradeTime, startTimeNoMono); err != nil {
+		if err := c.state.Upsert(persistence.UpgradeTime, startTimeNoMono); err != nil {
 			return err
 		}
 
@@ -863,7 +863,7 @@ func (c *Cluster) reportUpgradeComplete() error {
 		return err
 	}
 
-	metrics.UpgradeDurationMSMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Set(float64(time.Since(parsedStartTime)))
+	metrics.UpgradeDurationMSMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Set(float64(time.Since(parsedStartTime).Milliseconds()))
 
 	return retryutil.RetryFor(4*time.Second, c.updateCRStatus)
 }
