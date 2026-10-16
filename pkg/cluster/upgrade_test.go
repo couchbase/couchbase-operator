@@ -11,6 +11,7 @@ licenses/APL2.txt.
 package cluster
 
 import (
+	"slices"
 	"testing"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -278,5 +279,94 @@ func TestPendingPodsBlockingRebalance(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestSortCandidatesByUpgradeOrder checks every candidate comes back in upgrade
+// order, so previousVersionPodCount holds back the last ones, while the rolling
+// filter still only takes the first group. A pod whose class is gone from the
+// spec fits no group and goes last.
+func TestSortCandidatesByUpgradeOrder(t *testing.T) {
+	member := func(name, class string) couchbaseutil.Member {
+		return couchbaseutil.NewMember("default", "cb", name, "7.6.11", class, false, "couchbase/server:7.6.11")
+	}
+
+	candidates := couchbaseutil.NewMemberSet(
+		member("cb-0000", "data-only"), member("cb-0001", "data-only"),
+		member("cb-0002", "idx-query"), member("cb-0003", "idx-query"),
+		member("cb-0004", "rem-services"), member("cb-0005", "rem-services"),
+		member("cb-0006", "svc-less"), member("cb-0007", "gone"),
+	)
+
+	servers := []couchbasev2.ServerConfig{
+		{Name: "data-only", Services: []couchbasev2.Service{couchbasev2.DataService}},
+		{Name: "idx-query", Services: []couchbasev2.Service{couchbasev2.IndexService, couchbasev2.QueryService}},
+		{Name: "rem-services", Services: []couchbasev2.Service{couchbasev2.SearchService}},
+		{Name: "svc-less"},
+	}
+
+	names := func(list couchbaseutil.MemberList) []string {
+		out := []string{}
+		for _, m := range list {
+			out = append(out, m.Name())
+		}
+
+		return out
+	}
+
+	cases := []struct {
+		orderType couchbasev2.UpgradeOrderType
+		order     []string
+	}{
+		{couchbasev2.UpgradeOrderTypeServerClasses, []string{"idx-query", "data-only"}},
+		// svc-less counts as an arbiter, which the default service order puts last.
+		{couchbasev2.UpgradeOrderTypeServices, []string{"index"}},
+	}
+
+	for _, tc := range cases {
+		c := &Cluster{cluster: &couchbasev2.CouchbaseCluster{Spec: couchbasev2.ClusterSpec{
+			Servers: servers,
+			Upgrade: &couchbasev2.UpgradeSpec{UpgradeOrderType: tc.orderType, UpgradeOrder: tc.order},
+		}}}
+
+		want := []string{"cb-0002", "cb-0003", "cb-0000", "cb-0001", "cb-0004", "cb-0005", "cb-0006", "cb-0007"}
+		if got := names(c.sortCandidatesByUpgradeOrder(candidates)); !slices.Equal(got, want) {
+			t.Errorf("%s sort: got %v, want %v", tc.orderType, got, want)
+		}
+
+		if got := names(c.filterCandidatesByUpgradeOrder(candidates)); !slices.Equal(got, want[:2]) {
+			t.Errorf("%s filter: got %v, want %v", tc.orderType, got, want[:2])
+		}
+	}
+}
+
+// TestBuildClassOrder checks the class order used to pick which scaled-up pods stay on the old version.
+func TestBuildClassOrder(t *testing.T) {
+	servers := []couchbasev2.ServerConfig{
+		{Name: "data-only", Services: []couchbasev2.Service{couchbasev2.DataService}},
+		{Name: "idx-query", Services: []couchbasev2.Service{couchbasev2.IndexService, couchbasev2.QueryService}},
+		{Name: "rem-services", Services: []couchbasev2.Service{couchbasev2.SearchService}},
+		{Name: "svc-less"},
+	}
+
+	cases := []struct {
+		orderType couchbasev2.UpgradeOrderType
+		order     []string
+		want      []string
+	}{
+		{couchbasev2.UpgradeOrderTypeServerClasses, []string{"idx-query", "data-only"}, []string{"idx-query", "data-only", "rem-services", "svc-less"}},
+		// A class without services counts as an arbiter, which the default order puts last.
+		{couchbasev2.UpgradeOrderTypeServices, []string{"index"}, []string{"idx-query", "data-only", "rem-services", "svc-less"}},
+	}
+
+	for _, tc := range cases {
+		c := &Cluster{cluster: &couchbasev2.CouchbaseCluster{Spec: couchbasev2.ClusterSpec{
+			Servers: servers,
+			Upgrade: &couchbasev2.UpgradeSpec{UpgradeOrderType: tc.orderType, UpgradeOrder: tc.order},
+		}}}
+
+		if got := c.buildClassOrder(); !slices.Equal(got, tc.want) {
+			t.Errorf("%s: got %v, want %v", tc.orderType, got, tc.want)
+		}
 	}
 }

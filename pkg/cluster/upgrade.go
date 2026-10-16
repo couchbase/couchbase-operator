@@ -225,28 +225,52 @@ func (c *Cluster) needsMove() couchbaseutil.MemberSet {
 	return candidates
 }
 
-// filterCandidatesByUpgradeOrder returns the upgrade candidates ordered by the upgrade order specified in the cluster spec.
+// filterCandidatesByUpgradeOrder returns the candidates in the first upgrade order group.
 // This method does not apply any limits to the number of candidates that can be upgraded at once.
-// If ordering by server class or service, only candidates from the first non-empty class/service group are returned.
-func (c *Cluster) filterCandidatesByUpgradeOrder(candidates couchbaseutil.MemberSet) (couchbaseutil.MemberList, error) {
-	if c.cluster.Spec.Upgrade == nil {
-		return candidates.ToList(), nil
+func (c *Cluster) filterCandidatesByUpgradeOrder(candidates couchbaseutil.MemberSet) couchbaseutil.MemberList {
+	groups := c.groupCandidatesByUpgradeOrder(candidates)
+	if len(groups) == 0 {
+		return couchbaseutil.MemberList{}
 	}
 
-	upgradeOrderType := c.cluster.Spec.Upgrade.UpgradeOrderType
+	return groups[0]
+}
 
-	switch upgradeOrderType {
-	case couchbasev2.UpgradeOrderTypeNodes:
-		return c.selectCandidatesByNodesOrder(candidates), nil
-	case couchbasev2.UpgradeOrderTypeServerGroups:
-		return c.selectCandidatesByServerGroupsOrder(candidates)
-	case couchbasev2.UpgradeOrderTypeServerClasses:
-		return c.selectCandidatesByServerClassesOrder(candidates), nil
-	case couchbasev2.UpgradeOrderTypeServices:
-		return c.selectCandidatesByServicesOrder(candidates), nil
+// sortCandidatesByUpgradeOrder returns every candidate, one upgrade order group after another.
+func (c *Cluster) sortCandidatesByUpgradeOrder(candidates couchbaseutil.MemberSet) couchbaseutil.MemberList {
+	return slices.Concat(c.groupCandidatesByUpgradeOrder(candidates)...)
+}
+
+// groupCandidatesByUpgradeOrder splits the candidates into upgrade order groups, first to upgrade first.
+// Candidates that fit no group go in a final group.
+func (c *Cluster) groupCandidatesByUpgradeOrder(candidates couchbaseutil.MemberSet) []couchbaseutil.MemberList {
+	var groups []couchbaseutil.MemberList
+
+	if c.cluster.Spec.Upgrade != nil {
+		switch c.cluster.Spec.Upgrade.UpgradeOrderType {
+		case couchbasev2.UpgradeOrderTypeNodes:
+			groups = []couchbaseutil.MemberList{c.selectCandidatesByNodesOrder(candidates)}
+		case couchbasev2.UpgradeOrderTypeServerGroups:
+			groups = c.groupCandidatesByServerGroupsOrder(candidates)
+		case couchbasev2.UpgradeOrderTypeServerClasses:
+			groups = c.groupCandidatesByServerClassesOrder(candidates)
+		case couchbasev2.UpgradeOrderTypeServices:
+			groups = c.groupCandidatesByServicesOrder(candidates)
+		}
 	}
 
-	return candidates.ToList(), nil
+	rest := candidates.Copy()
+	for _, group := range groups {
+		for _, member := range group {
+			rest.Remove(member.Name())
+		}
+	}
+
+	if rest.Size() > 0 {
+		groups = append(groups, rest.ToList())
+	}
+
+	return groups
 }
 
 func (c *Cluster) selectCandidatesByNodesOrder(candidates couchbaseutil.MemberSet) couchbaseutil.MemberList {
@@ -286,8 +310,8 @@ func (c *Cluster) selectCandidatesByNodesOrder(candidates couchbaseutil.MemberSe
 	return finalCandidates
 }
 
-func (c *Cluster) selectCandidatesByServerGroupsOrder(candidates couchbaseutil.MemberSet) (couchbaseutil.MemberList, error) {
-	serverGroupOrder := append([]string(nil), c.cluster.Spec.Upgrade.UpgradeOrder...)
+func (c *Cluster) groupCandidatesByServerGroupsOrder(candidates couchbaseutil.MemberSet) []couchbaseutil.MemberList {
+	serverGroupOrder := slices.Clone(c.cluster.Spec.Upgrade.UpgradeOrder)
 
 	// Append all the server groups to the end of the order, to ensure we upgrade
 	// all server groups.
@@ -300,7 +324,7 @@ func (c *Cluster) selectCandidatesByServerGroupsOrder(candidates couchbaseutil.M
 	groupedCandidates := map[string]couchbaseutil.MemberSet{}
 
 	for _, candidate := range candidates {
-		// The pod is likely down, so just skip it
+		// The pod is likely down; groupCandidatesByUpgradeOrder puts it in the final group.
 		scheduledServerGroup, err := k8sutil.GetServerGroup(c.k8s, candidate.Name(), c.cluster.ServerGroupLabel())
 		if err != nil {
 			c.log.Error(err, "failed to get server group for candidate", "cluster", c.namespacedName(), "candidate", candidate.Name())
@@ -315,61 +339,43 @@ func (c *Cluster) selectCandidatesByServerGroupsOrder(candidates couchbaseutil.M
 	}
 
 	// Only nodes from one server group can be upgraded at a time.
-	// We'll move arbiter nodes to the end of the upgrade list so
-	// they will be upgraded last.
-	for _, group := range serverGroupOrder {
-		if members, ok := groupedCandidates[group]; ok && members.Size() > 0 {
-			filteredMembers := couchbaseutil.MemberList{}
-			arbiterMembers := couchbaseutil.MemberList{}
-			for _, member := range members.ToList() {
-				serverClass := c.cluster.Spec.GetServerConfigByName(member.Config())
-				if serverClass != nil && serverClass.HasService("arbiter") {
-					arbiterMembers = append(arbiterMembers, member)
-					continue
-				}
+	// Arbiter nodes go to the end of each group so they are upgraded last.
+	groups := []couchbaseutil.MemberList{}
 
-				filteredMembers = append(filteredMembers, member)
+	for _, group := range serverGroupOrder {
+		members, ok := groupedCandidates[group]
+		if !ok {
+			continue
+		}
+
+		delete(groupedCandidates, group)
+
+		filteredMembers := couchbaseutil.MemberList{}
+		arbiterMembers := couchbaseutil.MemberList{}
+
+		for _, member := range members.ToList() {
+			serverClass := c.cluster.Spec.GetServerConfigByName(member.Config())
+			if serverClass != nil && serverClass.HasService("arbiter") {
+				arbiterMembers = append(arbiterMembers, member)
+				continue
 			}
 
-			filteredMembers = append(filteredMembers, arbiterMembers...)
-			return filteredMembers, nil
+			filteredMembers = append(filteredMembers, member)
 		}
+
+		groups = append(groups, append(filteredMembers, arbiterMembers...))
 	}
 
-	// If there are remaining candidates not in a server group then they go last
-	return candidates.ToList(), nil
+	return groups
 }
 
-func (c *Cluster) selectCandidatesByServicesOrder(candidates couchbaseutil.MemberSet) couchbaseutil.MemberList {
-	serviceOrder := append([]string(nil), c.cluster.Spec.Upgrade.UpgradeOrder...)
-	for _, svc := range DefaultServicesOrder {
-		if !slices.Contains(serviceOrder, svc) {
-			serviceOrder = append(serviceOrder, svc)
-		}
-	}
+// groupCandidatesByServicesOrder buckets candidates by their highest-priority service in the upgrade order.
+func (c *Cluster) groupCandidatesByServicesOrder(candidates couchbaseutil.MemberSet) []couchbaseutil.MemberList {
+	serviceOrder := c.serviceUpgradeOrder()
+	groups := make([]couchbaseutil.MemberList, len(serviceOrder))
 
-	buckets, bestRank := c.groupByServiceRank(candidates, serviceOrder)
-
-	if bestRank >= 0 {
-		result := buckets[bestRank]
-		sort.Slice(result, func(i, j int) bool {
-			return result[i].Name() < result[j].Name()
-		})
-
-		return result
-	}
-
-	return candidates.ToList()
-}
-
-// groupByServiceRank buckets candidates by their highest-priority service rank
-// in a single pass. Returns the buckets and the index of the best (lowest) rank,
-// or -1 if no candidates were bucketed.
-func (c *Cluster) groupByServiceRank(candidates couchbaseutil.MemberSet, serviceOrder []string) (map[int]couchbaseutil.MemberList, int) {
-	buckets := make(map[int]couchbaseutil.MemberList)
-	bestRank := -1
-
-	for _, candidate := range candidates {
+	for _, candidate := range candidates.ToList() {
+		// A class gone from the spec goes in the final group.
 		sc := c.cluster.Spec.GetServerConfigByName(candidate.Config())
 		if sc == nil {
 			continue
@@ -377,39 +383,51 @@ func (c *Cluster) groupByServiceRank(candidates couchbaseutil.MemberSet, service
 
 		for rank, svc := range serviceOrder {
 			if sc.HasService(couchbasev2.Service(svc)) {
-				buckets[rank] = append(buckets[rank], candidate)
-				if bestRank < 0 || rank < bestRank {
-					bestRank = rank
-				}
-
+				groups[rank] = append(groups[rank], candidate)
 				break
 			}
 		}
 	}
 
-	return buckets, bestRank
+	return slices.DeleteFunc(groups, func(group couchbaseutil.MemberList) bool { return len(group) == 0 })
 }
 
-func (c *Cluster) selectCandidatesByServerClassesOrder(candidates couchbaseutil.MemberSet) couchbaseutil.MemberList {
-	serverClassOrder := append([]string(nil), c.cluster.Spec.Upgrade.UpgradeOrder...)
-
-	// Append any missing server classes to the end of the order.
+// serverClassUpgradeOrder returns the spec upgrade order with any missing server classes appended.
+func (c *Cluster) serverClassUpgradeOrder() []string {
+	order := slices.Clone(c.cluster.Spec.Upgrade.UpgradeOrder)
 	for _, sc := range c.cluster.Spec.Servers {
-		if !slices.Contains(serverClassOrder, sc.Name) {
-			serverClassOrder = append(serverClassOrder, sc.Name)
+		if !slices.Contains(order, sc.Name) {
+			order = append(order, sc.Name)
 		}
 	}
 
+	return order
+}
+
+// serviceUpgradeOrder returns the spec upgrade order with any missing default services appended.
+func (c *Cluster) serviceUpgradeOrder() []string {
+	order := slices.Clone(c.cluster.Spec.Upgrade.UpgradeOrder)
+	for _, svc := range DefaultServicesOrder {
+		if !slices.Contains(order, svc) {
+			order = append(order, svc)
+		}
+	}
+
+	return order
+}
+
+func (c *Cluster) groupCandidatesByServerClassesOrder(candidates couchbaseutil.MemberSet) []couchbaseutil.MemberList {
 	groupedCandidates := candidates.GroupByServerConfigs()
+	groups := []couchbaseutil.MemberList{}
 
-	for _, sc := range serverClassOrder {
-		if members, ok := groupedCandidates[sc]; ok && members.Size() > 0 {
-			return members.ToList()
+	for _, sc := range c.serverClassUpgradeOrder() {
+		if members, ok := groupedCandidates[sc]; ok {
+			groups = append(groups, members.ToList())
+			delete(groupedCandidates, sc)
 		}
 	}
 
-	// We should never get here, but just in case
-	return candidates.ToList()
+	return groups
 }
 
 // getRescheduleMoves determines and executes the appropriate reschedule strategy
@@ -598,8 +616,7 @@ func (c *Cluster) getUpgradeCandidates(logCandidates bool) (couchbaseutil.Member
 
 	if totalVersionCandidates > 0 {
 		// Determine how many pods are cleared to move to the new version this cycle.
-		// pvpc keeps up to N pods at the previous version globally; the upgrade-order
-		// filter further constrains the batch size.
+		// pvpc keeps the last N pods in upgrade order at the previous version.
 		numToUpgradeVersion := max(totalVersionCandidates-pvpc, 0)
 		specImage := c.cluster.Spec.CouchbaseImage()
 
@@ -607,10 +624,7 @@ func (c *Cluster) getUpgradeCandidates(logCandidates bool) (couchbaseutil.Member
 		allVersionCandidates.Merge(changes.VersionOnly)
 		allVersionCandidates.Merge(changes.Both)
 
-		orderedVersionCandidates, err := c.filterCandidatesByUpgradeOrder(allVersionCandidates)
-		if err != nil {
-			return nil, nil, nil, err
-		}
+		orderedVersionCandidates := c.sortCandidatesByUpgradeOrder(allVersionCandidates)
 
 		// Mark the first numToUpgradeVersion pods for a version bump.
 		// VOS pods are added to candidates here; IS pods are already present with
@@ -630,9 +644,10 @@ func (c *Cluster) getUpgradeCandidates(logCandidates bool) (couchbaseutil.Member
 		}
 	}
 
-	orderedCandidates, err := c.filterCandidatesByUpgradeOrder(candidates)
-	if err != nil {
-		return nil, nil, nil, err
+	// A rolling upgrade takes one upgrade order group per cycle, an immediate one takes them all.
+	orderedCandidates := candidates.ToList()
+	if c.cluster.GetUpgradeStrategy() == couchbasev2.RollingUpgrade {
+		orderedCandidates = c.filterCandidatesByUpgradeOrder(candidates)
 	}
 
 	// Return all candidates, all detected zone changes, and all detected PVC changes
@@ -1044,30 +1059,13 @@ func (c *Cluster) buildClassOrder() []string {
 	}
 	switch c.cluster.Spec.Upgrade.UpgradeOrderType {
 	case couchbasev2.UpgradeOrderTypeServerClasses:
-		order := append([]string(nil), c.cluster.Spec.Upgrade.UpgradeOrder...)
-		for _, sc := range c.cluster.Spec.Servers {
-			if !slices.Contains(order, sc.Name) {
-				order = append(order, sc.Name)
-			}
-		}
-		return order
+		return c.serverClassUpgradeOrder()
 	case couchbasev2.UpgradeOrderTypeServices:
-		serviceOrder := append([]string(nil), c.cluster.Spec.Upgrade.UpgradeOrder...)
-		for _, svc := range DefaultServicesOrder {
-			if !slices.Contains(serviceOrder, svc) {
-				serviceOrder = append(serviceOrder, svc)
-			}
-		}
-		seen := make(map[string]struct{})
 		var classOrder []string
-		for _, svc := range serviceOrder {
+		for _, svc := range c.serviceUpgradeOrder() {
 			for _, sc := range c.cluster.Spec.Servers {
-				if _, added := seen[sc.Name]; added {
-					continue
-				}
-				if sc.HasService(couchbasev2.Service(svc)) {
+				if !slices.Contains(classOrder, sc.Name) && sc.HasService(couchbasev2.Service(svc)) {
 					classOrder = append(classOrder, sc.Name)
-					seen[sc.Name] = struct{}{}
 				}
 			}
 		}
