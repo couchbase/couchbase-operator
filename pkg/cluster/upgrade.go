@@ -276,6 +276,26 @@ func (c *Cluster) filterCandidatesByUpgradeOrder(candidates couchbaseutil.Member
 	return candidates.ToList(), nil
 }
 
+// sortCandidatesByUpgradeOrder returns every candidate, one upgrade order group after another.
+func (c *Cluster) sortCandidatesByUpgradeOrder(candidates couchbaseutil.MemberSet) (couchbaseutil.MemberList, error) {
+	remaining := candidates.Copy()
+	sorted := couchbaseutil.MemberList{}
+
+	for remaining.Size() > 0 {
+		group, err := c.filterCandidatesByUpgradeOrder(remaining)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, member := range group {
+			sorted = append(sorted, member)
+			remaining.Remove(member.Name())
+		}
+	}
+
+	return sorted, nil
+}
+
 func (c *Cluster) selectCandidatesByNodesOrder(candidates couchbaseutil.MemberSet) couchbaseutil.MemberList {
 	nodeOrder := append([]string(nil), c.cluster.Spec.Upgrade.UpgradeOrder...)
 	finalCandidates := couchbaseutil.MemberList{}
@@ -628,8 +648,7 @@ func (c *Cluster) getUpgradeCandidates(logCandidates bool) (couchbaseutil.Member
 
 	if totalVersionCandidates > 0 {
 		// Determine how many pods are cleared to move to the new version this cycle.
-		// pvpc keeps up to N pods at the previous version globally; the upgrade-order
-		// filter further constrains the batch size.
+		// pvpc keeps the last N pods in upgrade order at the previous version.
 		numToUpgradeVersion := max(totalVersionCandidates-pvpc, 0)
 		specImage := c.cluster.Spec.CouchbaseImage()
 
@@ -637,7 +656,7 @@ func (c *Cluster) getUpgradeCandidates(logCandidates bool) (couchbaseutil.Member
 		allVersionCandidates.Merge(changes.VersionOnly)
 		allVersionCandidates.Merge(changes.Both)
 
-		orderedVersionCandidates, err := c.filterCandidatesByUpgradeOrder(allVersionCandidates)
+		orderedVersionCandidates, err := c.sortCandidatesByUpgradeOrder(allVersionCandidates)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -660,9 +679,12 @@ func (c *Cluster) getUpgradeCandidates(logCandidates bool) (couchbaseutil.Member
 		}
 	}
 
-	orderedCandidates, err := c.filterCandidatesByUpgradeOrder(candidates)
-	if err != nil {
-		return nil, nil, nil, err
+	// A rolling upgrade takes one upgrade order group per cycle, an immediate one takes them all.
+	orderedCandidates := candidates.ToList()
+	if c.cluster.GetUpgradeStrategy() == couchbasev2.RollingUpgrade {
+		if orderedCandidates, err = c.filterCandidatesByUpgradeOrder(candidates); err != nil {
+			return nil, nil, nil, err
+		}
 	}
 
 	// Return all candidates, all detected zone changes, and all detected PVC changes

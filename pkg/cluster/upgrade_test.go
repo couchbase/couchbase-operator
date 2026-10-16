@@ -11,11 +11,13 @@ licenses/APL2.txt.
 package cluster
 
 import (
+	"slices"
 	"testing"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	v1 "k8s.io/api/core/v1"
 )
@@ -121,5 +123,56 @@ func TestMigrationCycleStrategy(t *testing.T) {
 			t.Errorf("%s: migrationCycleStrategy = (inPlace %v, fullRecovery %v), want (%v, %v)",
 				tc.name, inPlace, fullRecovery, tc.wantInPlace, tc.wantFullRecovery)
 		}
+	}
+}
+
+// TestSortCandidatesByUpgradeOrder checks every server class comes back in upgrade
+// order, so previousVersionPodCount holds back the last ones, while the rolling
+// filter still only takes the first class.
+func TestSortCandidatesByUpgradeOrder(t *testing.T) {
+	member := func(name, class string) couchbaseutil.Member {
+		return couchbaseutil.NewMember("default", "cb", name, "7.6.11", class, false, "couchbase/server:7.6.11")
+	}
+
+	candidates := couchbaseutil.NewMemberSet(
+		member("cb-0000", "data-only"), member("cb-0001", "data-only"),
+		member("cb-0002", "idx-query"), member("cb-0003", "idx-query"),
+		member("cb-0004", "rem-services"), member("cb-0005", "rem-services"),
+		member("cb-0006", "svc-less"),
+	)
+
+	c := &Cluster{cluster: &couchbasev2.CouchbaseCluster{Spec: couchbasev2.ClusterSpec{
+		Servers: []couchbasev2.ServerConfig{{Name: "data-only"}, {Name: "idx-query"}, {Name: "rem-services"}, {Name: "svc-less"}},
+		Upgrade: &couchbasev2.UpgradeSpec{
+			UpgradeOrderType: couchbasev2.UpgradeOrderTypeServerClasses,
+			UpgradeOrder:     []string{"idx-query", "data-only"},
+		},
+	}}}
+
+	names := func(list couchbaseutil.MemberList) []string {
+		out := []string{}
+		for _, m := range list {
+			out = append(out, m.Name())
+		}
+
+		return out
+	}
+
+	got, err := c.sortCandidatesByUpgradeOrder(candidates)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if want := []string{"cb-0002", "cb-0003", "cb-0000", "cb-0001", "cb-0004", "cb-0005", "cb-0006"}; !slices.Equal(names(got), want) {
+		t.Errorf("sort: got %v, want %v", names(got), want)
+	}
+
+	got, err = c.filterCandidatesByUpgradeOrder(candidates)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if want := []string{"cb-0002", "cb-0003"}; !slices.Equal(names(got), want) {
+		t.Errorf("filter: got %v, want %v", names(got), want)
 	}
 }
