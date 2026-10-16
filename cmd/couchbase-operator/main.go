@@ -53,6 +53,7 @@ var (
 	podRecoveryMaxRetries int
 	chaosLevel            int
 	concurrency           int
+	restoreConcurrency    int
 
 	metricsHost       = "0.0.0.0"
 	metricsPort int32 = 8383
@@ -81,6 +82,7 @@ func main() {
 	pflag.StringVar(&podReadinessPeriod, "pod-readiness-period", "20s", "Sets the period between readiness probes")
 	pflag.IntVar(&podRecoveryMaxRetries, "pod-recovery-max-retries", 0, "Maximum number of pod recovery retries before falling back to swap rebalance. 0 means infinite retries (default behavior)")
 	pflag.IntVar(&concurrency, "concurrency", 4, "Number of concurrent reconciles to allow")
+	pflag.IntVar(&restoreConcurrency, "snapshot-restore-concurrency", 1, "Number of concurrent snapshot backup restores to allow")
 	pflag.StringVar(&secureMetricsCertFile, "secure-metrics-cert-file", "", "Path to the TLS certificate file for the metrics server. When set alongside --secure-metrics-key-file, metrics are served over HTTPS on the same port instead of HTTP.")
 	pflag.StringVar(&secureMetricsKeyFile, "secure-metrics-key-file", "", "Path to the TLS private key file for the metrics server.")
 	pflag.Parse()
@@ -161,7 +163,7 @@ func main() {
 		LoggerFactory:         logOptions.NewWithLogLevel,
 	}
 
-	if err := controller.AddToManager(mgr, concurrency, clusterConfig); err != nil {
+	if err := controller.AddToManager(mgr, concurrency, restoreConcurrency, clusterConfig); err != nil {
 		log.Error(err, "Error adding controller to manager")
 		os.Exit(1)
 	}

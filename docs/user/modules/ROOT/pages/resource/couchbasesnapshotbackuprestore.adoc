@@ -5,17 +5,17 @@ include::partial$autogen-reference-aliases.adoc[tags=couchbasesnapshotbackuprest
 :resource-name-plural: couchbasesnapshotbackuprestores
 :resource-name-kind: CouchbaseSnapshotBackupRestore
 
-CouchbaseSnapshotBackupRestore represents a single CSI VolumeSnapshot based restore request
-and its progress.
-It names a source CouchbaseSnapshotBackupRun and a target
-CouchbaseCluster.
-The target must already exist as a CR before a restore can act on it,
-if it is running, the restore replaces its data (a destructive rollback).
-If it is
-hibernated with no pods, the restore fills its volumes and starts it up.
-If no
-CouchbaseCluster with that name exists at all, the request is rejected until one is
-created.
+CouchbaseSnapshotBackupRestore restores a CouchbaseSnapshotBackupRun into a CouchbaseCluster,
+making its volumes from the run's CSI VolumeSnapshots.
+The target cluster must exist and be
+hibernated.
+A running target is left alone until it's hibernated.
+A target that already has
+data is rolled back to the backup, which needs acknowledgeDataLoss.
+A new target should be
+created with hibernate set to true.
+Once the volumes are restored, the user wakes the cluster,
+or the restore does when startClusterWhenReady is set.
 
 The following is an example resource, depicting the overall structure and any defaults (consult the field reference for valid values for "empty" values, such as empty strings etc.):
 
@@ -28,6 +28,7 @@ The following is an example resource, depicting the overall structure and any de
 <<couchbasesnapshotbackuprestores-spec,spec>>:
   <<couchbasesnapshotbackuprestores-spec-backupname,backupName>>: ""
   <<couchbasesnapshotbackuprestores-spec-runname,runName>>: ""
+  <<couchbasesnapshotbackuprestores-spec-startclusterwhenready,startClusterWhenReady>>: false
   <<couchbasesnapshotbackuprestores-spec-target,target>>:
     <<couchbasesnapshotbackuprestores-spec-target-acknowledgebucketgap,acknowledgeBucketGap>>: false
     <<couchbasesnapshotbackuprestores-spec-target-acknowledgedataloss,acknowledgeDataLoss>>: false
@@ -112,6 +113,21 @@ BackupName is the CouchbaseBackup that scheduled the run to restore from.
 RunName is the specific CouchbaseSnapshotBackupRun to restore.
 This field is
 required and must always be set explicitly.
+
+=== couchbasesnapshotbackuprestores.spec.startClusterWhenReady
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+StartClusterWhenReady sets spec.hibernate to false on the target once its volumes are
+restored, so the cluster starts on its own.
+It's off by default, the user starts the
+cluster when they're ready.
+The restore changes only that one field, once, and never
+changes it again.
 
 === couchbasesnapshotbackuprestores.spec.target
 
@@ -311,7 +327,7 @@ FailureReason explains why Phase is Failed, when it is.
 
 *Default*: `Validating`
 
-*Enumerations*: `Validating, Destroying, Provisioning, Remapping, WaitingForCluster, Complete, Failed`
+*Enumerations*: `Validating, Destroying, Provisioning, ReadyToStart, Remapping, WaitingForCluster, Complete, Failed`
 
 ==== Description
 

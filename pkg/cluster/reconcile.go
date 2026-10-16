@@ -92,6 +92,12 @@ func (c *Cluster) reconcileHibernation() error {
 		return c.hibernate()
 
 	case c.cluster.HasCondition(couchbasev2.ClusterConditionHibernating):
+		// The saved password may have changed while the cluster was asleep, a snapshot restore puts
+		// the backup's one there, so we load it again before talking to the cluster.
+		if err := c.reloadSavedPassword(); err != nil {
+			return err
+		}
+
 		// Waking: move to the new image if it changed while hibernated.
 		c.raiseEvent(k8sutil.HibernationEndedEvent(c.cluster))
 

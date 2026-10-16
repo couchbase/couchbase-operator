@@ -439,7 +439,8 @@ func TestListSnapshotBackupRunSnapshots(t *testing.T) {
 }
 
 // TestSnapshotBackupRunEntries checks that a group snapshot's snapshots are recorded on the
-// run with the member, volume, snapshot name, and mount path for each one.
+// run with the member, volume, snapshot name, mount path, server class, server group and zone
+// for each one.
 func TestSnapshotBackupRunEntries(t *testing.T) {
 	snapshot := func(name, pvc string) snapshotv1.VolumeSnapshot {
 		return snapshotv1.VolumeSnapshot{
@@ -464,11 +465,13 @@ func TestSnapshotBackupRunEntries(t *testing.T) {
 		[]snapshotv1.VolumeSnapshot{snapshot("member-1", "cb-0000-default-00"), snapshot("member-2", "cb-0000-data-00")},
 		func(pvc string) string { return members[pvc] },
 		func(pvc string) string { return mountPaths[pvc] },
+		func(string) string { return "data-index" },
+		func(string) (string, string) { return "group-a", "zone-a" },
 	)
 
 	expected := []couchbasev2.CouchbaseSnapshotBackupRunSnapshot{
-		{Member: "cb-0000", VolumeName: "cb-0000-default-00", SnapshotName: "member-1", MountPath: "/opt/couchbase/var/lib/couchbase"},
-		{Member: "cb-0000", VolumeName: "cb-0000-data-00", SnapshotName: "member-2", MountPath: "/mnt/data"},
+		{Member: "cb-0000", VolumeName: "cb-0000-default-00", SnapshotName: "member-1", MountPath: "/opt/couchbase/var/lib/couchbase", ServerClass: "data-index", ServerGroup: "group-a", AvailabilityZone: "zone-a"},
+		{Member: "cb-0000", VolumeName: "cb-0000-data-00", SnapshotName: "member-2", MountPath: "/mnt/data", ServerClass: "data-index", ServerGroup: "group-a", AvailabilityZone: "zone-a"},
 	}
 
 	if !reflect.DeepEqual(entries, expected) {
@@ -926,5 +929,43 @@ func TestSnapshotBackupRunsToDelete(t *testing.T) {
 				t.Errorf("expected %v to be deleted, got %v", testcase.expected, names)
 			}
 		})
+	}
+}
+
+// TestSaveSnapshotBackupRunAdmin checks a run keeps the admin login the operator is using, in a
+// Secret owned by the run, so a restore can log in to the restored data and the Secret goes when
+// the run does.
+func TestSaveSnapshotBackupRunAdmin(t *testing.T) {
+	kubeClient := kubefake.NewSimpleClientset()
+
+	c := &Cluster{
+		k8s:      &client.Client{KubeClient: kubeClient},
+		cluster:  &couchbasev2.CouchbaseCluster{ObjectMeta: metav1.ObjectMeta{Name: "cb", Namespace: "default"}},
+		username: "Administrator",
+		password: "backup-time-password",
+	}
+
+	run := &couchbasev2.CouchbaseSnapshotBackupRun{ObjectMeta: metav1.ObjectMeta{Name: "my-backup-abcde", Namespace: "default"}}
+
+	if err := c.saveSnapshotBackupRunAdmin(run); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	secret, err := kubeClient.CoreV1().Secrets("default").Get(t.Context(), "my-backup-abcde-admin", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("expected the admin login to be saved, got %v", err)
+	}
+
+	if string(secret.Data[constants.AuthSecretUsernameKey]) != "Administrator" || string(secret.Data[constants.AuthSecretPasswordKey]) != "backup-time-password" {
+		t.Errorf("expected the operator's login to be saved, got %v", secret.Data)
+	}
+
+	if len(secret.OwnerReferences) != 1 || secret.OwnerReferences[0].Name != run.Name || secret.Labels[constants.LabelCluster] != "cb" {
+		t.Errorf("expected the Secret to be owned by the run and labelled with the cluster, got %v %v", secret.OwnerReferences, secret.Labels)
+	}
+
+	// A failure is returned, not ignored, so the caller marks the run Invalid.
+	if err := c.saveSnapshotBackupRunAdmin(run); err == nil {
+		t.Errorf("expected a second save of the same run to fail")
 	}
 }

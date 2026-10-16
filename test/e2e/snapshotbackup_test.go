@@ -18,12 +18,17 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	utilconstants "github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -268,6 +273,309 @@ func mustWaitForBackupCronJobs(t *testing.T, kubernetes *types.Cluster, name str
 		}
 
 		return nil
+	})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+}
+
+// snapshotRestoreDocs is how many documents a restore test writes before and after its backup.
+const snapshotRestoreDocs = 500
+
+// TestSnapshotRestoreRollback checks a running cluster can be rolled back to a snapshot backup. It
+// writes some documents, backs up, writes more, then restores, and only the backed up documents
+// should be left. Each restored pod runs the node remap once before Couchbase starts.
+func TestSnapshotRestoreRollback(t *testing.T) {
+	kubernetes, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster().VolumeSnapshots()
+
+	cluster, bucket := mustCreateSnapshotRestoreCluster(t, kubernetes, clusterOptions().WithPersistentTopology(constants.Size3).Generate(kubernetes))
+
+	backup, run := mustTakeSnapshotBackupRun(t, kubernetes)
+
+	e2eutil.NewDocumentSet(bucket, snapshotRestoreDocs).WithPrefix("after").MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket, 2*snapshotRestoreDocs, time.Minute)
+
+	cluster = mustHibernateCluster(t, kubernetes, cluster)
+
+	mustCreateSnapshotRestore(t, kubernetes, backup, run, cluster, true, true)
+	mustWaitForSnapshotRestorePhase(t, kubernetes, couchbasev2.CouchbaseSnapshotBackupRestorePhaseComplete, 20*time.Minute)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket, snapshotRestoreDocs, 5*time.Minute)
+	mustHaveRemappedMembers(t, kubernetes, cluster, constants.Size3)
+}
+
+// TestSnapshotRestoreNewCluster checks a snapshot backup can be restored into a new cluster with the
+// same name, created hibernated. Without startClusterWhenReady, the restore waits for the user to
+// wake the cluster, and only then finishes.
+func TestSnapshotRestoreNewCluster(t *testing.T) {
+	kubernetes, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster().VolumeSnapshots()
+
+	cluster, bucket := mustCreateSnapshotRestoreCluster(t, kubernetes, clusterOptions().WithPersistentTopology(constants.Size3).Generate(kubernetes))
+
+	backup, run := mustTakeSnapshotBackupRun(t, kubernetes)
+
+	cluster = mustRecreateClusterHibernated(t, kubernetes, cluster)
+
+	mustCreateSnapshotRestore(t, kubernetes, backup, run, cluster, false, false)
+	restore := mustWaitForSnapshotRestorePhase(t, kubernetes, couchbasev2.CouchbaseSnapshotBackupRestorePhaseReadyToStart, 20*time.Minute)
+
+	if !meta.IsStatusConditionTrue(restore.Status.Conditions, "WaitingToStart") {
+		e2eutil.Die(t, fmt.Errorf("expected the restore to say it's waiting for the cluster to be woken, got %v", restore.Status.Conditions))
+	}
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/hibernate", false), time.Minute)
+	mustWaitForSnapshotRestorePhase(t, kubernetes, couchbasev2.CouchbaseSnapshotBackupRestorePhaseComplete, 20*time.Minute)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket, snapshotRestoreDocs, 5*time.Minute)
+	mustHaveRemappedMembers(t, kubernetes, cluster, constants.Size3)
+}
+
+// TestSnapshotRestorePasswordChanged checks a restore works after the admin password was changed
+// since the backup. The restored data only accepts the old password, so the operator has to log in
+// with it when the cluster wakes, then change it to the one in the admin secret.
+func TestSnapshotRestorePasswordChanged(t *testing.T) {
+	kubernetes, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster().VolumeSnapshots()
+
+	cluster, bucket := mustCreateSnapshotRestoreCluster(t, kubernetes, clusterOptions().WithPersistentTopology(constants.Size3).Generate(kubernetes))
+
+	backup, run := mustTakeSnapshotBackupRun(t, kubernetes)
+
+	e2eutil.MustRotateClusterPassword(t, kubernetes)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, k8sutil.EventReasonAdminPasswordChangedEvent(cluster), 5*time.Minute)
+
+	cluster = mustHibernateCluster(t, kubernetes, cluster)
+	restoreStart := time.Now()
+
+	mustCreateSnapshotRestore(t, kubernetes, backup, run, cluster, true, true)
+	mustWaitForSnapshotRestorePhase(t, kubernetes, couchbasev2.CouchbaseSnapshotBackupRestorePhaseComplete, 20*time.Minute)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket, snapshotRestoreDocs, 5*time.Minute)
+
+	// The operator changes the restored cluster's password to the one in the admin secret.
+	mustHaveClusterEventSince(t, kubernetes, cluster, k8sutil.EventReasonAdminPasswordChanged, restoreStart)
+}
+
+// TestSnapshotRestoreServerGroups checks a restore puts each member back in the zone it was backed
+// up in. A volume made from a snapshot could otherwise land in any zone.
+func TestSnapshotRestoreServerGroups(t *testing.T) {
+	kubernetes, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster().VolumeSnapshots().ServerGroups(3)
+
+	spec := clusterOptions().WithPersistentTopology(constants.Size3).Generate(kubernetes)
+	spec.Spec.ServerGroups = getAvailabilityZones(t, kubernetes)[:3]
+
+	cluster, bucket := mustCreateSnapshotRestoreCluster(t, kubernetes, spec)
+
+	backup, run := mustTakeSnapshotBackupRun(t, kubernetes)
+
+	zones := map[string]string{}
+
+	for _, snapshot := range run.Status.Snapshots {
+		if snapshot.ServerGroup == "" || snapshot.AvailabilityZone == "" {
+			e2eutil.Die(t, fmt.Errorf("expected run %s to record member %s's server group and zone, got %+v", run.Name, snapshot.Member, snapshot))
+		}
+
+		zones[snapshot.Member] = snapshot.AvailabilityZone
+	}
+
+	cluster = mustRecreateClusterHibernated(t, kubernetes, cluster)
+
+	mustCreateSnapshotRestore(t, kubernetes, backup, run, cluster, false, true)
+	mustWaitForSnapshotRestorePhase(t, kubernetes, couchbasev2.CouchbaseSnapshotBackupRestorePhaseComplete, 20*time.Minute)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket, snapshotRestoreDocs, 5*time.Minute)
+
+	for member, zone := range zones {
+		pod, err := kubernetes.KubeClient.CoreV1().Pods(kubernetes.Namespace).Get(context.Background(), member, metav1.GetOptions{})
+		if err != nil {
+			e2eutil.Die(t, err)
+		}
+
+		node, err := kubernetes.KubeClient.CoreV1().Nodes().Get(context.Background(), pod.Spec.NodeName, metav1.GetOptions{})
+		if err != nil {
+			e2eutil.Die(t, err)
+		}
+
+		if got := node.Labels[utilconstants.ServerGroupLabel]; got != zone {
+			e2eutil.Die(t, fmt.Errorf("expected member %s back in zone %s, it's on node %s in zone %s", member, zone, node.Name, got))
+		}
+	}
+}
+
+// mustCreateSnapshotRestoreCluster creates the cluster and a bucket, and writes the documents the
+// backup should keep.
+func mustCreateSnapshotRestoreCluster(t *testing.T, kubernetes *types.Cluster, spec *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, string) {
+	cluster := e2eutil.MustNewClusterFromSpec(t, kubernetes, spec)
+
+	bucket := e2eutil.MustGetBucket(framework.Global.BucketType, framework.Global.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
+
+	e2eutil.NewDocumentSet(bucket.GetName(), snapshotRestoreDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), snapshotRestoreDocs, time.Minute)
+
+	return cluster, bucket.GetName()
+}
+
+// mustTakeSnapshotBackupRun takes one snapshot backup and waits for its run to be Complete.
+func mustTakeSnapshotBackupRun(t *testing.T, kubernetes *types.Cluster) (*couchbasev2.CouchbaseBackup, *couchbasev2.CouchbaseSnapshotBackupRun) {
+	backup := e2eutil.MustCreateSnapshotBackup(t, kubernetes, snapshotBackupSpec(""), 0)
+	run := e2eutil.MustWaitForSnapshotBackupRuns(t, kubernetes, backup, couchbasev2.CouchbaseSnapshotBackupRunPhaseComplete, 1, 15*time.Minute)[0]
+
+	return backup, &run
+}
+
+// mustHibernateCluster hibernates the cluster and waits until it's done.
+func mustHibernateCluster(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster) *couchbasev2.CouchbaseCluster {
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/hibernate", true), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionHibernating, v1.ConditionTrue, cluster, 5*time.Minute)
+
+	return cluster
+}
+
+// mustRecreateClusterHibernated deletes the cluster and creates it again with the same name and
+// spec, hibernated, so it's a new cluster with no data for a restore to go into.
+func mustRecreateClusterHibernated(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster) *couchbasev2.CouchbaseCluster {
+	spec := &couchbasev2.CouchbaseCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: cluster.Name, Namespace: cluster.Namespace, Labels: cluster.Labels},
+		Spec:       *cluster.Spec.DeepCopy(),
+	}
+	spec.Spec.Hibernate = true
+
+	e2eutil.MustDeleteCluster(t, kubernetes, cluster)
+	e2eutil.MustWaitForResourceDeletion(t, kubernetes, cluster, 5*time.Minute)
+
+	cluster = e2eutil.MustNewClusterFromSpecAsync(t, kubernetes, spec)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionHibernating, v1.ConditionTrue, cluster, 5*time.Minute)
+
+	return cluster
+}
+
+// snapshotRestoreName is the name every restore test uses for its restore.
+const snapshotRestoreName = "restore"
+
+// mustCreateSnapshotRestore restores the run into the target cluster.
+func mustCreateSnapshotRestore(t *testing.T, kubernetes *types.Cluster, backup *couchbasev2.CouchbaseBackup, run *couchbasev2.CouchbaseSnapshotBackupRun, target *couchbasev2.CouchbaseCluster, acknowledgeDataLoss, startClusterWhenReady bool) {
+	restore := &couchbasev2.CouchbaseSnapshotBackupRestore{
+		ObjectMeta: metav1.ObjectMeta{Name: snapshotRestoreName},
+		Spec: couchbasev2.CouchbaseSnapshotBackupRestoreSpec{
+			BackupName:            backup.Name,
+			RunName:               run.Name,
+			StartClusterWhenReady: startClusterWhenReady,
+			Target:                couchbasev2.CouchbaseSnapshotBackupRestoreTarget{Name: target.Name},
+		},
+	}
+
+	if acknowledgeDataLoss {
+		restore.Spec.Target.AcknowledgeDataLoss = &acknowledgeDataLoss
+	}
+
+	if _, err := kubernetes.CRClient.CouchbaseV2().CouchbaseSnapshotBackupRestores(kubernetes.Namespace).Create(context.Background(), restore, metav1.CreateOptions{}); err != nil {
+		e2eutil.Die(t, err)
+	}
+}
+
+// mustWaitForSnapshotRestorePhase waits for the restore to reach the phase, and fails straight away
+// if it fails instead.
+func mustWaitForSnapshotRestorePhase(t *testing.T, kubernetes *types.Cluster, phase couchbasev2.CouchbaseSnapshotBackupRestorePhase, timeout time.Duration) *couchbasev2.CouchbaseSnapshotBackupRestore {
+	var restore *couchbasev2.CouchbaseSnapshotBackupRestore
+
+	err := retryutil.RetryFor(timeout, func() error {
+		var err error
+
+		restore, err = kubernetes.CRClient.CouchbaseV2().CouchbaseSnapshotBackupRestores(kubernetes.Namespace).Get(context.Background(), snapshotRestoreName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		// A failed restore never moves on, so stop waiting and fail below.
+		if restore.Status.Phase == couchbasev2.CouchbaseSnapshotBackupRestorePhaseFailed {
+			return nil
+		}
+
+		if restore.Status.Phase != phase {
+			return fmt.Errorf("restore is %s, waiting for %s", restore.Status.Phase, phase)
+		}
+
+		return nil
+	})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	if restore.Status.Phase != phase {
+		e2eutil.Die(t, fmt.Errorf("restore failed: %s", restore.Status.FailureReason))
+	}
+
+	return restore
+}
+
+// mustHaveRemappedMembers checks every restored member's pod ran the node remap and it finished,
+// and the restore removed its mark from every volume afterwards.
+func mustHaveRemappedMembers(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, members int) {
+	selector := utilconstants.LabelCluster + "=" + cluster.Name
+
+	pods, err := kubernetes.KubeClient.CoreV1().Pods(kubernetes.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector + "," + utilconstants.LabelNode})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	remapped := 0
+
+	for _, pod := range pods.Items {
+		for _, status := range pod.Status.InitContainerStatuses {
+			if status.Name == utilconstants.CouchbaseContainerName+"-remap" && status.State.Terminated != nil && status.State.Terminated.ExitCode == 0 {
+				remapped++
+			}
+		}
+	}
+
+	if remapped != members {
+		e2eutil.Die(t, fmt.Errorf("expected %d pods to have run the node remap, %d did", members, remapped))
+	}
+
+	volumes, err := kubernetes.KubeClient.CoreV1().PersistentVolumeClaims(kubernetes.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	for _, volume := range volumes.Items {
+		if _, ok := volume.Annotations[utilconstants.AnnotationSnapshotRestoreRemap]; ok {
+			e2eutil.Die(t, fmt.Errorf("expected the restore to remove the remap mark from volume %s", volume.Name))
+		}
+	}
+}
+
+// mustHaveClusterEventSince checks the cluster raised an event with the reason after the given time.
+func mustHaveClusterEventSince(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, reason string, since time.Time) {
+	err := retryutil.RetryFor(2*time.Minute, func() error {
+		events, err := kubernetes.KubeClient.CoreV1().Events(kubernetes.Namespace).List(context.Background(), metav1.ListOptions{FieldSelector: "involvedObject.name=" + cluster.Name + ",reason=" + reason})
+		if err != nil {
+			return err
+		}
+
+		for _, event := range events.Items {
+			if event.LastTimestamp.After(since) || event.EventTime.After(since) {
+				return nil
+			}
+		}
+
+		return fmt.Errorf("no %s event on cluster %s since %s", reason, cluster.Name, since)
 	})
 	if err != nil {
 		e2eutil.Die(t, err)

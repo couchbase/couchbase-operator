@@ -16,6 +16,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	couchbasefake "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned/fake"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/validator/types"
 	v1 "k8s.io/api/core/v1"
@@ -1890,7 +1891,8 @@ func TestCheckConstraintsSnapshotBackup(t *testing.T) {
 // add on is installed, the run is a Complete run of the named backup, the target cluster exists,
 // with acknowledgeDataLoss set if it already has data, and the target can run the backed up data.
 // It also checks backed up buckets, scopes and collections need CRs, and the warnings for a target
-// with a different number of nodes or a different admin secret.
+// with a different number of nodes. A target whose admin secret has a different username from the
+// backup is rejected, since the operator can only change the password.
 func TestCheckConstraintsSnapshotBackupRestore(t *testing.T) {
 	const namespace = "default"
 
@@ -1961,12 +1963,53 @@ func TestCheckConstraintsSnapshotBackupRestore(t *testing.T) {
 		return changedCluster(func(c *couchbasev2.CouchbaseCluster) { c.Spec.Servers[0].Size = size })
 	}
 
+	// adminSecret makes a Secret holding an admin login.
+	adminSecret := func(name, username, password string) *v1.Secret {
+		return &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+			Data:       map[string][]byte{"username": []byte(username), "password": []byte(password)},
+		}
+	}
+
+	withAdminSecret := changedCluster(func(c *couchbasev2.CouchbaseCluster) { c.Spec.Security.AdminSecret = "auth" })
+
 	// changedRun makes a Complete run with one change.
 	changedRun := func(change func(*couchbasev2.CouchbaseSnapshotBackupRun)) *couchbasev2.CouchbaseSnapshotBackupRun {
 		r := run("my-backup", couchbasev2.CouchbaseSnapshotBackupRunPhaseComplete, false)
 		change(r)
 
 		return r
+	}
+
+	// placedRun makes a Complete run whose members were in server class data-index, in the given
+	// server groups and zones, one member each.
+	placedRun := func(groups, zones []string) *couchbasev2.CouchbaseSnapshotBackupRun {
+		return changedRun(func(r *couchbasev2.CouchbaseSnapshotBackupRun) {
+			for i := range r.Status.Snapshots {
+				member := i / 3
+				r.Status.Snapshots[i].ServerClass = "data-index"
+				r.Status.Snapshots[i].ServerGroup = groups[member]
+				r.Status.Snapshots[i].AvailabilityZone = zones[member]
+			}
+		})
+	}
+
+	threeZones := []string{"zone-a", "zone-b", "zone-c"}
+	noZones := []string{"", "", ""}
+
+	withServerGroups := func(global, class []string) *couchbasev2.CouchbaseCluster {
+		return changedCluster(func(c *couchbasev2.CouchbaseCluster) {
+			c.Spec.ServerGroups = global
+			c.Spec.Servers[0].ServerGroups = class
+		})
+	}
+
+	// withOverride makes a target using serverGroupsLabelOverride, whose class runs in one zone.
+	withOverride := func(zone string) *couchbasev2.CouchbaseCluster {
+		return changedCluster(func(c *couchbasev2.CouchbaseCluster) {
+			c.Spec.ServerGroupsLabelOverride = "eks.amazonaws.com/nodegroup"
+			c.Spec.Servers[0].Pod = &couchbasev2.PodTemplate{Spec: v1.PodSpec{NodeSelector: map[string]string{constants.ServerGroupLabel: zone}}}
+		})
 	}
 
 	// A run that backed up bucket travel, its scope inventory and that scope's collection hotels,
@@ -2008,12 +2051,22 @@ func TestCheckConstraintsSnapshotBackupRestore(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "hotels", Namespace: namespace},
 	}
 
+	// continuousBackupBucket makes the travel bucket CR with continuous backup on or off.
+	continuousBackupBucket := func(enabled bool) *couchbasev2.CouchbaseBucket {
+		b := bucket(true)
+		b.Spec.ContinuousBackup = &couchbasev2.ContinuousBackupSettings{Enabled: &enabled}
+
+		return b
+	}
+
 	testcases := []struct {
 		name           string
 		runName        string
 		acknowledge    *bool
 		acknowledgeGap *bool
 		objects        []runtime.Object
+		// secrets are the Secrets in the cluster, like the admin login saved with the run.
+		secrets []runtime.Object
 		// served lists the snapshot APIs the cluster has. Left out means only the snapshot API.
 		served          []string
 		expectedErr     string
@@ -2086,7 +2139,7 @@ func TestCheckConstraintsSnapshotBackupRestore(t *testing.T) {
 		},
 		{
 			name:        "data from before 7.2.0 can't go onto 7.2.0 or later",
-			objects:     []runtime.Object{changedRun(func(r *couchbasev2.CouchbaseSnapshotBackupRun) { r.Spec.ServerVersion = "7.1.1" }), withImage("couchbase/server:7.2.4")},
+			objects:     []runtime.Object{changedRun(func(r *couchbasev2.CouchbaseSnapshotBackupRun) { r.Spec.ServerVersion = "7.1.1" }), withImage("couchbase/server:7.6.4")},
 			expectedErr: "before 7.2.0 can't be restored onto 7.2.0 or later",
 		},
 		{
@@ -2095,15 +2148,45 @@ func TestCheckConstraintsSnapshotBackupRestore(t *testing.T) {
 			expectedErr: "no server class in cluster target has the same volumes",
 		},
 		{
-			name: "run without mount paths skips the volume check",
+			name: "run without mount paths can't be restored",
 			objects: []runtime.Object{
 				changedRun(func(r *couchbasev2.CouchbaseSnapshotBackupRun) {
 					for i := range r.Status.Snapshots {
 						r.Status.Snapshots[i].MountPath = ""
 					}
 				}),
-				changedCluster(func(c *couchbasev2.CouchbaseCluster) { c.Spec.Servers[0].VolumeMounts.IndexClaim = "" }),
+				newCluster,
 			},
+			expectedErr: "doesn't record where member cb-0000's volumes were mounted",
+		},
+		{
+			name: "member's server class isn't in the target",
+			objects: []runtime.Object{
+				changedRun(func(r *couchbasev2.CouchbaseSnapshotBackupRun) {
+					for i := range r.Status.Snapshots {
+						r.Status.Snapshots[i].ServerClass = "query"
+					}
+				}),
+				newCluster,
+			},
+			expectedErr: "server class query, which cluster target doesn't have",
+		},
+		{
+			name: "member's server class has different volumes, even if another class matches",
+			objects: []runtime.Object{
+				changedRun(func(r *couchbasev2.CouchbaseSnapshotBackupRun) {
+					for i := range r.Status.Snapshots {
+						r.Status.Snapshots[i].ServerClass = "data-index"
+					}
+				}),
+				changedCluster(func(c *couchbasev2.CouchbaseCluster) {
+					other := *c.Spec.Servers[0].DeepCopy()
+					other.Name = "other"
+					c.Spec.Servers[0].VolumeMounts.IndexClaim = ""
+					c.Spec.Servers = append(c.Spec.Servers, other)
+				}),
+			},
+			expectedErr: "but server class data-index in cluster target has",
 		},
 		{
 			name:            "target with more nodes than the run warns",
@@ -2148,18 +2231,84 @@ func TestCheckConstraintsSnapshotBackupRestore(t *testing.T) {
 			objects: []runtime.Object{runWithData, newCluster},
 		},
 		{
-			name: "different admin secret warns",
+			name: "target older than the minimum version for a snapshot restore",
 			objects: []runtime.Object{
-				changedRun(func(r *couchbasev2.CouchbaseSnapshotBackupRun) { r.Spec.AdminSecretName = "old-auth" }),
-				changedCluster(func(c *couchbasev2.CouchbaseCluster) { c.Spec.Security.AdminSecret = "new-auth" }),
+				changedRun(func(r *couchbasev2.CouchbaseSnapshotBackupRun) { r.Spec.ServerVersion = "7.6.2" }),
+				withImage("couchbase/server:7.6.2"),
 			},
-			expectedWarning: "the restored data expects the password from when the backup was taken",
+			expectedErr: "a snapshot restore needs 7.6.4 or later",
+		},
+		{
+			name:        "restored bucket with continuous backup on",
+			objects:     []runtime.Object{runWithData, managedBuckets, continuousBackupBucket(true), scope, collection},
+			expectedErr: "bucket travel has spec.continuousBackup turned on",
+		},
+		{
+			name:    "restored bucket with continuous backup off",
+			objects: []runtime.Object{runWithData, managedBuckets, continuousBackupBucket(false), scope, collection},
+		},
+		{
+			name:    "members go back to the same server groups",
+			objects: []runtime.Object{placedRun(threeZones, threeZones), withServerGroups(threeZones, nil)},
+		},
+		{
+			name:        "a server group the target doesn't use is rejected",
+			objects:     []runtime.Object{placedRun(threeZones, threeZones), withServerGroups([]string{"zone-a", "zone-b"}, nil)},
+			expectedErr: "member cb-0002 was backed up in server group zone-c but server class data-index in cluster target uses zone-a, zone-b",
+		},
+		{
+			name:        "the server class's own server groups are used over the cluster's",
+			objects:     []runtime.Object{placedRun(threeZones, threeZones), withServerGroups(threeZones, []string{"zone-x"})},
+			expectedErr: "member cb-0000 was backed up in server group zone-a but server class data-index in cluster target uses zone-x",
+		},
+		{
+			name:    "a target without server groups takes any member, like the operator does",
+			objects: []runtime.Object{placedRun(threeZones, threeZones), newCluster},
+		},
+		{
+			name:    "with the label override, members in the class's zone are valid",
+			objects: []runtime.Object{placedRun([]string{"pg-1", "pg-2", "pg-3"}, []string{"zone-a", "zone-a", "zone-a"}), withOverride("zone-a")},
+		},
+		{
+			name:        "with the label override, a member in another zone is rejected",
+			objects:     []runtime.Object{placedRun([]string{"pg-1", "pg-2", "pg-3"}, []string{"zone-a", "zone-b", "zone-a"}), withOverride("zone-a")},
+			expectedErr: "member cb-0001 was backed up in zone zone-b but server class data-index in cluster target runs in zone zone-a",
+		},
+		{
+			name:            "an older run into a target with server groups warns",
+			objects:         []runtime.Object{completeRun, withServerGroups(threeZones, nil)},
+			expectedWarning: "the run doesn't record which server group each member was in, so cluster target's members may not go back to the same server groups",
+		},
+		{
+			name:    "an older run into a target without server groups doesn't warn",
+			objects: []runtime.Object{completeRun, newCluster},
+		},
+		{
+			name:        "with the label override, a run that didn't record zones is rejected",
+			objects:     []runtime.Object{placedRun(noZones, noZones), withOverride("zone-a")},
+			expectedErr: "member cb-0000's backup doesn't record its zone, which cluster target needs because serverGroupsLabelOverride is set",
+		},
+		{
+			name:        "different admin user is rejected",
+			objects:     []runtime.Object{completeRun, withAdminSecret},
+			secrets:     []runtime.Object{adminSecret("my-backup-run-admin", "Administrator", "old"), adminSecret("auth", "admin2", "new")},
+			expectedErr: "the backup was taken with admin user Administrator but cluster target's admin secret auth has user admin2",
+		},
+		{
+			name:    "same admin user with a different password is valid",
+			objects: []runtime.Object{completeRun, withAdminSecret},
+			secrets: []runtime.Object{adminSecret("my-backup-run-admin", "Administrator", "old"), adminSecret("auth", "Administrator", "new")},
+		},
+		{
+			name:    "run taken before the admin login was saved is valid",
+			objects: []runtime.Object{completeRun, withAdminSecret},
+			secrets: []runtime.Object{adminSecret("auth", "admin2", "new")},
 		},
 	}
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			client := k8sfake.NewSimpleClientset()
+			client := k8sfake.NewSimpleClientset(testcase.secrets...)
 
 			served := testcase.served
 			if served == nil {
@@ -2171,7 +2320,7 @@ func TestCheckConstraintsSnapshotBackupRestore(t *testing.T) {
 				discovery.Resources = append(discovery.Resources, &metav1.APIResourceList{GroupVersion: groupVersion})
 			}
 
-			v := types.New(client, couchbasefake.NewSimpleClientset(testcase.objects...), &types.ValidatorOptions{})
+			v := types.New(client, couchbasefake.NewSimpleClientset(testcase.objects...), &types.ValidatorOptions{ValidateSecrets: true})
 
 			runName := "my-backup-run"
 			if testcase.runName == "-" {

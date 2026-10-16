@@ -17,7 +17,6 @@ import (
 	"reflect"
 	"regexp"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -28,6 +27,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	"github.com/couchbase/couchbase-operator/pkg/util/tlsutil"
 	util_x509 "github.com/couchbase/couchbase-operator/pkg/util/x509"
 	"github.com/couchbase/couchbase-operator/pkg/validator/types"
@@ -3812,17 +3812,26 @@ func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.Couc
 // set if it already has data. It also checks the target can run the backed up data, by its
 // server version and volumes, and warns when the target has a different number of nodes.
 func CheckConstraintsSnapshotBackupRestore(v *types.Validator, restore *couchbasev2.CouchbaseSnapshotBackupRestore) ([]string, error) {
-	checks := []func(*types.Validator, *couchbasev2.CouchbaseSnapshotBackupRestore) error{
+	// The run and the target are read once and given to every check, so the checks don't each read
+	// them again.
+	run, cluster, err := getSnapshotBackupRestoreRunAndTarget(v, restore)
+	if err != nil {
+		return nil, err
+	}
+
+	checks := []func(*types.Validator, *couchbasev2.CouchbaseSnapshotBackupRestore, *couchbasev2.CouchbaseSnapshotBackupRun, *couchbasev2.CouchbaseCluster) error{
 		checkConstraintSnapshotBackupRestoreNameLength,
 		checkSnapshotBackupRestoreRun,
 		checkSnapshotBackupRestoreTarget,
 		checkSnapshotBackupRestoreFits,
+		checkSnapshotBackupRestoreAdminUser,
+		checkSnapshotBackupRestorePlacement,
 	}
 
 	var errs []error
 
 	for _, check := range checks {
-		if err := check(v, restore); err != nil {
+		if err := check(v, restore, run, cluster); err != nil {
 			var composite *errors.CompositeError
 
 			if ok := goerrors.As(err, &composite); ok {
@@ -3838,10 +3847,10 @@ func CheckConstraintsSnapshotBackupRestore(v *types.Validator, restore *couchbas
 		return nil, errors.CompositeValidationError(errs...)
 	}
 
-	return snapshotBackupRestoreWarnings(v, restore)
+	return snapshotBackupRestoreWarnings(v, restore, run, cluster)
 }
 
-func checkConstraintSnapshotBackupRestoreNameLength(_ *types.Validator, restore *couchbasev2.CouchbaseSnapshotBackupRestore) error {
+func checkConstraintSnapshotBackupRestoreNameLength(_ *types.Validator, restore *couchbasev2.CouchbaseSnapshotBackupRestore, _ *couchbasev2.CouchbaseSnapshotBackupRun, _ *couchbasev2.CouchbaseCluster) error {
 	const maxLabelValueLength = 63
 	if len(restore.Name) > maxLabelValueLength {
 		return fmt.Errorf("snapshot backup restore name %q cannot be longer than %d characters", restore.Name, maxLabelValueLength)
@@ -3852,7 +3861,7 @@ func checkConstraintSnapshotBackupRestoreNameLength(_ *types.Validator, restore 
 
 // checkSnapshotBackupRestoreRun checks the run to restore from exists, came from the named
 // backup, and finished as Complete, so a restore never starts from a backup that isn't usable.
-func checkSnapshotBackupRestoreRun(v *types.Validator, restore *couchbasev2.CouchbaseSnapshotBackupRestore) error {
+func checkSnapshotBackupRestoreRun(v *types.Validator, restore *couchbasev2.CouchbaseSnapshotBackupRestore, run *couchbasev2.CouchbaseSnapshotBackupRun, _ *couchbasev2.CouchbaseCluster) error {
 	spec := restore.Spec
 
 	if spec.BackupName == "" || spec.RunName == "" || spec.Target.Name == "" {
@@ -3863,12 +3872,7 @@ func checkSnapshotBackupRestoreRun(v *types.Validator, restore *couchbasev2.Couc
 		return err
 	}
 
-	run, found, err := v.Abstraction.GetCouchbaseSnapshotBackupRun(restore.Namespace, spec.RunName)
-	if err != nil {
-		return err
-	}
-
-	if !found {
+	if run == nil {
 		return fmt.Errorf("spec.runName %s doesn't exist in namespace %s", spec.RunName, restore.Namespace)
 	}
 
@@ -3891,13 +3895,8 @@ func checkSnapshotBackupRestoreRun(v *types.Validator, restore *couchbasev2.Couc
 // checkSnapshotBackupRestoreTarget checks the cluster to restore into exists, and that the user
 // has agreed to lose its data if it has any. A cluster that has ever run has a cluster ID, and
 // still has its data even when hibernated, since hibernating keeps the volumes.
-func checkSnapshotBackupRestoreTarget(v *types.Validator, restore *couchbasev2.CouchbaseSnapshotBackupRestore) error {
+func checkSnapshotBackupRestoreTarget(_ *types.Validator, restore *couchbasev2.CouchbaseSnapshotBackupRestore, _ *couchbasev2.CouchbaseSnapshotBackupRun, cluster *couchbasev2.CouchbaseCluster) error {
 	target := restore.Spec.Target
-
-	cluster, err := getCouchbaseClusterByName(v, restore.Namespace, target.Name)
-	if err != nil {
-		return err
-	}
 
 	if cluster == nil {
 		return fmt.Errorf("spec.target.name %s doesn't exist, create the cluster first with spec.hibernate set to true", target.Name)
@@ -3916,27 +3915,66 @@ func checkSnapshotBackupRestoreTarget(v *types.Validator, restore *couchbasev2.C
 // checkSnapshotBackupRestoreFits checks the target cluster can run the backed up data, its server
 // version must be one the data can be upgraded to, and its volumes must match the run's. Every
 // backed up bucket, scope and collection also needs a CR, or the operator deletes it again.
-func checkSnapshotBackupRestoreFits(v *types.Validator, restore *couchbasev2.CouchbaseSnapshotBackupRestore) error {
-	run, cluster, err := getSnapshotBackupRestoreRunAndTarget(v, restore)
-	if err != nil || run == nil || cluster == nil {
+func checkSnapshotBackupRestoreFits(v *types.Validator, restore *couchbasev2.CouchbaseSnapshotBackupRestore, run *couchbasev2.CouchbaseSnapshotBackupRun, cluster *couchbasev2.CouchbaseCluster) error {
+	if run == nil || cluster == nil {
 		// A missing run or cluster is already reported by the other checks.
-		return err
+		return nil
 	}
 
 	if err := checkSnapshotBackupRestoreVersion(run, cluster); err != nil {
 		return err
 	}
 
-	if err := checkSnapshotBackupRestoreVolumes(run, cluster); err != nil {
+	if _, err := k8sutil.SnapshotRestoreMembers(cluster, run); err != nil {
 		return err
 	}
 
-	return checkSnapshotBackupRestoreCoverage(v, restore, run, cluster)
+	if err := checkSnapshotBackupRestoreCoverage(v, restore, run, cluster); err != nil {
+		return err
+	}
+
+	return checkSnapshotBackupRestoreContinuousBackup(v, run, cluster)
+}
+
+// checkSnapshotBackupRestoreContinuousBackup rejects a restore when a restored bucket's CR has continuous
+// backup turned on. The operator turns it on again as soon as the cluster starts, and it would keep
+// writing to the same place as before the restore, mixing the old and new history.
+func checkSnapshotBackupRestoreContinuousBackup(v *types.Validator, run *couchbasev2.CouchbaseSnapshotBackupRun, cluster *couchbasev2.CouchbaseCluster) error {
+	if !cluster.Spec.Buckets.Managed {
+		return nil
+	}
+
+	buckets, err := v.Abstraction.GetCouchbaseBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
+	if err != nil {
+		return err
+	}
+
+	restored := map[string]bool{}
+	for _, name := range run.Spec.Buckets {
+		restored[name] = true
+	}
+
+	for i := range buckets.Items {
+		bucket := &buckets.Items[i]
+
+		settings := bucket.Spec.ContinuousBackup
+		if !restored[bucket.GetCouchbaseName()] || settings == nil || settings.Enabled == nil || !*settings.Enabled {
+			continue
+		}
+
+		return fmt.Errorf("bucket %s has spec.continuousBackup turned on, after the restore it would keep writing to the same place as before, turn it off or point it at a new location before restoring", bucket.GetCouchbaseName())
+	}
+
+	return nil
 }
 
 // checkSnapshotBackupRestoreVersion checks the target's server version can start on the backed
 // up data. Starting a newer server on old data is an upgrade, so the normal upgrade rules apply,
 // and an older server can't read the data at all.
+// snapshotRestoreMinimumVersion is the first server version whose node_remap tool can turn off auto
+// failover on its own, which a restore needs before the restored cluster starts.
+const snapshotRestoreMinimumVersion = "7.6.4"
+
 func checkSnapshotBackupRestoreVersion(run *couchbasev2.CouchbaseSnapshotBackupRun, cluster *couchbasev2.CouchbaseCluster) error {
 	runVersion := run.Spec.ServerVersion
 
@@ -3950,6 +3988,15 @@ func checkSnapshotBackupRestoreVersion(run *couchbasev2.CouchbaseSnapshotBackupR
 		return nil
 	}
 
+	tooOld, err := couchbaseutil.VersionBefore(targetVersion, snapshotRestoreMinimumVersion)
+	if err != nil {
+		return err
+	}
+
+	if tooOld {
+		return fmt.Errorf("cluster %s runs %s, a snapshot restore needs %s or later", cluster.Name, targetVersion, snapshotRestoreMinimumVersion)
+	}
+
 	crosses72, err := couchbaseutil.UpgradeCrosses(runVersion, targetVersion, "7.2.0")
 	if err != nil {
 		return err
@@ -3961,47 +4008,6 @@ func checkSnapshotBackupRestoreVersion(run *couchbasev2.CouchbaseSnapshotBackupR
 
 	if err := couchbaseutil.CheckUpgradePath(runVersion, targetVersion); err != nil {
 		return fmt.Errorf("cluster %s can't run data backed up from %s: %w", cluster.Name, runVersion, err)
-	}
-
-	return nil
-}
-
-// checkSnapshotBackupRestoreVolumes checks every backed up member's volumes match the volumes of
-// one of the target's server classes, so each snapshot has a matching volume to go back into.
-// Runs taken before mount paths were recorded can't be checked.
-func checkSnapshotBackupRestoreVolumes(run *couchbasev2.CouchbaseSnapshotBackupRun, cluster *couchbasev2.CouchbaseCluster) error {
-	memberPaths := map[string][]string{}
-
-	for _, snapshot := range run.Status.Snapshots {
-		if snapshot.MountPath == "" {
-			return nil
-		}
-
-		memberPaths[snapshot.Member] = append(memberPaths[snapshot.Member], snapshot.MountPath)
-	}
-
-	targetLayouts := map[string]bool{}
-
-	for i := range cluster.Spec.Servers {
-		paths := k8sutil.SnapshotMountPaths(cluster.Spec.Servers[i].GetVolumeMounts())
-		sort.Strings(paths)
-		targetLayouts[strings.Join(paths, ", ")] = true
-	}
-
-	members := make([]string, 0, len(memberPaths))
-	for member := range memberPaths {
-		members = append(members, member)
-	}
-
-	sort.Strings(members)
-
-	for _, member := range members {
-		paths := memberPaths[member]
-		sort.Strings(paths)
-
-		if layout := strings.Join(paths, ", "); !targetLayouts[layout] {
-			return fmt.Errorf("member %s was backed up with volumes [%s], but no server class in cluster %s has the same volumes", member, layout, cluster.Name)
-		}
 	}
 
 	return nil
@@ -4214,13 +4220,10 @@ func (c *snapshotBackupRestoreCoverage) addCollections(v *types.Validator, names
 }
 
 // snapshotBackupRestoreWarnings warns about things a restore allows but the user may not expect,
-// like restoring a target with a different number of nodes, which the restore then has to scale,
-// and a target using a different admin secret than the run, since the restored data keeps its old
-// password.
-func snapshotBackupRestoreWarnings(v *types.Validator, restore *couchbasev2.CouchbaseSnapshotBackupRestore) ([]string, error) {
-	run, cluster, err := getSnapshotBackupRestoreRunAndTarget(v, restore)
-	if err != nil || run == nil || cluster == nil {
-		return nil, err
+// like restoring a target with a different number of nodes, which the restore then has to scale.
+func snapshotBackupRestoreWarnings(_ *types.Validator, _ *couchbasev2.CouchbaseSnapshotBackupRestore, run *couchbasev2.CouchbaseSnapshotBackupRun, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+	if run == nil || cluster == nil {
+		return nil, nil
 	}
 
 	var warnings []string
@@ -4239,24 +4242,147 @@ func snapshotBackupRestoreWarnings(v *types.Validator, restore *couchbasev2.Couc
 		warnings = append(warnings, fmt.Sprintf("the run has %d nodes but cluster %s asks for %d, the other %d start empty and join with a rebalance", runNodes, cluster.Name, targetNodes, targetNodes-runNodes))
 	}
 
-	if run.Spec.AdminSecretName != "" && run.Spec.AdminSecretName != cluster.Spec.Security.AdminSecret {
-		warnings = append(warnings, fmt.Sprintf("the run was taken with admin secret %s but cluster %s uses %s, the restored data expects the password from when the backup was taken", run.Spec.AdminSecretName, cluster.Name, cluster.Spec.Security.AdminSecret))
+	// Runs taken before server groups were recorded can't put members back in their groups, so the
+	// operator picks a group for each one, like for a new member.
+	if !runRecordsServerGroups(run) && cluster.ServerGroupLabel() == constants.ServerGroupLabel && clusterUsesServerGroups(cluster) {
+		warnings = append(warnings, fmt.Sprintf("the run doesn't record which server group each member was in, so cluster %s's members may not go back to the same server groups", cluster.Name))
 	}
 
 	return warnings, nil
 }
 
-// getSnapshotBackupRestoreRunAndTarget returns the run and the target cluster a restore names.
-// Either is nil if it doesn't exist.
-func getSnapshotBackupRestoreRunAndTarget(v *types.Validator, restore *couchbasev2.CouchbaseSnapshotBackupRestore) (*couchbasev2.CouchbaseSnapshotBackupRun, *couchbasev2.CouchbaseCluster, error) {
-	run, found, err := v.Abstraction.GetCouchbaseSnapshotBackupRun(restore.Namespace, restore.Spec.RunName)
-	if err != nil || !found {
-		return nil, nil, err
+// checkSnapshotBackupRestoreAdminUser rejects a restore when the target's admin secret has a
+// different username from the backup. The restored data only accepts the old one, and the operator
+// can change the password but not the username. Runs taken before the login was saved are skipped.
+func checkSnapshotBackupRestoreAdminUser(v *types.Validator, _ *couchbasev2.CouchbaseSnapshotBackupRestore, run *couchbasev2.CouchbaseSnapshotBackupRun, cluster *couchbasev2.CouchbaseCluster) error {
+	if !v.Options.ValidateSecrets || run == nil || cluster == nil {
+		return nil
 	}
 
-	cluster, err := getCouchbaseClusterByName(v, restore.Namespace, restore.Spec.Target.Name)
+	saved, found, err := v.Abstraction.GetSecret(run.Namespace, run.AdminSecretCopyName())
+	if err != nil || !found {
+		return err
+	}
+
+	target, found, err := v.Abstraction.GetSecret(cluster.Namespace, cluster.Spec.Security.AdminSecret)
+	if err != nil || !found {
+		return err
+	}
+
+	backedUp := string(saved.Data[constants.AuthSecretUsernameKey])
+	current := string(target.Data[constants.AuthSecretUsernameKey])
+
+	if backedUp != current {
+		return fmt.Errorf("the backup was taken with admin user %s but cluster %s's admin secret %s has user %s, the restored data only accepts %s", backedUp, cluster.Name, cluster.Spec.Security.AdminSecret, current, backedUp)
+	}
+
+	return nil
+}
+
+// runRecordsServerGroups reports whether the run recorded a server group for any member.
+func runRecordsServerGroups(run *couchbasev2.CouchbaseSnapshotBackupRun) bool {
+	for _, snapshot := range run.Status.Snapshots {
+		if snapshot.ServerGroup != "" {
+			return true
+		}
+	}
+
+	return false
+}
+
+// clusterUsesServerGroups reports whether any server class is placed by server group, either
+// from spec.serverGroups or a zone in its pod template, the same groups the operator restricts
+// a member to.
+func clusterUsesServerGroups(cluster *couchbasev2.CouchbaseCluster) bool {
+	for i := range cluster.Spec.Servers {
+		config := &cluster.Spec.Servers[i]
+
+		if groups, _ := scheduler.GetServerGroupsForClass(cluster, config); len(groups) > 0 {
+			return true
+		}
+
+		if config.Pod != nil && config.Pod.Spec.NodeSelector[constants.ServerGroupLabel] != "" {
+			return true
+		}
+	}
+
+	return false
+}
+
+// checkSnapshotBackupRestorePlacement rejects a restore whose members the operator couldn't put back,
+// using the same rules it uses to recover a member from its volumes. A member whose recorded server
+// group isn't one its server class uses, or whose zone isn't the class's zone when
+// serverGroupsLabelOverride is set, would be treated as lost and replaced, and its restored data
+// with it.
+func checkSnapshotBackupRestorePlacement(_ *types.Validator, _ *couchbasev2.CouchbaseSnapshotBackupRestore, run *couchbasev2.CouchbaseSnapshotBackupRun, cluster *couchbasev2.CouchbaseCluster) error {
+	if run == nil || cluster == nil {
+		return nil
+	}
+
+	members, err := k8sutil.SnapshotRestoreMembers(cluster, run)
 	if err != nil {
-		return nil, nil, err
+		// checkSnapshotBackupRestoreFits reports it.
+		return nil
+	}
+
+	for _, member := range members {
+		config := member.Config
+
+		if cluster.ServerGroupLabel() != constants.ServerGroupLabel {
+			zone := ""
+			if config.Pod != nil {
+				zone = config.Pod.Spec.NodeSelector[constants.ServerGroupLabel]
+			}
+
+			switch {
+			case zone == "":
+			case member.AvailabilityZone == "":
+				return fmt.Errorf("member %s's backup doesn't record its zone, which cluster %s needs because serverGroupsLabelOverride is set", member.Name, cluster.Name)
+			case member.AvailabilityZone != zone:
+				return fmt.Errorf("member %s was backed up in zone %s but server class %s in cluster %s runs in zone %s", member.Name, member.AvailabilityZone, config.Name, cluster.Name, zone)
+			}
+
+			continue
+		}
+
+		groups, _ := scheduler.GetServerGroupsForClass(cluster, config)
+		if len(groups) == 0 && config.Pod != nil {
+			if group, ok := config.Pod.Spec.NodeSelector[constants.ServerGroupLabel]; ok {
+				groups = []string{group}
+			}
+		}
+
+		if member.ServerGroup != "" && len(groups) > 0 && !slices.Contains(groups, member.ServerGroup) {
+			return fmt.Errorf("member %s was backed up in server group %s but server class %s in cluster %s uses %s", member.Name, member.ServerGroup, config.Name, cluster.Name, strings.Join(groups, ", "))
+		}
+	}
+
+	return nil
+}
+
+// getSnapshotBackupRestoreRunAndTarget returns the run and the target cluster a restore names.
+// Either is nil if it isn't set or doesn't exist.
+func getSnapshotBackupRestoreRunAndTarget(v *types.Validator, restore *couchbasev2.CouchbaseSnapshotBackupRestore) (*couchbasev2.CouchbaseSnapshotBackupRun, *couchbasev2.CouchbaseCluster, error) {
+	var run *couchbasev2.CouchbaseSnapshotBackupRun
+
+	if restore.Spec.RunName != "" {
+		found, ok, err := v.Abstraction.GetCouchbaseSnapshotBackupRun(restore.Namespace, restore.Spec.RunName)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if ok {
+			run = found
+		}
+	}
+
+	var cluster *couchbasev2.CouchbaseCluster
+
+	if restore.Spec.Target.Name != "" {
+		var err error
+		if cluster, err = getCouchbaseClusterByName(v, restore.Namespace, restore.Spec.Target.Name); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	return run, cluster, nil

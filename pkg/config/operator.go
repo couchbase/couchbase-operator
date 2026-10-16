@@ -432,6 +432,19 @@ func (o *generateOperatorOptions) getOperatorRole() runtime.Object {
 				couchbasev2.GroupName,
 			},
 			Resources: []string{
+				// Binder pods are owned by their restore. OpenShift only allows that if the operator can
+				// also update the restore's finalizers.
+				couchbasev2.SnapshotBackupRestoreCRDResourcePlural + "/finalizers",
+			},
+			Verbs: []string{
+				"update",
+			},
+		},
+		{
+			APIGroups: []string{
+				couchbasev2.GroupName,
+			},
+			Resources: []string{
 				couchbasev2.AutoscalerCRDResourcePlural,
 				couchbasev2.SnapshotBackupRunCRDResourcePlural,
 				// Snapshots are owned by their backup run. OpenShift only allows that if the operator can

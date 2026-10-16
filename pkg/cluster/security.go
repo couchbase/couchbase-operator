@@ -11,6 +11,7 @@ licenses/APL2.txt.
 package cluster
 
 import (
+	goerrors "errors"
 	"fmt"
 
 	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
@@ -62,6 +63,27 @@ func (c *Cluster) reconcileAdminPassword() error {
 	c.api.SetPassword(password)
 
 	c.raiseEvent(k8sutil.EventReasonAdminPasswordChangedEvent(c.cluster))
+
+	return nil
+}
+
+// reloadSavedPassword reads the admin password from the saved state again, and gives it to the
+// client if it changed.
+func (c *Cluster) reloadSavedPassword() error {
+	password, err := c.state.Get(persistence.Password)
+	if err != nil {
+		// Nothing saved, so we keep the one we have.
+		if goerrors.Is(err, persistence.ErrKeyError) {
+			return nil
+		}
+
+		return err
+	}
+
+	if password != c.password {
+		c.password = password
+		c.api.SetPassword(password)
+	}
 
 	return nil
 }

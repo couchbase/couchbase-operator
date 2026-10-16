@@ -883,6 +883,21 @@ type CouchbaseSnapshotBackupRunSnapshot struct {
 	// uses it to put each snapshot back as the right volume.
 	// +optional
 	MountPath string `json:"mountPath,omitempty"`
+
+	// ServerClass is the spec.servers entry the member belonged to. Restore uses it to give each
+	// restored volume the right server class.
+	// +optional
+	ServerClass string `json:"serverClass,omitempty"`
+
+	// ServerGroup is the server group the member was in, from its volume's
+	// pvc.couchbase.com/serverGroup annotation. Restore puts the member back in the same group.
+	// +optional
+	ServerGroup string `json:"serverGroup,omitempty"`
+
+	// AvailabilityZone is the zone the volume was in, from its pvc.couchbase.com/availabilityZone
+	// annotation. Restore makes the new volume in the same zone.
+	// +optional
+	AvailabilityZone string `json:"availabilityZone,omitempty"`
 }
 
 type CouchbaseSnapshotBackupRunPhase string
@@ -900,13 +915,12 @@ type CouchbaseSnapshotBackupRunList struct {
 	Items           []CouchbaseSnapshotBackupRun `json:"items"`
 }
 
-// CouchbaseSnapshotBackupRestore represents a single CSI VolumeSnapshot based restore request
-// and its progress. It names a source CouchbaseSnapshotBackupRun and a target
-// CouchbaseCluster. The target must already exist as a CR before a restore can act on it,
-// if it is running, the restore replaces its data (a destructive rollback). If it is
-// hibernated with no pods, the restore fills its volumes and starts it up. If no
-// CouchbaseCluster with that name exists at all, the request is rejected until one is
-// created.
+// CouchbaseSnapshotBackupRestore restores a CouchbaseSnapshotBackupRun into a CouchbaseCluster,
+// making its volumes from the run's CSI VolumeSnapshots. The target cluster must exist and be
+// hibernated. A running target is left alone until it's hibernated. A target that already has
+// data is rolled back to the backup, which needs acknowledgeDataLoss. A new target should be
+// created with hibernate set to true. Once the volumes are restored, the user wakes the cluster,
+// or the restore does when startClusterWhenReady is set.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:categories=all;couchbase
@@ -936,6 +950,13 @@ type CouchbaseSnapshotBackupRestoreSpec struct {
 
 	// Target describes the cluster to restore into.
 	Target CouchbaseSnapshotBackupRestoreTarget `json:"target"`
+
+	// StartClusterWhenReady sets spec.hibernate to false on the target once its volumes are
+	// restored, so the cluster starts on its own. It's off by default, the user starts the
+	// cluster when they're ready. The restore changes only that one field, once, and never
+	// changes it again.
+	// +optional
+	StartClusterWhenReady bool `json:"startClusterWhenReady,omitempty"`
 }
 
 // CouchbaseSnapshotBackupRestoreTarget describes the restore's destination and the explicit
@@ -962,7 +983,7 @@ type CouchbaseSnapshotBackupRestoreTarget struct {
 // CouchbaseSnapshotBackupRestoreStatus reports restore progress and outcome.
 type CouchbaseSnapshotBackupRestoreStatus struct {
 	// Phase is the restore's current state.
-	// +kubebuilder:validation:Enum=Validating;Destroying;Provisioning;Remapping;WaitingForCluster;Complete;Failed
+	// +kubebuilder:validation:Enum=Validating;Destroying;Provisioning;ReadyToStart;Remapping;WaitingForCluster;Complete;Failed
 	// +kubebuilder:default="Validating"
 	Phase CouchbaseSnapshotBackupRestorePhase `json:"phase,omitempty"`
 
@@ -991,6 +1012,7 @@ const (
 	CouchbaseSnapshotBackupRestorePhaseValidating        CouchbaseSnapshotBackupRestorePhase = "Validating"
 	CouchbaseSnapshotBackupRestorePhaseDestroying        CouchbaseSnapshotBackupRestorePhase = "Destroying"
 	CouchbaseSnapshotBackupRestorePhaseProvisioning      CouchbaseSnapshotBackupRestorePhase = "Provisioning"
+	CouchbaseSnapshotBackupRestorePhaseReadyToStart      CouchbaseSnapshotBackupRestorePhase = "ReadyToStart"
 	CouchbaseSnapshotBackupRestorePhaseRemapping         CouchbaseSnapshotBackupRestorePhase = "Remapping"
 	CouchbaseSnapshotBackupRestorePhaseWaitingForCluster CouchbaseSnapshotBackupRestorePhase = "WaitingForCluster"
 	CouchbaseSnapshotBackupRestorePhaseComplete          CouchbaseSnapshotBackupRestorePhase = "Complete"

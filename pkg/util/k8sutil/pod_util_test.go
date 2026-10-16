@@ -769,6 +769,131 @@ func TestSnapshotMountPaths(t *testing.T) {
 	}
 }
 
+// TestSnapshotRestoreMembers checks each backed up member gets the server class
+// it was recorded in, or for older runs the class with the same volumes, and that
+// a class with different volumes is refused, since some snapshots would have
+// nowhere to go.
+func TestSnapshotRestoreMembers(t *testing.T) {
+	const (
+		defaultPath = "/opt/couchbase/var/lib/couchbase"
+		dataPath    = "/mnt/data"
+	)
+
+	// target has class data with default and data volumes, and class other with only default.
+	target := &couchbasev2.CouchbaseCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "target"},
+		Spec: couchbasev2.ClusterSpec{
+			Servers: []couchbasev2.ServerConfig{
+				{Name: "data", VolumeMounts: &couchbasev2.VolumeMounts{DefaultClaim: "couchbase", DataClaim: "couchbase"}},
+				{Name: "other", VolumeMounts: &couchbasev2.VolumeMounts{DefaultClaim: "couchbase"}},
+			},
+		},
+	}
+
+	// run makes a run of members cb-0001 and cb-0000, in that order, each with the given volumes
+	// and server class.
+	run := func(class string, paths ...string) *couchbasev2.CouchbaseSnapshotBackupRun {
+		r := &couchbasev2.CouchbaseSnapshotBackupRun{ObjectMeta: metav1.ObjectMeta{Name: "daily-run"}}
+
+		for _, member := range []string{"cb-0001", "cb-0000"} {
+			for _, path := range paths {
+				r.Status.Snapshots = append(r.Status.Snapshots, couchbasev2.CouchbaseSnapshotBackupRunSnapshot{
+					Member:           member,
+					SnapshotName:     member + path,
+					MountPath:        path,
+					ServerClass:      class,
+					ServerGroup:      "group-" + member,
+					AvailabilityZone: "zone-" + member,
+				})
+			}
+		}
+
+		return r
+	}
+
+	testcases := []struct {
+		name          string
+		run           *couchbasev2.CouchbaseSnapshotBackupRun
+		expectedClass string
+		expectedErr   string
+	}{
+		{
+			name:          "the recorded class is used",
+			run:           run("other", defaultPath),
+			expectedClass: "other",
+		},
+		{
+			name:          "an older run gets the class with the same volumes",
+			run:           run("", defaultPath, dataPath),
+			expectedClass: "data",
+		},
+		{
+			name:        "a recorded class the target doesn't have",
+			run:         run("query", defaultPath),
+			expectedErr: "server class query, which cluster target doesn't have",
+		},
+		{
+			name:        "a recorded class with different volumes is refused, even though another class matches",
+			run:         run("data", defaultPath),
+			expectedErr: "but server class data in cluster target has",
+		},
+		{
+			name:        "an older run with no class that matches",
+			run:         run("", dataPath),
+			expectedErr: "no server class in cluster target has the same volumes",
+		},
+		{
+			name:        "a run without mount paths",
+			run:         run("data", ""),
+			expectedErr: "doesn't record where member cb-0001's volumes were mounted",
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			members, err := SnapshotRestoreMembers(target, testcase.run)
+
+			if testcase.expectedErr != "" {
+				if err == nil || !strings.Contains(err.Error(), testcase.expectedErr) {
+					t.Fatalf("expected an error containing %q, got %v", testcase.expectedErr, err)
+				}
+
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if len(members) != 2 || members[0].Name != "cb-0000" || members[1].Name != "cb-0001" {
+				t.Fatalf("expected members cb-0000 and cb-0001 in order, got %v", members)
+			}
+
+			for _, member := range members {
+				checkSnapshotRestoreMember(t, member, testcase.expectedClass, defaultPath)
+			}
+		})
+	}
+}
+
+// checkSnapshotRestoreMember checks a member got the expected class, kept its
+// group and zone, and has the right snapshot for path.
+func checkSnapshotRestoreMember(t *testing.T, member SnapshotRestoreMember, class, path string) {
+	t.Helper()
+
+	if member.Config.Name != class {
+		t.Errorf("member %s: expected class %s, got %s", member.Name, class, member.Config.Name)
+	}
+
+	if member.ServerGroup != "group-"+member.Name || member.AvailabilityZone != "zone-"+member.Name {
+		t.Errorf("member %s: group and zone not kept, got %s and %s", member.Name, member.ServerGroup, member.AvailabilityZone)
+	}
+
+	if member.Snapshots[path] != member.Name+path {
+		t.Errorf("member %s: wrong snapshot for %s, got %v", member.Name, path, member.Snapshots)
+	}
+}
+
 // TestIsBackupPVCByLabel checks that a PVC with the backup label counts as a
 // backup PVC even when its backup is gone, so it isn't treated as a server PVC.
 func TestIsBackupPVCByLabel(t *testing.T) {
@@ -820,5 +945,169 @@ func TestHasJoinedNote(t *testing.T) {
 				t.Errorf("hasJoinedNote = %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+// TestMemberPersistentVolumeClaims checks a restore gets the same volumes the operator would make
+// for a member, one per mount, with the operator's names, labels and annotations.
+func TestMemberPersistentVolumeClaims(t *testing.T) {
+	cluster := &couchbasev2.CouchbaseCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "rx", Namespace: "default"},
+		Spec: couchbasev2.ClusterSpec{
+			Image: "couchbase/server:7.6.8",
+			VolumeClaimTemplates: []couchbasev2.PersistentVolumeClaimTemplate{
+				{ObjectMeta: couchbasev2.NamedObjectMeta{Name: "couchbase"}},
+			},
+		},
+	}
+
+	config := couchbasev2.ServerConfig{
+		Name:         "data",
+		VolumeMounts: &couchbasev2.VolumeMounts{DefaultClaim: "couchbase", DataClaim: "couchbase"},
+	}
+
+	member := couchbaseutil.NewMember("default", "rx", "rx-0000", "7.6.8", "data", false, "couchbase/server:7.6.8")
+
+	pvcs, err := MemberPersistentVolumeClaims(cluster, member, config)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	expected := map[string]string{
+		"rx-0000-default-00": "/opt/couchbase/var/lib/couchbase",
+		"rx-0000-data-00":    "/mnt/data",
+	}
+
+	if len(pvcs) != len(expected) {
+		t.Fatalf("expected %d volumes, got %d", len(expected), len(pvcs))
+	}
+
+	for _, pvc := range pvcs {
+		path, ok := expected[pvc.Name]
+		if !ok {
+			t.Errorf("unexpected volume %s", pvc.Name)
+			continue
+		}
+
+		if pvc.Annotations[constants.AnnotationVolumeMountPath] != path {
+			t.Errorf("expected %s to be mounted at %s, got %s", pvc.Name, path, pvc.Annotations[constants.AnnotationVolumeMountPath])
+		}
+
+		if len(pvc.Spec.AccessModes) != 1 || pvc.Spec.AccessModes[0] != v1.ReadWriteOnce {
+			t.Errorf("expected %s to be ReadWriteOnce, got %v", pvc.Name, pvc.Spec.AccessModes)
+		}
+
+		if pvc.Annotations[constants.AnnotationVolumeNodeConf] != "data" || pvc.Labels[constants.LabelNode] != "rx-0000" || pvc.Labels[constants.LabelCluster] != "rx" {
+			t.Errorf("expected %s to carry the member, cluster and server class, got labels %v annotations %v", pvc.Name, pvc.Labels, pvc.Annotations)
+		}
+	}
+}
+
+// remapTestPod builds a member's pod, with its default volume marked as made by a snapshot
+// restore when restored is set.
+func remapTestPod(t *testing.T, restored bool) *v1.Pod {
+	cluster := &couchbasev2.CouchbaseCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "rx", Namespace: "default"},
+		Spec: couchbasev2.ClusterSpec{
+			Image: "couchbase/server:7.6.8",
+			VolumeClaimTemplates: []couchbasev2.PersistentVolumeClaimTemplate{
+				{ObjectMeta: couchbasev2.NamedObjectMeta{Name: "couchbase"}},
+			},
+		},
+	}
+
+	config := couchbasev2.ServerConfig{
+		Name:         "data",
+		VolumeMounts: &couchbasev2.VolumeMounts{DefaultClaim: "couchbase", DataClaim: "couchbase"},
+	}
+
+	member := couchbaseutil.NewMember("default", "rx", "rx-0000", "7.6.8", "data", false, "couchbase/server:7.6.8")
+
+	pvcs, err := MemberPersistentVolumeClaims(cluster, member, config)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	for _, pvc := range pvcs {
+		if restored && isPathPersisted(pvc, couchbaseVolumeDefaultConfigDir) {
+			pvc.Annotations[constants.AnnotationSnapshotRestoreRemap] = "true"
+			pvc.Annotations[constants.AnnotationSnapshotRestoreRemapID] = "3f2a9c1e-5b7d-4e8f-9a6c-2d1b0e4f7a83"
+		}
+	}
+
+	pod, err := CreateCouchbasePodSpec(member, cluster, config, "", &PersistentVolumeClaimState{pvcs: pvcs}, "couchbase/server:7.6.8", PodReadinessConfig{})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	return pod
+}
+
+// TestRemapInitContainer checks a pod only gets the node remap init container when its default
+// volume was made by a snapshot restore, so normal pods stay the same.
+func TestRemapInitContainer(t *testing.T) {
+	for _, restored := range []bool{false, true} {
+		t.Run(fmt.Sprintf("restored=%v", restored), func(t *testing.T) {
+			pod := remapTestPod(t, restored)
+
+			names := []string{}
+			for _, container := range pod.Spec.InitContainers {
+				names = append(names, container.Name)
+			}
+
+			expected := []string{"couchbase-server-init"}
+			if restored {
+				expected = append(expected, "couchbase-server-remap")
+			}
+
+			if !reflect.DeepEqual(names, expected) {
+				t.Fatalf("expected init containers %v, got %v", expected, names)
+			}
+		})
+	}
+
+	remap := remapTestPod(t, true).Spec.InitContainers[1]
+
+	if !strings.Contains(strings.Join(remap.Args, " "), "--just-disable-auto-failover") {
+		t.Errorf("expected the remap to turn off auto failover, got %v", remap.Args)
+	}
+
+	// The tool breaks the restored config if it writes over the folder it reads from.
+	if !strings.Contains(strings.Join(remap.Args, " "), `--output-path "$D/.snapshot-restore-remap"`) {
+		t.Errorf("expected the remap to write to its own folder, got %v", remap.Args)
+	}
+
+	// A done file that came back in the backup from an earlier restore mustn't stop the remap.
+	script := strings.Join(remap.Args, " ")
+	if !strings.Contains(script, `[ ! -e "$D/.snapshot-restore-remapped-3f2a9c1e-5b7d-4e8f-9a6c-2d1b0e4f7a83" ]`) || !strings.Contains(script, `"$D"/.snapshot-restore-remapped*`) {
+		t.Errorf("expected the done file to be named after the restore, and older ones removed, got %v", remap.Args)
+	}
+
+	mounts := map[string]string{}
+	for _, mount := range remap.VolumeMounts {
+		mounts[mount.MountPath] = mount.SubPath
+	}
+
+	if !reflect.DeepEqual(mounts, map[string]string{couchbaseVolumeDefaultConfigDir: defaultSubPathName, couchbaseVolumeDefaultEtcDir: etcSubPathName}) {
+		t.Errorf("expected the remap to mount the volume like the Couchbase container, got %v", remap.VolumeMounts)
+	}
+
+	pod := remapTestPod(t, true)
+	if !reflect.DeepEqual(pod.Spec.InitContainers[1].Resources, pod.Spec.Containers[0].Resources) {
+		t.Errorf("expected the remap to get the Couchbase container's resources, got %v", pod.Spec.InitContainers[1].Resources)
+	}
+}
+
+// TestRemapInitContainerBadRestoreID checks a restored volume whose restore UID isn't one k8s would
+// make doesn't get a pod, since the UID goes into the init container's script.
+func TestRemapInitContainerBadRestoreID(t *testing.T) {
+	cluster := &couchbasev2.CouchbaseCluster{ObjectMeta: metav1.ObjectMeta{Name: "rx", Namespace: "default"}}
+
+	if _, err := couchbaseRemapInitContainer(cluster, "rx-0000-default-00", couchbasev2.ServerConfig{}, "couchbase/server:7.6.8", "x\"; touch /tmp/y; \""); err == nil {
+		t.Errorf("expected a bad restore UID to be refused")
+	}
+
+	if _, err := couchbaseRemapInitContainer(cluster, "rx-0000-default-00", couchbasev2.ServerConfig{}, "couchbase/server:7.6.8", ""); err == nil {
+		t.Errorf("expected a missing restore UID to be refused")
 	}
 }

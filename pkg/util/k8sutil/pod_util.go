@@ -18,6 +18,7 @@ import (
 	"math/rand"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"slices"
 	"sort"
 	"strconv"
@@ -270,6 +271,22 @@ func pvcServerGroup(pvc *v1.PersistentVolumeClaim) string {
 	}
 
 	return pvc.Annotations[constants.ServerGroupLabel]
+}
+
+// PVCServerGroup returns the server group the operator recorded for a member's volume.
+func PVCServerGroup(pvc *v1.PersistentVolumeClaim) string {
+	return pvcServerGroup(pvc)
+}
+
+// PVCAvailabilityZone returns the zone the operator recorded for a member's volume.
+func PVCAvailabilityZone(pvc *v1.PersistentVolumeClaim) string {
+	return pvcAvailabilityZone(pvc)
+}
+
+// AddServerGroupAnnotations records a member's server group and zone on a volume the operator
+// didn't create itself, the same way it does for its own volumes.
+func AddServerGroupAnnotations(pvc *v1.PersistentVolumeClaim, serverGroup, zone string, cluster *couchbasev2.CouchbaseCluster) {
+	addServerGroupAnnotations(pvc, serverGroup, zone, cluster)
 }
 
 // addServerGroupAnnotations records scheduling hints on a persistent volume claim. serverGroup is
@@ -643,6 +660,35 @@ func generatePVC(cluster *couchbasev2.CouchbaseCluster, member couchbaseutil.Mem
 	return pvc, nil
 }
 
+// MemberPersistentVolumeClaims returns the volumes the operator would make for a member, with
+// the same names, labels and annotations. A restore uses it to make them again from snapshots.
+func MemberPersistentVolumeClaims(cluster *couchbasev2.CouchbaseCluster, member couchbaseutil.Member, config couchbasev2.ServerConfig) ([]*v1.PersistentVolumeClaim, error) {
+	if config.GetVolumeMounts() == nil {
+		return nil, nil
+	}
+
+	mounts, err := getPathsToPersist(member, config.VolumeMounts)
+	if err != nil {
+		return nil, err
+	}
+
+	pvcs := make([]*v1.PersistentVolumeClaim, 0, len(mounts))
+
+	for _, mount := range mounts {
+		pvc, err := generatePVC(cluster, member, mount, config)
+		if err != nil {
+			return nil, err
+		}
+
+		// Volumes are only mounted by one pod at a time, the operator sets this when it creates them.
+		pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+
+		pvcs = append(pvcs, pvc)
+	}
+
+	return pvcs, nil
+}
+
 // Add a persistent volume to the pod spec for each spec.servers.volumeMounts.
 // The volumes are first created via persistentVolumeClaims
 // Volumes that already exist are reused.
@@ -856,6 +902,102 @@ func SnapshotMountPaths(mounts *couchbasev2.VolumeMounts) []string {
 	}
 
 	return paths
+}
+
+// SnapshotRestoreMember is a backed up member, and where the restore puts it in the target.
+type SnapshotRestoreMember struct {
+	// Name is the member's name.
+	Name string
+
+	// Config is the target's server class the member goes back into.
+	Config *couchbasev2.ServerConfig
+
+	// Snapshots is the snapshot taken of each of the member's volumes, by mount path.
+	Snapshots map[string]string
+
+	// ServerGroup and AvailabilityZone are where the member ran, empty for older runs.
+	ServerGroup      string
+	AvailabilityZone string
+}
+
+// SnapshotRestoreMembers returns every member in the run, sorted by name, each with
+// the target's server class it goes back into. That's the class recorded on the run,
+// or for older runs without it, the class whose volumes match the member's. The class
+// must have the same volumes the member was backed up with, so every snapshot has a
+// volume to go into. The validator and the restore both use it, so they always agree.
+func SnapshotRestoreMembers(target *couchbasev2.CouchbaseCluster, run *couchbasev2.CouchbaseSnapshotBackupRun) ([]SnapshotRestoreMember, error) {
+	byName := map[string]*SnapshotRestoreMember{}
+	recorded := map[string]string{}
+
+	for _, snapshot := range run.Status.Snapshots {
+		if snapshot.MountPath == "" {
+			return nil, fmt.Errorf("run %s doesn't record where member %s's volumes were mounted", run.Name, snapshot.Member)
+		}
+
+		member, ok := byName[snapshot.Member]
+		if !ok {
+			member = &SnapshotRestoreMember{Name: snapshot.Member, Snapshots: map[string]string{}}
+			byName[snapshot.Member] = member
+		}
+
+		member.Snapshots[snapshot.MountPath] = snapshot.SnapshotName
+
+		if snapshot.ServerClass != "" {
+			recorded[snapshot.Member] = snapshot.ServerClass
+		}
+
+		if snapshot.ServerGroup != "" {
+			member.ServerGroup = snapshot.ServerGroup
+			member.AvailabilityZone = snapshot.AvailabilityZone
+		}
+	}
+
+	members := make([]SnapshotRestoreMember, 0, len(byName))
+
+	for _, member := range byName {
+		paths := make([]string, 0, len(member.Snapshots))
+		for path := range member.Snapshots {
+			paths = append(paths, path)
+		}
+
+		layout := snapshotLayout(paths)
+
+		if class := recorded[member.Name]; class != "" {
+			member.Config = target.Spec.GetServerConfigByName(class)
+			if member.Config == nil {
+				return nil, fmt.Errorf("member %s was backed up in server class %s, which cluster %s doesn't have", member.Name, class, target.Name)
+			}
+
+			if classLayout := snapshotLayout(SnapshotMountPaths(member.Config.GetVolumeMounts())); classLayout != layout {
+				return nil, fmt.Errorf("member %s was backed up with volumes [%s], but server class %s in cluster %s has [%s]", member.Name, layout, class, target.Name, classLayout)
+			}
+		} else {
+			for i := range target.Spec.Servers {
+				if snapshotLayout(SnapshotMountPaths(target.Spec.Servers[i].GetVolumeMounts())) == layout {
+					member.Config = &target.Spec.Servers[i]
+					break
+				}
+			}
+
+			if member.Config == nil {
+				return nil, fmt.Errorf("member %s was backed up with volumes [%s], but no server class in cluster %s has the same volumes", member.Name, layout, target.Name)
+			}
+		}
+
+		members = append(members, *member)
+	}
+
+	sort.Slice(members, func(i, j int) bool { return members[i].Name < members[j].Name })
+
+	return members, nil
+}
+
+// snapshotLayout returns the mount paths sorted and joined, so two layouts can be compared.
+func snapshotLayout(paths []string) string {
+	sorted := slices.Clone(paths)
+	sort.Strings(sorted)
+
+	return strings.Join(sorted, ", ")
 }
 
 func GetAnalyticsVolumePaths(mounts *couchbasev2.VolumeMounts) []string {
@@ -1212,6 +1354,16 @@ func CreateCouchbasePodSpec(m couchbaseutil.Member, cluster *couchbasev2.Couchba
 			if isPathPersisted(pvc, couchbaseVolumeDefaultConfigDir) {
 				initContainer := couchbaseInitContainer(cluster, pvc.Name, serverConfig, image)
 				pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
+
+				// A volume made by a snapshot restore needs a node remap before Couchbase starts.
+				if _, ok := pvc.Annotations[constants.AnnotationSnapshotRestoreRemap]; ok {
+					remap, err := couchbaseRemapInitContainer(cluster, pvc.Name, serverConfig, image, pvc.Annotations[constants.AnnotationSnapshotRestoreRemapID])
+					if err != nil {
+						return nil, err
+					}
+
+					pod.Spec.InitContainers = append(pod.Spec.InitContainers, remap)
+				}
 			}
 		}
 	}
@@ -2155,6 +2307,48 @@ func couchbaseInitContainer(cluster *couchbasev2.CouchbaseCluster, claimName str
 
 	return initContainer
 }
+
+// couchbaseRemapInitContainer runs the Couchbase node remap tool on a restored volume before
+// Couchbase starts, to turn off auto failover. The operator turns it back on from the cluster
+// spec once the cluster is up. The tool can't write over the folder it reads from, so we write to
+// a separate folder on the volume and copy that back. It only runs once, it leaves a file on the
+// volume, and a restarted pod sees the file and skips it.
+func couchbaseRemapInitContainer(cluster *couchbasev2.CouchbaseCluster, claimName string, config couchbasev2.ServerConfig, image, restoreID string) (v1.Container, error) {
+	// A restored volume can carry done files from earlier restores in its backup, so the file is
+	// named after the restore. Older ones are removed so they don't end up in later backups.
+	if !remapRestoreID.MatchString(restoreID) {
+		return v1.Container{}, fmt.Errorf("volume %s has a bad restore UID %q", claimName, restoreID)
+	}
+
+	done := "$D/.snapshot-restore-remapped-" + restoreID
+
+	container := couchbaseInitContainer(cluster, claimName, config, image)
+	container.Name = fmt.Sprintf("%s-remap", constants.CouchbaseContainerName)
+
+	// The node remap tool needs a lot more memory than the small init container, so we use the
+	// same CPU and memory as the Couchbase container.
+	container.Resources = couchbaseContainer(cluster, &config, image).Resources
+
+	container.Args = []string{"bash", "-c", `D=/opt/couchbase/var/lib/couchbase
+if [ ! -e "` + done + `" ]; then
+  rm -rf "$D/.snapshot-restore-remap" &&
+  /opt/couchbase/bin/node_remap --initargs "$D/initargs" --output-path "$D/.snapshot-restore-remap" --just-disable-auto-failover &&
+  cp -Rf "$D/.snapshot-restore-remap/." "$D/" &&
+  rm -rf "$D/.snapshot-restore-remap" "$D"/.snapshot-restore-remapped* &&
+  touch "` + done + `"
+fi`}
+
+	// Mounted the same way as the Couchbase container, since the node remap tool reads the paths saved in initargs.
+	container.VolumeMounts = []v1.VolumeMount{
+		{Name: claimName, MountPath: couchbaseVolumeDefaultConfigDir, SubPath: defaultSubPathName},
+		{Name: claimName, MountPath: couchbaseVolumeDefaultEtcDir, SubPath: etcSubPathName},
+	}
+
+	return container, nil
+}
+
+// remapRestoreID matches a k8s UID, the only thing that goes into the done file's name.
+var remapRestoreID = regexp.MustCompile(`^[a-z0-9-]+$`)
 
 // createCloudNativeGatewayContainer creates a new Cloud Native Gateway container based on inputs from manifest.
 func createCloudNativeGatewayContainer(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) v1.Container {

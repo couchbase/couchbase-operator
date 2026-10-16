@@ -17,8 +17,10 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/client"
+	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
 	cbfake "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned/fake"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -281,6 +283,91 @@ func TestUpdateCRSpecAnnotationSkipsReplacedCluster(t *testing.T) {
 
 	if _, ok := got.Annotations[constants.AnnotationLastReconciledSpec]; ok {
 		t.Errorf("expected the new cluster to have no lastReconciledSpec annotation, got %v", got.Annotations)
+	}
+}
+
+// fakeSavedState is a saved state kept in memory, for tests.
+type fakeSavedState map[persistence.PersistentKind]string
+
+func (f fakeSavedState) Insert(kind persistence.PersistentKind, value string) error {
+	f[kind] = value
+	return nil
+}
+
+func (f fakeSavedState) Upsert(kind persistence.PersistentKind, value string) error {
+	f[kind] = value
+	return nil
+}
+
+func (f fakeSavedState) Update(kind persistence.PersistentKind, value string) error {
+	f[kind] = value
+	return nil
+}
+
+func (f fakeSavedState) Delete(kind persistence.PersistentKind) error {
+	delete(f, kind)
+	return nil
+}
+
+func (f fakeSavedState) DeleteXDCR(string) error {
+	return nil
+}
+
+func (f fakeSavedState) Get(kind persistence.PersistentKind) (string, error) {
+	value, ok := f[kind]
+	if !ok {
+		return "", persistence.ErrKeyError
+	}
+
+	return value, nil
+}
+
+func (f fakeSavedState) Clear() error {
+	return nil
+}
+
+// TestReloadSavedPassword checks a cluster waking from hibernation picks up a password that was saved
+// while it slept, like the one a snapshot restore puts there, and keeps its own when none is saved.
+func TestReloadSavedPassword(t *testing.T) {
+	testcases := []struct {
+		name     string
+		saved    fakeSavedState
+		expected string
+	}{
+		{
+			name:     "a different password was saved",
+			saved:    fakeSavedState{persistence.Password: "backup-time-password"},
+			expected: "backup-time-password",
+		},
+		{
+			name:     "the same password is saved",
+			saved:    fakeSavedState{persistence.Password: "current-password"},
+			expected: "current-password",
+		},
+		{
+			name:     "no password is saved",
+			saved:    fakeSavedState{},
+			expected: "current-password",
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			c := &Cluster{
+				state:    testcase.saved,
+				password: "current-password",
+				api:      couchbaseutil.New(t.Context(), "default/cb-example", "Administrator", "current-password", logf.Log.WithName("test")),
+				log:      logf.Log.WithName("test"),
+			}
+
+			if err := c.reloadSavedPassword(); err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+
+			if c.password != testcase.expected {
+				t.Errorf("expected password %q, got %q", testcase.expected, c.password)
+			}
+		})
 	}
 }
 

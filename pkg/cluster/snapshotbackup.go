@@ -25,6 +25,7 @@ import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/robfig/cron/v3"
 	"golang.org/x/sync/errgroup"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -407,6 +408,27 @@ func (c *Cluster) createSnapshotBackupRun(backup *couchbasev2.CouchbaseBackup, b
 	return c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseSnapshotBackupRuns(c.cluster.Namespace).UpdateStatus(context.Background(), created, metav1.UpdateOptions{})
 }
 
+// saveSnapshotBackupRunAdmin keeps the admin login the cluster has right now, since the restored
+// data only accepts that one. The Secret is owned by the run, so it goes when the run does.
+func (c *Cluster) saveSnapshotBackupRunAdmin(run *couchbasev2.CouchbaseSnapshotBackupRun) error {
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            run.AdminSecretCopyName(),
+			Namespace:       run.Namespace,
+			Labels:          k8sutil.LabelsForCluster(c.cluster),
+			OwnerReferences: []metav1.OwnerReference{run.AsOwner()},
+		},
+		Data: map[string][]byte{
+			constants.AuthSecretUsernameKey: []byte(c.username),
+			constants.AuthSecretPasswordKey: []byte(c.password),
+		},
+	}
+
+	_, err := c.k8s.KubeClient.CoreV1().Secrets(run.Namespace).Create(context.Background(), secret, metav1.CreateOptions{})
+
+	return err
+}
+
 // backfillDataVolumeLabels makes sure every non log PVC for this cluster carries the label
 // a group snapshot selector needs, including ones created before that label existed. A
 // label update never requires recreating the PVC.
@@ -502,9 +524,12 @@ func (c *Cluster) captureIndividualSnapshots(backup *couchbasev2.CouchbaseBackup
 	className := backup.Spec.SnapshotBackup.VolumeSnapshotClassName
 
 	type volumeToSnapshot struct {
-		member    string
-		pvc       string
-		mountPath string
+		member           string
+		pvc              string
+		mountPath        string
+		serverClass      string
+		serverGroup      string
+		availabilityZone string
 	}
 
 	var volumes []volumeToSnapshot
@@ -519,7 +544,14 @@ func (c *Cluster) captureIndividualSnapshots(backup *couchbasev2.CouchbaseBackup
 				continue
 			}
 
-			volumes = append(volumes, volumeToSnapshot{member: member.Name(), pvc: pvc.Name, mountPath: pvc.Annotations[constants.AnnotationVolumeMountPath]})
+			volumes = append(volumes, volumeToSnapshot{
+				member:      member.Name(),
+				pvc:         pvc.Name,
+				mountPath:   pvc.Annotations[constants.AnnotationVolumeMountPath],
+				serverClass:      pvc.Annotations[constants.AnnotationVolumeNodeConf],
+				serverGroup:      k8sutil.PVCServerGroup(pvc),
+				availabilityZone: k8sutil.PVCAvailabilityZone(pvc),
+			})
 		}
 	}
 
@@ -542,6 +574,9 @@ func (c *Cluster) captureIndividualSnapshots(backup *couchbasev2.CouchbaseBackup
 				VolumeName:   volume.pvc,
 				SnapshotName: snapshotName,
 				MountPath:    volume.mountPath,
+				ServerClass:      volume.serverClass,
+				ServerGroup:      volume.serverGroup,
+				AvailabilityZone: volume.availabilityZone,
 			}
 
 			return nil
@@ -731,8 +766,9 @@ func isOwnedByGroupSnapshot(owners []metav1.OwnerReference, groupSnapshotName st
 }
 
 // snapshotBackupRunEntries turns a group snapshot's snapshots into the list recorded on the
-// run. memberForPVC returns the member a PVC belongs to, and mountPathForPVC where it's mounted.
-func snapshotBackupRunEntries(snapshots []snapshotv1.VolumeSnapshot, memberForPVC, mountPathForPVC func(string) string) []couchbasev2.CouchbaseSnapshotBackupRunSnapshot {
+// run. memberForPVC returns the member a PVC belongs to, mountPathForPVC where it's mounted,
+// serverClassForPVC the server class it belongs to, and placementForPVC its server group and zone.
+func snapshotBackupRunEntries(snapshots []snapshotv1.VolumeSnapshot, memberForPVC, mountPathForPVC, serverClassForPVC func(string) string, placementForPVC func(string) (string, string)) []couchbasev2.CouchbaseSnapshotBackupRunSnapshot {
 	var entries []couchbasev2.CouchbaseSnapshotBackupRunSnapshot
 
 	for _, snapshot := range snapshots {
@@ -741,11 +777,16 @@ func snapshotBackupRunEntries(snapshots []snapshotv1.VolumeSnapshot, memberForPV
 			pvc = *snapshot.Spec.Source.PersistentVolumeClaimName
 		}
 
+		group, zone := placementForPVC(pvc)
+
 		entries = append(entries, couchbasev2.CouchbaseSnapshotBackupRunSnapshot{
-			Member:       memberForPVC(pvc),
-			VolumeName:   pvc,
-			SnapshotName: snapshot.Name,
-			MountPath:    mountPathForPVC(pvc),
+			Member:           memberForPVC(pvc),
+			VolumeName:       pvc,
+			SnapshotName:     snapshot.Name,
+			MountPath:        mountPathForPVC(pvc),
+			ServerClass:      serverClassForPVC(pvc),
+			ServerGroup:      group,
+			AvailabilityZone: zone,
 		})
 	}
 
@@ -1067,7 +1108,7 @@ func (c *Cluster) validateSnapshotBackupRun(run *couchbasev2.CouchbaseSnapshotBa
 
 		// A group snapshot's snapshots are only known now, so record them for restore.
 		if run.Status.GroupSnapshot {
-			run.Status.Snapshots = snapshotBackupRunEntries(snapshots, c.memberForPVC, c.mountPathForPVC)
+			run.Status.Snapshots = snapshotBackupRunEntries(snapshots, c.memberForPVC, c.mountPathForPVC, c.serverClassForPVC, c.placementForPVC)
 		}
 	case couchbasev2.CouchbaseSnapshotBackupRunPhaseInvalid:
 		run.Status.Phase = check.phase
@@ -1112,6 +1153,24 @@ func (c *Cluster) mountPathForPVC(name string) string {
 	}
 
 	return ""
+}
+
+// serverClassForPVC returns the server class a PVC belongs to, from its serverConfig annotation.
+func (c *Cluster) serverClassForPVC(name string) string {
+	if pvc, ok := c.k8s.PersistentVolumeClaims.Get(name); ok {
+		return pvc.Annotations[constants.AnnotationVolumeNodeConf]
+	}
+
+	return ""
+}
+
+// placementForPVC returns the server group and zone the operator recorded on a PVC.
+func (c *Cluster) placementForPVC(name string) (string, string) {
+	if pvc, ok := c.k8s.PersistentVolumeClaims.Get(name); ok {
+		return k8sutil.PVCServerGroup(pvc), k8sutil.PVCAvailabilityZone(pvc)
+	}
+
+	return "", ""
 }
 
 // cleanupOldSnapshotBackupRuns deletes the backup's runs that are older than its
@@ -1272,7 +1331,10 @@ func (c *Cluster) reconcileSnapshotBackupFor(backup *couchbasev2.CouchbaseBackup
 		return err
 	}
 
-	captureErr := c.captureSnapshots(backup, run)
+	captureErr := c.saveSnapshotBackupRunAdmin(run)
+	if captureErr == nil {
+		captureErr = c.captureSnapshots(backup, run)
+	}
 
 	endTime := metav1.Now()
 	run.Status.EndTime = &endTime

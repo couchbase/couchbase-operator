@@ -221,6 +221,15 @@ const (
 	EnabledValue = "enabled"
 )
 
+// AnnotationSnapshotRestoreRemap marks a volume made by a snapshot restore. The member's pod runs
+// the Couchbase node remap tool once before Couchbase starts, to turn off auto failover while the
+// restored cluster comes back.
+const AnnotationSnapshotRestoreRemap = "snapshot.couchbase.com/remap"
+
+// AnnotationSnapshotRestoreRemapID is the UID of the restore that made a volume. The node remap's
+// done file is named after it, so a done file that came back from an earlier restore doesn't count.
+const AnnotationSnapshotRestoreRemapID = "snapshot.couchbase.com/remap-id"
+
 // Represents the Kubernetes version by its major and minor parts. The first
 // two digits represent the major version and the last two digits represent the
 // minor version. We do not track the maintenance version.

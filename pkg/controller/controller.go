@@ -332,7 +332,7 @@ func (r *CouchbaseClusterReconciler) reconcileFailedValidationCluster(c *cluster
 
 // AddToManager registers a controller reconciler with the manager and triggers updates
 // when CouchbaseCluster objects are modified.
-func AddToManager(mgr manager.Manager, concurrency int, clusterConfig cluster.Config) error {
+func AddToManager(mgr manager.Manager, concurrency, restoreConcurrency int, clusterConfig cluster.Config) error {
 	r := &CouchbaseClusterReconciler{
 		client:            mgr.GetClient(),
 		clusters:          CreateManagedClusters(),
@@ -378,5 +378,36 @@ func AddToManager(mgr manager.Manager, concurrency int, clusterConfig cluster.Co
 		&handler.TypedEnqueueRequestForObject[*couchbasev2.CouchbaseEncryptionKey]{},
 	)
 
-	return ekController.Watch(ekSrc)
+	if err := ekController.Watch(ekSrc); err != nil {
+		return err
+	}
+
+	// Register the snapshot restore controller, which carries out snapshot backup restores
+	restoreReconciler, err := newSnapshotBackupRestoreReconciler(mgr)
+	if err != nil {
+		return err
+	}
+
+	// Restores are rare, so one at a time is enough unless more are asked for.
+	if restoreConcurrency < 1 {
+		restoreConcurrency = 1
+	}
+
+	restoreOptions := controller.Options{
+		Reconciler:              restoreReconciler,
+		MaxConcurrentReconciles: restoreConcurrency,
+	}
+
+	restoreController, err := controller.New("couchbase-snapshot-restore-controller", mgr, restoreOptions)
+	if err != nil {
+		return err
+	}
+
+	restoreSrc := source.Kind(
+		mgr.GetCache(),
+		&couchbasev2.CouchbaseSnapshotBackupRestore{},
+		&handler.TypedEnqueueRequestForObject[*couchbasev2.CouchbaseSnapshotBackupRestore]{},
+	)
+
+	return restoreController.Watch(restoreSrc)
 }

@@ -51,6 +51,11 @@ func (c *CouchbaseCluster) AsOwner() metav1.OwnerReference {
 	}
 }
 
+// AdminSecretCopyName is the Secret holding the admin login from when the run was taken.
+func (r *CouchbaseSnapshotBackupRun) AdminSecretCopyName() string {
+	return r.Name + "-admin"
+}
+
 // AsOwner returns an owner reference to the CouchbaseSnapshotBackupRun, used on every snapshot
 // the run takes, so deleting the run also deletes its snapshots.
 func (r *CouchbaseSnapshotBackupRun) AsOwner() metav1.OwnerReference {
@@ -59,6 +64,20 @@ func (r *CouchbaseSnapshotBackupRun) AsOwner() metav1.OwnerReference {
 	return metav1.OwnerReference{
 		APIVersion:         SchemeGroupVersion.String(),
 		Kind:               SnapshotBackupRunCRDResourceKind,
+		Name:               r.Name,
+		UID:                r.UID,
+		Controller:         &trueVar,
+		BlockOwnerDeletion: &trueVar,
+	}
+}
+
+// AsOwner returns an owner reference for the restore, for the objects it makes.
+func (r *CouchbaseSnapshotBackupRestore) AsOwner() metav1.OwnerReference {
+	trueVar := true
+
+	return metav1.OwnerReference{
+		APIVersion:         SchemeGroupVersion.String(),
+		Kind:               SnapshotBackupRestoreCRDResourceKind,
 		Name:               r.Name,
 		UID:                r.UID,
 		Controller:         &trueVar,

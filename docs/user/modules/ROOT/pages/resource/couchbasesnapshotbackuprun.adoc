@@ -44,8 +44,11 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbasesnapshotbackupruns-status-phase,phase>>: InProgress
   <<couchbasesnapshotbackupruns-status-reason,reason>>: ""
   <<couchbasesnapshotbackupruns-status-snapshots,snapshots>>:
-  - <<couchbasesnapshotbackupruns-status-snapshots-member,member>>: ""
+  - <<couchbasesnapshotbackupruns-status-snapshots-availabilityzone,availabilityZone>>: ""
+    <<couchbasesnapshotbackupruns-status-snapshots-member,member>>: ""
     <<couchbasesnapshotbackupruns-status-snapshots-mountpath,mountPath>>: ""
+    <<couchbasesnapshotbackupruns-status-snapshots-serverclass,serverClass>>: ""
+    <<couchbasesnapshotbackupruns-status-snapshots-servergroup,serverGroup>>: ""
     <<couchbasesnapshotbackupruns-status-snapshots-snapshotname,snapshotName>>: ""
     <<couchbasesnapshotbackupruns-status-snapshots-volumename,volumeName>>: ""
   <<couchbasesnapshotbackupruns-status-starttime,startTime>>: ""
@@ -376,6 +379,18 @@ entry per volume.
 A restore reads this list directly to know exactly which snapshot
 to restore each volume from.
 
+=== couchbasesnapshotbackupruns.status.snapshots.availabilityZone
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+AvailabilityZone is the zone the volume was in, from its pvc.couchbase.com/availabilityZone
+annotation.
+Restore makes the new volume in the same zone.
+
 === couchbasesnapshotbackupruns.status.snapshots.member
 
 ==== Constraints
@@ -399,6 +414,30 @@ Member is the name of the pod/member this volume belonged to.
 MountPath is where this volume is mounted in the pod, for example /mnt/data.
 Restore
 uses it to put each snapshot back as the right volume.
+
+=== couchbasesnapshotbackupruns.status.snapshots.serverClass
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+ServerClass is the spec.servers entry the member belonged to.
+Restore uses it to give each
+restored volume the right server class.
+
+=== couchbasesnapshotbackupruns.status.snapshots.serverGroup
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+ServerGroup is the server group the member was in, from its volume's
+pvc.couchbase.com/serverGroup annotation.
+Restore puts the member back in the same group.
 
 === couchbasesnapshotbackupruns.status.snapshots.snapshotName
 
