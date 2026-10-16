@@ -371,7 +371,7 @@ If unspecified, continuous backup will be disabled.
 This is only supported on buckets with storageBackend=magma, and cannot be enabled unless
 change history is also enabled for the bucket, meaning spec.historyRetention.seconds and/or
 spec.historyRetention.bytes must be set to a non-zero value.
-This field is available in Couchbase Server 8.1.0 and later.
+This field is available in Couchbase Server 8.5.0 and later.
 
 === couchbasebuckets.spec.continuousBackup.cloudCredentialId
 
@@ -512,7 +512,7 @@ rebalance.
 During the backfill phase of a vBucket move the server can either copy the vBucket
 files directly from the source node to the destination node, which is significantly faster and
 uses less CPU, memory and network, or stream the data over DCP as it did before Couchbase
-Server 8.1.0.
+Server 8.5.0.
 - "auto" lets the cluster manager choose for each move.
 In most cases, this is the right choice
 - "preferFileBased" asks it to favour file based moves wherever possible
@@ -528,7 +528,7 @@ what this is set to.
 The value is still accepted and stored in that case, and takes effect if
 the cluster level switch is turned back on.
 Defaults to "auto".
-This field is available in Couchbase Server 8.1.0 and later.
+This field is available in Couchbase Server 8.5.0 and later.
 
 === couchbasebuckets.spec.durabilityImpossibleFallback
 
@@ -1081,7 +1081,7 @@ unlimited, which means the bucket has no ceiling of its own and may use as much 
 as is available at the time (still bounded by the cluster's nodeCapacity, if one is set).
 Rate limiting only takes effect when it is enabled at the cluster level via
 spec.cluster.data.kvThrottle.enabled.
-This field is available in Couchbase Server 8.1.0 and later.
+This field is available in Couchbase Server 8.5.0 and later.
 
 === couchbasebuckets.spec.throttleReserved
 
@@ -1107,7 +1107,7 @@ bucket has no guaranteed minimum and instead competes for whatever throughput is
 the shared node capacity.
 Rate limiting only takes effect when it is enabled at the
 cluster level via spec.cluster.data.kvThrottle.enabled.
-This field is available in Couchbase Server 8.1.0 and later.
+This field is available in Couchbase Server 8.5.0 and later.
 
 === couchbasebuckets.spec.versionPruningWindowHrs
 

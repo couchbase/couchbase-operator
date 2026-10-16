@@ -206,7 +206,7 @@ func derefUint64(v *uint64) interface{} {
 
 // TestGatherEphemeralBucketsKVThrottle is the ephemeral bucket version of
 // TestGatherCouchbaseBucketsKVThrottle, values the user set are kept, omitted values fall back to
-// the server defaults (0 reserved, max uint64 hard limit), and nothing is set below 8.1.
+// the server defaults (0 reserved, max uint64 hard limit), and nothing is set below 8.5.0.
 func TestGatherEphemeralBucketsKVThrottle(t *testing.T) {
 	reserved := int64(3000)
 	hardLimit := int64(6000)
@@ -513,7 +513,7 @@ func intPtr(i int) *int {
 // TestGatherBucketsDataServiceRebalanceType checks the per bucket Data Service rebalance type for
 // both couchbase and ephemeral buckets, which support the setting identically: values the user set
 // are passed through, an omitted value falls back to the server's own default of "auto", and nothing
-// is set below 8.1.0 where the field does not exist.
+// is set below 8.5.0 where the field does not exist.
 //
 // The defaulting is the important part. See TestGatherBucketsRebalanceTypeIsIdempotent for why.
 func TestGatherBucketsDataServiceRebalanceType(t *testing.T) {
@@ -590,7 +590,7 @@ func TestGatherBucketsDataServiceRebalanceType(t *testing.T) {
 			expectedValue: "auto",
 		},
 		{
-			// Below 8.1.0 the field must stay empty so that FormEncode omits it entirely, rather
+			// Below 8.5.0 the field must stay empty so that FormEncode omits it entirely, rather
 			// than sending a key the server does not understand.
 			name:          "not set when the feature is unsupported",
 			supported:     false,

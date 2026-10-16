@@ -46,7 +46,7 @@ kind: CouchbaseCluster
 metadata:
   name: cluster1
 spec:
-  image: couchbase/server:8.1.0
+  image: couchbase/server:8.5.0
   security:
     adminSecret: cb-example-auth
     rbac:
@@ -66,7 +66,7 @@ spec:
   cluster:
     dataServiceMemoryQuota: 4048Mi
 status:
-  currentVersion: 8.1.0
+  currentVersion: 8.5.0
   size: 1
 ---
 apiVersion: v1

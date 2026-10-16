@@ -525,13 +525,13 @@ func (c *Cluster) reconcileClusterSettings() error {
 
 // reconcileFileBasedRebalanceEnabled reconciles the cluster wide Data Service file based rebalance
 // switch, which users set with the cao.couchbase.com/dataServiceFileBasedRebalanceEnabled
-// annotation. Available in Couchbase Server 8.1.0+.
+// annotation. Available in Couchbase Server 8.5.0+.
 //
 // The setting lives on /internalSettings, and InternalSettings struct models only that one key, so the other
 // internal settings are dropped on read and never sent on write. POST to /internalSettings is a
 // partial update, so this cannot clobber values the operator does not manage.
 func (c *Cluster) reconcileFileBasedRebalanceEnabled() error {
-	if !c.SupportsVersionFeatures("8.1.0") {
+	if !c.SupportsVersionFeatures("8.5.0") {
 		c.log.V(1).Info("File based rebalance setting not supported on this version", "cluster", c.namespacedName())
 		return nil
 	}
@@ -581,7 +581,7 @@ func (c *Cluster) reconcileRebalanceSettings() error {
 	if rebalance := c.cluster.Spec.ClusterSettings.Rebalance; rebalance != nil {
 		requested.RebalanceMovesPerNode = ptr.To(ptr.Deref(rebalance.MovesPerNode, constants.RebalanceMovesPerNodeDefault))
 
-		if c.SupportsVersionFeatures("8.1.0") {
+		if c.SupportsVersionFeatures("8.5.0") {
 			requested.DataServiceFileBasedRebalanceMovesPerNode = ptr.To(ptr.Deref(rebalance.FileBasedMovesPerNode, constants.RebalanceMovesPerNodeDefault))
 		}
 	}
@@ -918,11 +918,11 @@ func (c *Cluster) reconcileMemcachedDataSettings() error {
 
 // applyKVThrottleSettings overlays the cluster level KV rate limiting settings (throttle_enabled,
 // node_capacity) onto the requested memcached globals. These are supported by Couchbase Server from
-// 8.1.0. We only write them when the user has set kvThrottle; if the block is absent we leave the
+// 8.5.0. We only write them when the user has set kvThrottle; if the block is absent we leave the
 // server's current values as they are, so to turn throttling off the user must explicitly set
 // enabled to false.
 func (c *Cluster) applyKVThrottleSettings(requested *couchbaseutil.MemcachedGlobals) {
-	if !c.SupportsVersionFeatures("8.1.0") {
+	if !c.SupportsVersionFeatures("8.5.0") {
 		return
 	}
 

@@ -2625,7 +2625,7 @@ func TestUpgradePrevent3Versions(t *testing.T) {
 
 	// Step 2: Attempt to change to a third version while in mixed mode
 	// This should be REJECTED by the DAC
-	thirdVersionImage := "couchbase/server:enterprise-8.1.0" // Hypothetical third version
+	thirdVersionImage := "couchbase/server:enterprise-8.5.0" // Hypothetical third version
 
 	// Attempt to patch to third version - this should fail validation
 	// MustNotPatchCluster will die if the patch succeeds, which it shouldn't

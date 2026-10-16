@@ -1676,7 +1676,7 @@ that the other buckets sharing the cluster suffer degraded performance.
 It is most useful
 in multi-tenant clusters where each bucket serves a different tenant or application.
 Per bucket limits are set via spec.throttleReserved and spec.throttleHardLimit.
-This field is available in Couchbase Server 8.1.0 and later.
+This field is available in Couchbase Server 8.5.0 and later.
 
 === couchbaseclusters.spec.cluster.data.kvThrottle.enabled
 
@@ -2627,7 +2627,7 @@ moves are governed by spec.cluster.rebalance.movesPerNode.
 Defaults to 4 on the server.
 Leaving it unset while spec.cluster.rebalance is present resets it
 to that default.
-This field is available in Couchbase Server 8.1.0 and later.
+This field is available in Couchbase Server 8.5.0 and later.
 
 === couchbaseclusters.spec.cluster.rebalance.movesPerNode
 

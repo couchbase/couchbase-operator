@@ -166,7 +166,7 @@ const (
 	RebalanceModeFileBased RebalanceMode = "file-based"
 
 	// RebalanceModeDCP pins the master switch off, so every vBucket move streams over DCP, which
-	// is the pre-8.1.0 behaviour.
+	// is the pre-8.5.0 behaviour.
 	RebalanceModeDCP RebalanceMode = "dcp"
 )
 

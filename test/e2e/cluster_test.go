@@ -1280,9 +1280,9 @@ func TestModifyDataServiceSettings(t *testing.T) {
 		numPatches += 4
 	}
 
-	if after81, err := couchbaseutil.VersionAfter(cbVersion, "8.1.0"); err != nil {
+	if after85, err := couchbaseutil.VersionAfter(cbVersion, "8.5.0"); err != nil {
 		e2eutil.Die(t, err)
-	} else if after81 {
+	} else if after85 {
 		// KV rate limiting cluster level settings. Enable throttling and set a node capacity, then
 		// check the server reports the same values back via the memcached global settings endpoint.
 		nodeCapacity := int64(10000)
@@ -1307,11 +1307,11 @@ func TestModifyDataServiceSettings(t *testing.T) {
 }
 
 // TestModifyRebalanceEnabledAndSettings covers the two cluster wide rebalance controls added for Couchbase
-// Server 8.1.0: the file based rebalance switch, set with an annotation and written to
+// Server 8.5.0: the file based rebalance switch, set with an annotation and written to
 // /internalSettings, and vBucket move concurrency, set in spec.cluster.rebalance and written to
 // /settings/rebalance.
 //
-// The whole test requires 8.1.0+, because these settings do not exist before then. The
+// The whole test requires 8.5.0+, because these settings do not exist before then. The
 // behaviour of movesPerNode on an older cluster, which is deliberately not version gated, belongs
 // with the upgrade tests instead.
 func TestModifyRebalanceEnabledAndSettings(t *testing.T) {
@@ -1321,7 +1321,7 @@ func TestModifyRebalanceEnabledAndSettings(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).AtLeastVersion("8.1.0")
+	framework.Requires(t, kubernetes).AtLeastVersion("8.5.0")
 
 	// Static configuration.
 	clusterSize := 1

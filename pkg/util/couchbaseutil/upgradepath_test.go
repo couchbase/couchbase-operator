@@ -37,7 +37,7 @@ func TestGetUpgradePath(t *testing.T) {
 		{"7.8.0", 4},
 		{"8.0.0", 4},
 		{"8.0.1", 4},
-		{"8.1.0", 4},
+		{"8.5.0", 4},
 	}
 
 	for _, expectedGroup := range expectedGroups {
@@ -67,7 +67,7 @@ func TestValidUpgrades(t *testing.T) {
 		{"7.2.3", "7.6.0"},
 		{"7.2.3", "8.0.0"},
 		{"7.6.0", "8.0.0"},
-		{"8.0.0", "8.1.0"},
+		{"8.0.0", "8.5.0"},
 	}
 
 	for _, u := range validUpgrades {
@@ -119,7 +119,7 @@ func TestCheckUpgradePath(t *testing.T) {
 		{"7.1.6", "8.0.0", "The next version on the recommended upgrade path should be >= 7.2.0 and < 7.2.4"},
 		{"7.6.0", "7.2.4", "Downgrades are not supported"},
 		{"8.0.0", "10.0.0", "Version must be less than 9.0.0"},
-		{"8.1.0", "10.1.5", "Version must be less than 9.1.0"},
+		{"8.5.0", "10.1.5", "Version must be less than 9.5.0"},
 	}
 
 	for _, u := range invalidUpgrades {

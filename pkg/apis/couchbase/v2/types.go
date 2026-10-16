@@ -1083,7 +1083,7 @@ type CouchbaseBackupRestoreSpec struct {
 	// spec.overwriteUsers, or a disabled service in spec.services is rejected, because those
 	// have no equivalent and would otherwise be silently dropped.
 	// +optional
-	// +couchbase:version:minimum=8.1.0
+	// +couchbase:version:minimum=8.5.0
 	ContinuousBackup *CouchbaseBackupRestoreContinuousBackup `json:"continuousBackup,omitempty" annotation:"continuousBackup"`
 }
 
@@ -1093,7 +1093,7 @@ type CouchbaseBackupRestoreSpec struct {
 const ContinuousBackupRestoreTargetEverything = "everything"
 
 // CouchbaseBackupRestoreContinuousBackup configures a point in time recovery from continuous
-// backups.  It is only available with Couchbase Server 8.1.0 and later.
+// backups.  It is only available with Couchbase Server 8.5.0 and later.
 type CouchbaseBackupRestoreContinuousBackup struct {
 	// Location is the continuous backup storage location to recover from, matching the
 	// spec.continuousBackup.location of the bucket that wrote them.  This is either a path on a
@@ -2044,7 +2044,7 @@ type CouchbaseBucketSpec struct {
 	// change history is also enabled for the bucket, meaning spec.historyRetention.seconds and/or
 	// spec.historyRetention.bytes must be set to a non-zero value.
 	// +optional
-	// +couchbase:version:minimum=8.1.0
+	// +couchbase:version:minimum=8.5.0
 	ContinuousBackup *ContinuousBackupSettings `json:"continuousBackup,omitempty"`
 
 	// MagmaSeqTreeDataBlockSize is the block size, in bytes, for Magma seqIndex blocks.
@@ -2138,7 +2138,7 @@ type CouchbaseBucketSpec struct {
 	// the shared node capacity. Rate limiting only takes effect when it is enabled at the
 	// cluster level via spec.cluster.data.kvThrottle.enabled.
 	// +kubebuilder:validation:Minimum=0
-	// +couchbase:version:minimum=8.1.0
+	// +couchbase:version:minimum=8.5.0
 	ThrottleReserved *int64 `json:"throttleReserved,omitempty"`
 
 	// ThrottleHardLimit is the maximum KV throughput, in units per second, that this bucket may
@@ -2149,14 +2149,14 @@ type CouchbaseBucketSpec struct {
 	// Rate limiting only takes effect when it is enabled at the cluster level via
 	// spec.cluster.data.kvThrottle.enabled.
 	// +kubebuilder:validation:Minimum=0
-	// +couchbase:version:minimum=8.1.0
+	// +couchbase:version:minimum=8.5.0
 	ThrottleHardLimit *int64 `json:"throttleHardLimit,omitempty"`
 
 	// DataServiceRebalanceType controls how the Data Service moves this bucket's vBuckets during a
 	// rebalance. During the backfill phase of a vBucket move the server can either copy the vBucket
 	// files directly from the source node to the destination node, which is significantly faster and
 	// uses less CPU, memory and network, or stream the data over DCP as it did before Couchbase
-	// Server 8.1.0.
+	// Server 8.5.0.
 	// - "auto" lets the cluster manager choose for each move. In most cases, this is the right choice
 	// - "preferFileBased" asks it to favour file based moves wherever possible
 	// - "preferDcp" asks it to favour DCP.
@@ -2169,7 +2169,7 @@ type CouchbaseBucketSpec struct {
 	// what this is set to. The value is still accepted and stored in that case, and takes effect if
 	// the cluster level switch is turned back on.
 	// Defaults to "auto".
-	// +couchbase:version:minimum=8.1.0
+	// +couchbase:version:minimum=8.5.0
 	// +optional
 	DataServiceRebalanceType DataServiceRebalanceType `json:"dataServiceRebalanceType,omitempty"`
 }
@@ -2213,7 +2213,7 @@ type CouchbaseBucketStatus struct {
 }
 
 // ContinuousBackupSettings configures continuous backup for a bucket. Continuous backup is only
-// available on Couchbase Server 8.1.0 and later, and only for buckets using the magma storage
+// available on Couchbase Server 8.5.0 and later, and only for buckets using the magma storage
 // backend.
 type ContinuousBackupSettings struct {
 	// Enabled turns continuous backup on or off. This field defaults to false.
@@ -2464,7 +2464,7 @@ type CouchbaseEphemeralBucketSpec struct {
 	// the shared node capacity. Rate limiting only takes effect when it is enabled at the
 	// cluster level via spec.cluster.data.kvThrottle.enabled.
 	// +kubebuilder:validation:Minimum=0
-	// +couchbase:version:minimum=8.1.0
+	// +couchbase:version:minimum=8.5.0
 	ThrottleReserved *int64 `json:"throttleReserved,omitempty"`
 
 	// ThrottleHardLimit is the maximum KV throughput, in units per second, that this bucket may
@@ -2475,14 +2475,14 @@ type CouchbaseEphemeralBucketSpec struct {
 	// Rate limiting only takes effect when it is enabled at the cluster level via
 	// spec.cluster.data.kvThrottle.enabled.
 	// +kubebuilder:validation:Minimum=0
-	// +couchbase:version:minimum=8.1.0
+	// +couchbase:version:minimum=8.5.0
 	ThrottleHardLimit *int64 `json:"throttleHardLimit,omitempty"`
 
 	// DataServiceRebalanceType controls how the Data Service moves this bucket's vBuckets during a
 	// rebalance. During the backfill phase of a vBucket move the server can either copy the vBucket
 	// files directly from the source node to the destination node, which is significantly faster and
 	// uses less CPU, memory and network, or stream the data over DCP as it did before Couchbase
-	// Server 8.1.0.
+	// Server 8.5.0.
 	// - "auto" lets the cluster manager choose for each move. In most cases, this is the right choice
 	// - "preferFileBased" asks it to favour file based moves wherever possible
 	// - "preferDcp" asks it to favour DCP.
@@ -2495,7 +2495,7 @@ type CouchbaseEphemeralBucketSpec struct {
 	// what this is set to. The value is still accepted and stored in that case, and takes effect if
 	// the cluster level switch is turned back on.
 	// Defaults to "auto".
-	// +couchbase:version:minimum=8.1.0
+	// +couchbase:version:minimum=8.5.0
 	// +optional
 	DataServiceRebalanceType DataServiceRebalanceType `json:"dataServiceRebalanceType,omitempty"`
 }
@@ -4767,7 +4767,7 @@ type ClusterConfig struct {
 	// The cluster manager still chooses the method for each move: backfill generally uses file based
 	// transfer while takeover uses DCP, and DCP is used unconditionally while a storage migration or
 	// an eviction policy change is pending.
-	// This is a master switch. Setting it to false makes every move use DCP, which is the pre-8.1.0
+	// This is a master switch. Setting it to false makes every move use DCP, which is the pre-8.5.0
 	// behaviour, and no bucket can opt back in: a bucket's spec.dataServiceRebalanceType of
 	// "preferFileBased" is still accepted and stored, but has no effect until this is true again.
 	// Individual buckets can only narrow the choice within an enabled cluster, by asking for DCP with
@@ -5194,7 +5194,7 @@ func (q *CouchbaseClusterQuerySettings) MarshalJSON() ([]byte, error) {
 // network, and may degrade the performance of the Data Service while the rebalance runs.
 //
 // Note the two fields have different minimum server versions: movesPerNode has existed for many
-// releases, while fileBasedMovesPerNode is new in Couchbase Server 8.1.0.
+// releases, while fileBasedMovesPerNode is new in Couchbase Server 8.5.0.
 type ClusterRebalanceSettings struct {
 	// MovesPerNode is the number of concurrent vBucket moves per node during a DCP rebalance.
 	// A higher setting may improve rebalance performance at the cost of higher resource consumption,
@@ -5215,7 +5215,7 @@ type ClusterRebalanceSettings struct {
 	// to that default.
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=64
-	// +couchbase:version:minimum=8.1.0
+	// +couchbase:version:minimum=8.5.0
 	// +optional
 	FileBasedMovesPerNode *int `json:"fileBasedMovesPerNode,omitempty"`
 }
@@ -5320,7 +5320,7 @@ type CouchbaseClusterDataSettings struct {
 	// that the other buckets sharing the cluster suffer degraded performance. It is most useful
 	// in multi-tenant clusters where each bucket serves a different tenant or application.
 	// Per bucket limits are set via spec.throttleReserved and spec.throttleHardLimit.
-	// +couchbase:version:minimum=8.1.0
+	// +couchbase:version:minimum=8.5.0
 	// +optional
 	KVThrottle *KVThrottleSettings `json:"kvThrottle,omitempty"`
 }

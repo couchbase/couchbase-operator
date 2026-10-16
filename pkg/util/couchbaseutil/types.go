@@ -984,7 +984,7 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 
 		// Continuous backup is magma only, so it is read back here alongside the other magma
 		// settings. A nil enabled means the server does not report the feature at all. Note that
-		// some servers before 8.1.0 (e.g. 8.0.2) still report enabled=false, so callers must
+		// some servers before 8.5.0 (e.g. 8.0.2) still report enabled=false, so callers must
 		// ignore these fields when the cluster does not support continuous backup.
 		//
 		// The rest are only read back while the feature is on, mirroring what the operator puts on

@@ -223,7 +223,7 @@ accepts a smaller set of options.
 Setting this alongside spec.start, spec.end,
 spec.overwriteUsers, or a disabled service in spec.services is rejected, because those
 have no equivalent and would otherwise be silently dropped.
-This field is available in Couchbase Server 8.1.0 and later.
+This field is available in Couchbase Server 8.5.0 and later.
 
 === couchbasebackuprestores.spec.continuousBackup.autoResolveConflicts
 

@@ -42,7 +42,7 @@ func recordBucketRef(tracker *unreconcilable.Tracker, kind, bucketName, crName s
 
 // continuousBackupMinVersion is the first Couchbase Server release with per bucket continuous
 // backup, and so the first with the backup service roles the feature reads and writes.
-const continuousBackupMinVersion = "8.1.0"
+const continuousBackupMinVersion = "8.5.0"
 
 type SupportedFeature int
 
@@ -576,13 +576,13 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 
 	supportedFeatures[Additional80Settings] = atleast80
 
-	// KV rate limiting (per bucket throttleReserved and throttleHardLimit) is available in 8.1.0+.
-	supportedFeatures[SupportedKVThrottle] = c.SupportsVersionFeatures("8.1.0")
+	// KV rate limiting (per bucket throttleReserved and throttleHardLimit) is available in 8.5.0+.
+	supportedFeatures[SupportedKVThrottle] = c.SupportsVersionFeatures("8.5.0")
 
-	// Per bucket Data Service rebalance type (dataServiceRebalanceType) is available in 8.1.0+.
-	supportedFeatures[SupportedFileBasedRebalance] = c.SupportsVersionFeatures("8.1.0")
+	// Per bucket Data Service rebalance type (dataServiceRebalanceType) is available in 8.5.0+.
+	supportedFeatures[SupportedFileBasedRebalance] = c.SupportsVersionFeatures("8.5.0")
 
-	// Per bucket continuous backup is available in 8.1.0+, and only for magma buckets.
+	// Per bucket continuous backup is available in 8.5.0+, and only for magma buckets.
 	supportedFeatures[SupportedContinuousBackup] = c.SupportsVersionFeatures(continuousBackupMinVersion)
 
 	allBuckets := []couchbaseutil.Bucket{}
@@ -797,7 +797,7 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []bucketUpdate, []co
 					a.NumVBuckets = nil
 				}
 
-				// Servers before 8.1.0 can still report continuous backup settings (e.g. 8.0.2
+				// Servers before 8.5.0 can still report continuous backup settings (e.g. 8.0.2
 				// returns continuousBackupEnabled=false), but the operator does not manage them
 				// there, so ignore them to avoid a permanent diff.
 				if !supportedContinuousBackup {

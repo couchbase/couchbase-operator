@@ -2027,12 +2027,12 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 }
 
 // TestValidationRebalanceSettings covers the admission time validation for the file based rebalance
-// controls added in Couchbase Server 8.1.0, at both the cluster and the bucket level.
+// controls added in Couchbase Server 8.5.0, at both the cluster and the bucket level.
 func TestValidationRebalanceSettings(t *testing.T) {
 	const (
-		fileBasedMovesErr  = `spec.cluster.rebalance.fileBasedMovesPerNode can only be set for Couchbase Server 8.1.0\+`
-		rebalanceTypeErr   = `spec.dataServiceRebalanceType can only be set for Couchbase Server 8.1.0\+`
-		annotationWarning  = `dataServiceFileBasedRebalanceEnabled.*has no effect on Couchbase Server releases before 8.1.0`
+		fileBasedMovesErr  = `spec.cluster.rebalance.fileBasedMovesPerNode can only be set for Couchbase Server 8.5.0\+`
+		rebalanceTypeErr   = `spec.dataServiceRebalanceType can only be set for Couchbase Server 8.5.0\+`
+		annotationWarning  = `dataServiceFileBasedRebalanceEnabled.*has no effect on Couchbase Server releases before 8.5.0`
 		fileBasedRebalance = pkgconstants.AnnotationDataServiceFileBasedRebalanceEnabled
 	)
 
@@ -2057,7 +2057,7 @@ func TestValidationRebalanceSettings(t *testing.T) {
 			expectedErrors: []string{fileBasedMovesErr},
 		},
 		{
-			// movesPerNode is not an 8.1 feature and must be accepted on this 8.0.0 cluster.
+			// movesPerNode is not an 8.5 feature and must be accepted on this 8.0.0 cluster.
 			name: "TestValidateRebalanceMovesPerNodeAcceptedBefore81",
 			mutations: patchMap{"cluster1": jsonpatch.NewPatchSet().
 				Add("/spec/cluster/rebalance", &couchbasev2.ClusterRebalanceSettings{
@@ -2094,7 +2094,7 @@ func TestValidationRebalanceSettings(t *testing.T) {
 }
 
 // TestValidationContinuousBackup covers the admission time validation for per bucket continuous
-// backup, which is a Couchbase Server 8.1.0 magma only feature.
+// backup, which is a Couchbase Server 8.5.0 magma only feature.
 func TestValidationContinuousBackup(t *testing.T) {
 	const (
 		locationErr   = `spec.continuousBackup.location must be set when spec.continuousBackup.enabled is true`
@@ -2375,19 +2375,19 @@ func TestValidationContinuousBackup(t *testing.T) {
 		},
 	}
 
-	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-81.yaml"})
+	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-85.yaml"})
 }
 
 // TestValidationContinuousBackupUnsupportedVersion checks that continuous backup is rejected
-// outright on a cluster older than Couchbase Server 8.1.0, which is where the feature was
+// outright on a cluster older than Couchbase Server 8.5.0, which is where the feature was
 // introduced. It runs against the 8.0.0 fixture for that reason.
 func TestValidationContinuousBackupUnsupportedVersion(t *testing.T) {
 	const (
-		versionErr = `spec.continuousBackup can only be set for Couchbase Server 8.1.0\+`
+		versionErr = `spec.continuousBackup can only be set for Couchbase Server 8.5.0\+`
 
 		// A recovery is refused by a different check, which names the cluster it found too old,
 		// so it reads differently from the bucket's.
-		restoreVersionErr = `spec.continuousBackup can only be used with Couchbase Server 8.1.0\+, cluster .* is older`
+		restoreVersionErr = `spec.continuousBackup can only be used with Couchbase Server 8.5.0\+, cluster .* is older`
 	)
 
 	testDefs := []testDef{
@@ -2806,7 +2806,7 @@ func TestValidationRestoreContinuousBackup(t *testing.T) {
 		},
 	}
 
-	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-81.yaml"})
+	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-85.yaml"})
 }
 
 func TestCBVersionSpecificPosValidationsCreateCouchbaseClusterSettings(t *testing.T) {

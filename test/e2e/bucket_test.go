@@ -447,9 +447,9 @@ func TestEditBucket(t *testing.T) {
 		patchCycles += 6
 	}
 
-	if isAtleast81, err := couchbaseutil.VersionAfter(cbVersion, "8.1.0"); err != nil {
+	if isAtleast85, err := couchbaseutil.VersionAfter(cbVersion, "8.5.0"); err != nil {
 		e2eutil.Die(t, err)
-	} else if isAtleast81 {
+	} else if isAtleast85 {
 		// KV rate limiting per bucket settings. Set throttleReserved and throttleHardLimit on the
 		// bucket, then check the server reports the same values back. This proves the operator both
 		// sends these fields and reads them back under the names the reconciler expects.
@@ -482,7 +482,7 @@ func TestEditBucket(t *testing.T) {
 
 // TestEditEphemeralBucketKVThrottle sets throttleReserved/throttleHardLimit on an ephemeral bucket
 // and checks the server reports the same values back. TestEditBucket covers couchbase buckets, this
-// covers the separate ephemeral path. Skipped below Couchbase Server 8.1.0.
+// covers the separate ephemeral path. Skipped below Couchbase Server 8.5.0.
 func TestEditEphemeralBucketKVThrottle(t *testing.T) {
 	f := framework.Global
 
@@ -492,10 +492,10 @@ func TestEditEphemeralBucketKVThrottle(t *testing.T) {
 	framework.Requires(t, kubernetes).CouchbaseBucket()
 
 	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
-	if isAtleast81, err := couchbaseutil.VersionAfter(cbVersion, "8.1.0"); err != nil {
+	if isAtleast85, err := couchbaseutil.VersionAfter(cbVersion, "8.5.0"); err != nil {
 		e2eutil.Die(t, err)
-	} else if !isAtleast81 {
-		t.Skip("KV rate limiting requires Couchbase Server 8.1.0 or later")
+	} else if !isAtleast85 {
+		t.Skip("KV rate limiting requires Couchbase Server 8.5.0 or later")
 	}
 
 	bucket := e2eutil.MustNewBucket(t, kubernetes, &couchbasev2.CouchbaseEphemeralBucket{
@@ -527,10 +527,10 @@ func TestBucketContinuousBackup(t *testing.T) {
 	framework.Requires(t, kubernetes).CouchbaseBucket()
 
 	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
-	if isAtleast81, err := couchbaseutil.VersionAfter(cbVersion, "8.1.0"); err != nil {
+	if isAtleast85, err := couchbaseutil.VersionAfter(cbVersion, "8.5.0"); err != nil {
 		e2eutil.Die(t, err)
-	} else if !isAtleast81 {
-		t.Skip("per bucket continuous backup requires Couchbase Server 8.1.0 or later")
+	} else if !isAtleast85 {
+		t.Skip("per bucket continuous backup requires Couchbase Server 8.5.0 or later")
 	}
 
 	const (
@@ -647,10 +647,10 @@ func testBucketContinuousBackupS3(t *testing.T, withKMS bool) {
 	}
 
 	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
-	if isAtleast81, err := couchbaseutil.VersionAfter(cbVersion, "8.1.0"); err != nil {
+	if isAtleast85, err := couchbaseutil.VersionAfter(cbVersion, "8.5.0"); err != nil {
 		e2eutil.Die(t, err)
-	} else if !isAtleast81 {
-		t.Skip("per bucket continuous backup requires Couchbase Server 8.1.0 or later")
+	} else if !isAtleast85 {
+		t.Skip("per bucket continuous backup requires Couchbase Server 8.5.0 or later")
 	}
 
 	const (
@@ -809,10 +809,10 @@ func testBucketContinuousBackupS3RestoreAll(t *testing.T, withKMS bool) {
 	}
 
 	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
-	if isAtleast81, err := couchbaseutil.VersionAfter(cbVersion, "8.1.0"); err != nil {
+	if isAtleast85, err := couchbaseutil.VersionAfter(cbVersion, "8.5.0"); err != nil {
 		e2eutil.Die(t, err)
-	} else if !isAtleast81 {
-		t.Skip("per bucket continuous backup requires Couchbase Server 8.1.0 or later")
+	} else if !isAtleast85 {
+		t.Skip("per bucket continuous backup requires Couchbase Server 8.5.0 or later")
 	}
 
 	const (
@@ -1009,10 +1009,10 @@ func TestBucketDataServiceRebalanceType(t *testing.T) {
 	framework.Requires(t, kubernetes).CouchbaseBucket()
 
 	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
-	if isAtleast81, err := couchbaseutil.VersionAfter(cbVersion, "8.1.0"); err != nil {
+	if isAtleast85, err := couchbaseutil.VersionAfter(cbVersion, "8.5.0"); err != nil {
 		e2eutil.Die(t, err)
-	} else if !isAtleast81 {
-		t.Skip("per bucket Data Service rebalance type requires Couchbase Server 8.1.0 or later")
+	} else if !isAtleast85 {
+		t.Skip("per bucket Data Service rebalance type requires Couchbase Server 8.5.0 or later")
 	}
 
 	// The values a user can explicitly ask for but "auto" since it's the default behaviour.

@@ -60,7 +60,7 @@ const (
 
 	// continuousBackupMinimumServerVersion is the Couchbase Server release continuous backup, and
 	// therefore recovering from it, arrived in.
-	continuousBackupMinimumServerVersion = "8.1.0"
+	continuousBackupMinimumServerVersion = "8.5.0"
 
 	// continuousBackupMinimumBackupImageVersion is the backup image release that first carried
 	// cbcontbk, the tool a point in time recovery runs.
@@ -2494,19 +2494,19 @@ func checkBucketContinuousBackupKeyManagement(config *couchbasev2.ContinuousBack
 }
 
 // checkBucketContinuousBackupVersion rejects spec.continuousBackup on clusters running a Couchbase
-// Server release older than 8.1.0, which is when the feature was introduced.
+// Server release older than 8.5.0, which is when the feature was introduced.
 func checkBucketContinuousBackupVersion(cluster *couchbasev2.CouchbaseCluster, config *couchbasev2.ContinuousBackupSettings) error {
 	if config == nil {
 		return nil
 	}
 
-	atLeast81, err := cluster.IsAtLeastVersion("8.1.0")
+	atLeast85, err := cluster.IsAtLeastVersion("8.5.0")
 	if err != nil {
 		return err
 	}
 
-	if !atLeast81 {
-		return fmt.Errorf("spec.continuousBackup can only be set for Couchbase Server 8.1.0+")
+	if !atLeast85 {
+		return fmt.Errorf("spec.continuousBackup can only be set for Couchbase Server 8.5.0+")
 	}
 
 	return nil
@@ -4403,7 +4403,7 @@ func checkConstraintRestoreContinuousBackupKMS(v *types.Validator, restore *couc
 
 // checkConstraintRestoreContinuousBackupSupported rejects a recovery the environment cannot run.
 //
-// Continuous backup arrived in Couchbase Server 8.1.0, and the tool that recovers from it arrived
+// Continuous backup arrived in Couchbase Server 8.5.0, and the tool that recovers from it arrived
 // in the 1.7.0 backup image. Without these checks a mismatch shows up as a container that exits
 // with "command not found", or a server rejecting settings it has never heard of, neither of
 // which points at the real problem.
@@ -4420,13 +4420,13 @@ func checkConstraintRestoreContinuousBackupSupported(v *types.Validator, restore
 	for i := range clusters.Items {
 		cluster := &clusters.Items[i]
 
-		atLeast81, err := cluster.IsAtLeastVersion(continuousBackupMinimumServerVersion)
+		atLeast85, err := cluster.IsAtLeastVersion(continuousBackupMinimumServerVersion)
 		if err != nil {
 			// A version we cannot read is not a version we can reject on.
 			continue
 		}
 
-		if !atLeast81 {
+		if !atLeast85 {
 			return fmt.Errorf("spec.continuousBackup can only be used with Couchbase Server %s+, cluster %s is older",
 				continuousBackupMinimumServerVersion, cluster.NamespacedName())
 		}
@@ -7735,44 +7735,44 @@ func checkConstraintsDataSettings(v *types.Validator, cluster *couchbasev2.Couch
 // Couchbase Server release..
 //
 // spec.cluster.rebalance.movesPerNode is intentionally not checked here it predates file based rebalance
-// and is not dependent on 8.1.0+. The 1 to 64 range for both fields is enforced by the CRD schema, so it does not need repeating here.
+// and is not dependent on 8.5.0+. The 1 to 64 range for both fields is enforced by the CRD schema, so it does not need repeating here.
 func checkConstraintsRebalanceSettings(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	rebalance := cluster.Spec.ClusterSettings.Rebalance
 	if rebalance == nil || rebalance.FileBasedMovesPerNode == nil {
 		return nil
 	}
 
-	atLeast81, err := cluster.IsAtLeastVersion("8.1.0")
+	atLeast85, err := cluster.IsAtLeastVersion("8.5.0")
 	if err != nil {
 		return err
 	}
 
-	if !atLeast81 {
-		return fmt.Errorf("spec.cluster.rebalance.fileBasedMovesPerNode can only be set for Couchbase Server 8.1.0+")
+	if !atLeast85 {
+		return fmt.Errorf("spec.cluster.rebalance.fileBasedMovesPerNode can only be set for Couchbase Server 8.5.0+")
 	}
 
 	return nil
 }
 
 // checkConstraintFileBasedRebalanceSupported warns when the file based rebalance annotation is set on
-// a cluster running a Couchbase Server release older than 8.1.0, where the setting does not exist.
+// a cluster running a Couchbase Server release older than 8.5.0, where the setting does not exist.
 func checkConstraintFileBasedRebalanceSupported(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
 	if cluster.Spec.ClusterSettings.FileBasedRebalanceEnabled == nil {
 		return nil, nil
 	}
 
-	atLeast81, err := cluster.IsAtLeastVersion("8.1.0")
+	atLeast85, err := cluster.IsAtLeastVersion("8.5.0")
 	if err != nil {
 		return nil, err
 	}
 
-	if atLeast81 {
+	if atLeast85 {
 		return nil, nil
 	}
 
 	return []string{
 		fmt.Sprintf("Annotation '%s' has no effect on Couchbase "+
-			"Server releases before 8.1.0 and will be ignored.", constants.AnnotationDataServiceFileBasedRebalanceEnabled),
+			"Server releases before 8.5.0 and will be ignored.", constants.AnnotationDataServiceFileBasedRebalanceEnabled),
 	}, nil
 }
 
@@ -8734,20 +8734,20 @@ func checkEphemeralBucketUnsupportedFields(v *types.Validator, bucket *couchbase
 }
 
 // checkBucketDataServiceRebalanceType rejects spec.dataServiceRebalanceType on clusters running a
-// Couchbase Server release older than 8.1.0, which is when the field was introduced. Shared by the
+// Couchbase Server release older than 8.5.0, which is when the field was introduced. Shared by the
 // couchbase and ephemeral bucket paths, both of which support the setting.
 func checkBucketDataServiceRebalanceType(cluster *couchbasev2.CouchbaseCluster, rebalanceType couchbasev2.DataServiceRebalanceType) error {
 	if rebalanceType == "" {
 		return nil
 	}
 
-	atLeast81, err := cluster.IsAtLeastVersion("8.1.0")
+	atLeast85, err := cluster.IsAtLeastVersion("8.5.0")
 	if err != nil {
 		return err
 	}
 
-	if !atLeast81 {
-		return fmt.Errorf("spec.dataServiceRebalanceType can only be set for Couchbase Server 8.1.0+")
+	if !atLeast85 {
+		return fmt.Errorf("spec.dataServiceRebalanceType can only be set for Couchbase Server 8.5.0+")
 	}
 
 	return nil

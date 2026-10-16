@@ -492,7 +492,7 @@ func configure() (err error) {
 		"TLS version to use.  Either 1.0, 1.1, 1.2, or 1.3. 1.3 requires at least Couchbase Server 7.1")
 	flag.Var(&rebalanceMode, "rebalance-mode",
 		"Data Service rebalance method to use for every cluster.  Either 'default' (leave the server "+
-			"default alone), 'file-based' or 'dcp'.  Requires at least Couchbase Server 8.1.0, and is "+
+			"default alone), 'file-based' or 'dcp'.  Requires at least Couchbase Server 8.5.0, and is "+
 			"ignored otherwise.")
 	flag.StringVar(&params.BackupStorageClassName, "backup-storage-class",
 		"",

@@ -100,8 +100,8 @@ func convertCouchbaseBucketToAPIBucket(bucket *couchbaseutil.Bucket, namer Bucke
 		}
 
 		// Only build the block when the server actually reported continuous backup. A server older
-		// than 8.1.0 does not know the feature, and synthesising an all nil block there would make
-		// the resulting resource fail the 8.1.0+ version check for a field the user never set.
+		// than 8.5.0 does not know the feature, and synthesising an all nil block there would make
+		// the resulting resource fail the 8.5.0+ version check for a field the user never set.
 		//
 		// Enabled alone is enough to test for. It is the one setting carried whatever the state of
 		// the feature, so the rest are non nil only when it is, and are left nil here otherwise.
