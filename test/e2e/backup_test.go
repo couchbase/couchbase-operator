@@ -820,8 +820,10 @@ func testFullIncrementalOverTLS(t *testing.T, providerType cloud.ProviderType) {
 	// wait for backups to complete
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupStartedEvent(cluster, backup.Name), 5*time.Minute)
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
+
+	// the started/completed events may occur at basically the same time, hence the MustObserveBackupEventFrom on the completed
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupStartedEvent(cluster, backup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
+	e2eutil.MustObserveBackupEventFrom(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 30*time.Second, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
