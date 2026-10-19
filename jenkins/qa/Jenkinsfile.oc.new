@@ -61,8 +61,6 @@ pipeline {
     DOCKER_CREDENTIALS = credentials('couchbaseqe-dockerhub')
     GITLAB_CREDENTIALS = credentials('couchbaseqe-gitlab')
     GHCR_CREDENTIALS = credentials('couchbaseqe-ghrc')
-    S3_ACCESS_KEY = credentials('CAO_AWS')
-    S3_SECRET_ID = credentials('CAO_AWS')
     AWS_CREDS = credentials('CAO_AWS')
     JIRA_USERNAME = "operator-bot@couchbase.com"
     JIRA_API_TOKEN = credentials('operator-bot-jira')
@@ -199,39 +197,41 @@ PYEOF
                 echo "Running ${suite} Test Suite"
 
                 try {
-                  sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/openshift-linux-amd64/cao certify \
-                  --clean \
-                  --parallel 6 \
-                  --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
-                  --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
-                  --storage-class ${params.storage_class} \
-                  --image ${params.certification_image} \
-                  --archive-name ${suite} \
-                  -- \
-                  -suite ${suite} \
-                  -platform-type openshift \
-                  -operator-image ${params.operator_image} \
-                  -admission-image ${params.admission_image} \
-                  -mobile-image ${params.mobile_image} \
-                  -server-image ${params.server_image} \
-                  ${params.server_image_version ? "-server-image-version ${params.server_image_version}" : ''} \
-                  -server-image-upgrade ${params.server_image_upgrade} \
-                  ${params.server_image_upgrade_version ? "-server-image-upgrade-version ${params.server_image_upgrade_version}" : ''} \
-                  -exporter-image ${params.exporter_image} \
-                  -exporter-image-upgrade ${params.exporter_image_upgrade} \
-                  -backup-image ${params.backup_image} \
-                  -logging-image ${params.logging_image} \
-                  -logging-image-upgrade ${params.logging_image_upgrade} \
-                  -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
-                  -lpv=${params.lpv} \
-                  -bucket-type ${params.bucket_type} \
-                  -compression-mode ${params.compression_mode} \
-                  -s3-region ${params.s3_region} \
-                  -s3-access-key ${env.S3_ACCESS_KEY} \
-                  -s3-secret-id ${env.S3_SECRET_ID} \
-                  -tls-version ${params.tls_version} \
-                  -collect-logs \
-                  -color=false"
+                  withCredentials([aws(accessKeyVariable: 'AWS_ACCESS_KEY_ID', credentialsId: 'CAO_AWS', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                    sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/openshift-linux-amd64/cao certify \
+                    --clean \
+                    --parallel 6 \
+                    --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
+                    --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
+                    --storage-class ${params.storage_class} \
+                    --image ${params.certification_image} \
+                    --archive-name ${suite} \
+                    -- \
+                    -suite ${suite} \
+                    -platform-type openshift \
+                    -operator-image ${params.operator_image} \
+                    -admission-image ${params.admission_image} \
+                    -mobile-image ${params.mobile_image} \
+                    -server-image ${params.server_image} \
+                    ${params.server_image_version ? "-server-image-version ${params.server_image_version}" : ''} \
+                    -server-image-upgrade ${params.server_image_upgrade} \
+                    ${params.server_image_upgrade_version ? "-server-image-upgrade-version ${params.server_image_upgrade_version}" : ''} \
+                    -exporter-image ${params.exporter_image} \
+                    -exporter-image-upgrade ${params.exporter_image_upgrade} \
+                    -backup-image ${params.backup_image} \
+                    -logging-image ${params.logging_image} \
+                    -logging-image-upgrade ${params.logging_image_upgrade} \
+                    -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
+                    -lpv=${params.lpv} \
+                    -bucket-type ${params.bucket_type} \
+                    -compression-mode ${params.compression_mode} \
+                    -s3-region ${params.s3_region} \
+                    -s3-access-key ${env.AWS_ACCESS_KEY_ID} \
+                    -s3-secret-id ${env.AWS_SECRET_ACCESS_KEY} \
+                    -tls-version ${params.tls_version} \
+                    -collect-logs \
+                    -color=false"
+                  }
                 } catch (e) {
                   currentBuild.result = 'UNSTABLE'
                 }
@@ -321,39 +321,41 @@ PYEOF
           echo "Running Custom Tests"
 
           try {
-            sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/openshift-linux-amd64/cao certify \
-            --clean \
-            --parallel 6 \
-            --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
-            --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
-            --storage-class ${params.storage_class} \
-            --image ${params.certification_image} \
-            --archive-name custom \
-            -- \
-            ${params.custom_args} \
-            -platform-type openshift \
-            -operator-image ${params.operator_image} \
-            -admission-image ${params.admission_image} \
-            -mobile-image ${params.mobile_image} \
-            -server-image ${params.server_image} \
-            ${params.server_image_version ? "-server-image-version ${params.server_image_version}" : ''} \
-            -server-image-upgrade ${params.server_image_upgrade} \
-            ${params.server_image_upgrade_version ? "-server-image-upgrade-version ${params.server_image_upgrade_version}" : ''} \
-            -exporter-image ${params.exporter_image} \
-            -exporter-image-upgrade ${params.exporter_image_upgrade} \
-            -backup-image ${params.backup_image} \
-            -logging-image ${params.logging_image} \
-            -logging-image-upgrade ${params.logging_image_upgrade} \
-            -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
-            -lpv=${params.lpv} \
-            -bucket-type ${params.bucket_type} \
-            -compression-mode ${params.compression_mode} \
-            -s3-region ${params.s3_region} \
-            -s3-access-key ${env.S3_ACCESS_KEY} \
-            -s3-secret-id ${env.S3_SECRET_ID} \
-            -tls-version ${params.tls_version} \
-            -collect-logs \
-            -color=false"
+            withCredentials([aws(accessKeyVariable: 'AWS_ACCESS_KEY_ID', credentialsId: 'CAO_AWS', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+              sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/openshift-linux-amd64/cao certify \
+              --clean \
+              --parallel 6 \
+              --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
+              --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
+              --storage-class ${params.storage_class} \
+              --image ${params.certification_image} \
+              --archive-name custom \
+              -- \
+              ${params.custom_args} \
+              -platform-type openshift \
+              -operator-image ${params.operator_image} \
+              -admission-image ${params.admission_image} \
+              -mobile-image ${params.mobile_image} \
+              -server-image ${params.server_image} \
+              ${params.server_image_version ? "-server-image-version ${params.server_image_version}" : ''} \
+              -server-image-upgrade ${params.server_image_upgrade} \
+              ${params.server_image_upgrade_version ? "-server-image-upgrade-version ${params.server_image_upgrade_version}" : ''} \
+              -exporter-image ${params.exporter_image} \
+              -exporter-image-upgrade ${params.exporter_image_upgrade} \
+              -backup-image ${params.backup_image} \
+              -logging-image ${params.logging_image} \
+              -logging-image-upgrade ${params.logging_image_upgrade} \
+              -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
+              -lpv=${params.lpv} \
+              -bucket-type ${params.bucket_type} \
+              -compression-mode ${params.compression_mode} \
+              -s3-region ${params.s3_region} \
+              -s3-access-key ${env.AWS_ACCESS_KEY_ID} \
+              -s3-secret-id ${env.AWS_SECRET_ACCESS_KEY} \
+              -tls-version ${params.tls_version} \
+              -collect-logs \
+              -color=false"
+            }
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
@@ -466,39 +468,41 @@ PYEOF
 
           if (failedTestsStr != '') {
             try {
-              sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/openshift-linux-amd64/cao certify \
-              --clean \
-              --parallel 6 \
-              --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
-              --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
-              --storage-class ${params.storage_class} \
-              --image ${params.certification_image} \
-              --archive-name first_rerun \
-              -- \
-              ${failedTestsStr} \
-              -platform-type openshift \
-              -operator-image ${params.operator_image} \
-              -admission-image ${params.admission_image} \
-              -mobile-image ${params.mobile_image} \
-              -server-image ${params.server_image} \
-              ${params.server_image_version ? "-server-image-version ${params.server_image_version}" : ''} \
-              -server-image-upgrade ${params.server_image_upgrade} \
-              ${params.server_image_upgrade_version ? "-server-image-upgrade-version ${params.server_image_upgrade_version}" : ''} \
-              -exporter-image ${params.exporter_image} \
-              -exporter-image-upgrade ${params.exporter_image_upgrade} \
-              -backup-image ${params.backup_image} \
-              -logging-image ${params.logging_image} \
-              -logging-image-upgrade ${params.logging_image_upgrade} \
-              -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
-              -lpv=${params.lpv} \
-              -bucket-type ${params.bucket_type} \
-              -compression-mode ${params.compression_mode} \
-              -s3-region ${params.s3_region} \
-              -s3-access-key ${env.S3_ACCESS_KEY} \
-              -s3-secret-id ${env.S3_SECRET_ID} \
-              -tls-version ${params.tls_version} \
-              -collect-logs \
-              -color=false"
+              withCredentials([aws(accessKeyVariable: 'AWS_ACCESS_KEY_ID', credentialsId: 'CAO_AWS', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/openshift-linux-amd64/cao certify \
+                --clean \
+                --parallel 6 \
+                --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
+                --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
+                --storage-class ${params.storage_class} \
+                --image ${params.certification_image} \
+                --archive-name first_rerun \
+                -- \
+                ${failedTestsStr} \
+                -platform-type openshift \
+                -operator-image ${params.operator_image} \
+                -admission-image ${params.admission_image} \
+                -mobile-image ${params.mobile_image} \
+                -server-image ${params.server_image} \
+                ${params.server_image_version ? "-server-image-version ${params.server_image_version}" : ''} \
+                -server-image-upgrade ${params.server_image_upgrade} \
+                ${params.server_image_upgrade_version ? "-server-image-upgrade-version ${params.server_image_upgrade_version}" : ''} \
+                -exporter-image ${params.exporter_image} \
+                -exporter-image-upgrade ${params.exporter_image_upgrade} \
+                -backup-image ${params.backup_image} \
+                -logging-image ${params.logging_image} \
+                -logging-image-upgrade ${params.logging_image_upgrade} \
+                -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
+                -lpv=${params.lpv} \
+                -bucket-type ${params.bucket_type} \
+                -compression-mode ${params.compression_mode} \
+                -s3-region ${params.s3_region} \
+                -s3-access-key ${env.AWS_ACCESS_KEY_ID} \
+                -s3-secret-id ${env.AWS_SECRET_ACCESS_KEY} \
+                -tls-version ${params.tls_version} \
+                -collect-logs \
+                -color=false"
+              }
             }
             catch (e) {
               currentBuild.result = 'UNSTABLE'
@@ -606,39 +610,41 @@ PYEOF
 
           if (failedTestsStr != '') {
             try {
-              sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/openshift-linux-amd64/cao certify \
-              --clean \
-              --parallel 6 \
-              --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
-              --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
-              --storage-class ${params.storage_class} \
-              --image ${params.certification_image} \
-              --archive-name second_rerun \
-              -- \
-              ${failedTestsStr} \
-              -platform-type openshift \
-              -operator-image ${params.operator_image} \
-              -admission-image ${params.admission_image} \
-              -mobile-image ${params.mobile_image} \
-              -server-image ${params.server_image} \
-              ${params.server_image_version ? "-server-image-version ${params.server_image_version}" : ''} \
-              -server-image-upgrade ${params.server_image_upgrade} \
-              ${params.server_image_upgrade_version ? "-server-image-upgrade-version ${params.server_image_upgrade_version}" : ''} \
-              -exporter-image ${params.exporter_image} \
-              -exporter-image-upgrade ${params.exporter_image_upgrade} \
-              -backup-image ${params.backup_image} \
-              -logging-image ${params.logging_image} \
-              -logging-image-upgrade ${params.logging_image_upgrade} \
-              -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
-              -lpv=${params.lpv} \
-              -bucket-type ${params.bucket_type} \
-              -compression-mode ${params.compression_mode} \
-              -s3-region ${params.s3_region} \
-              -s3-access-key ${env.S3_ACCESS_KEY} \
-              -s3-secret-id ${env.S3_SECRET_ID} \
-              -tls-version ${params.tls_version} \
-              -collect-logs \
-              -color=false"
+              withCredentials([aws(accessKeyVariable: 'AWS_ACCESS_KEY_ID', credentialsId: 'CAO_AWS', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/openshift-linux-amd64/cao certify \
+                --clean \
+                --parallel 6 \
+                --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
+                --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
+                --storage-class ${params.storage_class} \
+                --image ${params.certification_image} \
+                --archive-name second_rerun \
+                -- \
+                ${failedTestsStr} \
+                -platform-type openshift \
+                -operator-image ${params.operator_image} \
+                -admission-image ${params.admission_image} \
+                -mobile-image ${params.mobile_image} \
+                -server-image ${params.server_image} \
+                ${params.server_image_version ? "-server-image-version ${params.server_image_version}" : ''} \
+                -server-image-upgrade ${params.server_image_upgrade} \
+                ${params.server_image_upgrade_version ? "-server-image-upgrade-version ${params.server_image_upgrade_version}" : ''} \
+                -exporter-image ${params.exporter_image} \
+                -exporter-image-upgrade ${params.exporter_image_upgrade} \
+                -backup-image ${params.backup_image} \
+                -logging-image ${params.logging_image} \
+                -logging-image-upgrade ${params.logging_image_upgrade} \
+                -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
+                -lpv=${params.lpv} \
+                -bucket-type ${params.bucket_type} \
+                -compression-mode ${params.compression_mode} \
+                -s3-region ${params.s3_region} \
+                -s3-access-key ${env.AWS_ACCESS_KEY_ID} \
+                -s3-secret-id ${env.AWS_SECRET_ACCESS_KEY} \
+                -tls-version ${params.tls_version} \
+                -collect-logs \
+                -color=false"
+              }
             }
             catch (e) {
               currentBuild.result = 'UNSTABLE'
