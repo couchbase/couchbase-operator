@@ -4784,6 +4784,7 @@ type ClusterConfig struct {
 	// +kubebuilder:default="120s"
 	AutoFailoverTimeout *metav1.Duration `json:"autoFailoverTimeout,omitempty"`
 
+	// DEPRECATED - by Couchbase Server 8.5+, the setting will be removed in a future server release.
 	// AutoFailoverMaxCount is the maximum number of automatic failovers Couchbase server
 	// will allow before not allowing any more.  This field must be between 1-3 for server versions prior to 7.1.0
 	// default is 1.

@@ -163,6 +163,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkMigrationConstraints,
 		checkConstraintMemcachedBucketDeprecated,
 		checkServerClassImageDeprecated,
+		checkConstraintAutoFailoverMaxCountDeprecated,
 		checkConstraintsDeprecatedNetworkingOptions,
 		checkConstraintDeprecatedAnnotations,
 		checkConstraintDeprecatedRBACRoles,
@@ -7834,6 +7835,22 @@ func checkServerClassImageDeprecated(v *types.Validator, cluster *couchbasev2.Co
 	}
 
 	return nil, nil
+}
+
+// checkConstraintAutoFailoverMaxCountDeprecated warns when autoFailoverMaxCount is set on
+// Couchbase Server 8.5+, where the setting is deprecated. The CRD defaults the field to 1, so
+// we only warn when it has been changed from the default.
+func checkConstraintAutoFailoverMaxCountDeprecated(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+	deprecated, err := cluster.IsAtLeastVersion("8.5.0")
+	if err != nil {
+		return nil, err
+	}
+
+	if !deprecated || cluster.Spec.ClusterSettings.AutoFailoverMaxCount == 1 {
+		return nil, nil
+	}
+
+	return []string{"spec.cluster.autoFailoverMaxCount is deprecated in Couchbase Server 8.5 and will be removed in a future release"}, nil
 }
 
 // checkConstraintBucketsMeetMinReplicasCount warns when an existing CouchbaseBucket or

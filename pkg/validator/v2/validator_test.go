@@ -2140,3 +2140,38 @@ func TestCheckImmutableFieldsSnapshotBackupRestore(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckConstraintAutoFailoverMaxCountDeprecated(t *testing.T) {
+	testcases := []struct {
+		name        string
+		image       string
+		maxCount    uint64
+		expectsWarn bool
+	}{
+		{name: "changed on 8.5 warns", image: "couchbase/server:8.5.0", maxCount: 3, expectsWarn: true},
+		{name: "default on 8.5 is silent", image: "couchbase/server:8.5.0", maxCount: 1},
+		{name: "changed before 8.5 is silent", image: "couchbase/server:8.0.0", maxCount: 3},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			cluster := &couchbasev2.CouchbaseCluster{
+				Spec: couchbasev2.ClusterSpec{
+					Image: tc.image,
+					ClusterSettings: couchbasev2.ClusterConfig{
+						AutoFailoverMaxCount: tc.maxCount,
+					},
+				},
+			}
+
+			warnings, err := checkConstraintAutoFailoverMaxCountDeprecated(nil, cluster)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if got := len(warnings) > 0; got != tc.expectsWarn {
+				t.Errorf("expected warning %v, got %v", tc.expectsWarn, warnings)
+			}
+		})
+	}
+}
