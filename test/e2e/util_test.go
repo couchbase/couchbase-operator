@@ -902,7 +902,7 @@ func registerTests() {
 		framework.NewTestDef(TestDataSynchronizationOperatorRestart).WithTags(TagSuiteP1, TagFeatureSynchronization),
 
 		// System tests.
-		framework.NewTestDef(TestFeaturesAll).WithTags(TagSuiteSystem, TagSuiteP1),
+		framework.NewTestDef(TestFeaturesAll).WithTags(TagSuiteSystem),
 
 		// Local Persistent Volume tests
 		framework.NewTestDef(TestLocalVolumeMountReuse).WithTags(TagFeatureLPV),
