@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 )
 
 // Test scaling a cluster with no buckets up and down
@@ -1396,7 +1397,7 @@ func TestAppTelemetrySettings(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/appTelemetry", &couchbasev2.CouchbaseClusterAppTelemetrySettings{
-		Enabled: true,
+		Enabled: ptr.To(true),
 	}), time.Minute)
 	e2eutil.MustPatchAppTelemetrySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/Enabled", true), time.Minute)
 
@@ -1412,6 +1413,46 @@ func TestAppTelemetrySettings(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Repeat{Times: patchCycles, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestAppTelemetrySettingsClusterDefault checks the server default for app telemetry
+// is left alone when unset (disabled before 8.5.0, enabled from 8.5.0), and that
+// explicitly inverting it via the CRD is respected (Requires MB-69077 for 8.5.0 test pass).
+func TestAppTelemetrySettingsClusterDefault(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("8.0.0")
+
+	clusterSize := 3
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	atLeast85, err := cluster.IsAtLeastVersion("8.5.0")
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	// With no appTelemetry in the spec, the server default should be untouched.
+	e2eutil.MustPatchAppTelemetrySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/Enabled", atLeast85), time.Minute)
+
+	// Invert the default via the CRD and check it is applied.
+	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/appTelemetry", &couchbasev2.CouchbaseClusterAppTelemetrySettings{
+		Enabled: ptr.To(!atLeast85),
+	}), time.Minute)
+	e2eutil.MustPatchAppTelemetrySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/Enabled", !atLeast85), time.Minute)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)

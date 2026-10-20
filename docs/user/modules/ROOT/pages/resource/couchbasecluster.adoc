@@ -1265,15 +1265,14 @@ This field is available in Couchbase Server 8.0.0 and later.
 
 ==== Constraints
 
-*Required*
-
 *Type*: `boolean`
-
-*Default*: `False`
 
 ==== Description
 
 Enabled controls whether application telemetry is enabled.
+If not specified, the Couchbase Server default is used, which is disabled
+prior to Couchbase Server 8.5.0 and enabled from Couchbase Server 8.5.0.
+Set to false to opt out of application telemetry.
 
 === couchbaseclusters.spec.cluster.appTelemetry.maxScrapeClientsPerNode
 

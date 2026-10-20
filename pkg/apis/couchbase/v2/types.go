@@ -5128,8 +5128,10 @@ type CouchbaseClusterQuerySettings struct {
 // CouchbaseClusterAppTelemetrySettings allows application telemetry service tweaks.
 type CouchbaseClusterAppTelemetrySettings struct {
 	// Enabled controls whether application telemetry is enabled.
-	// +kubebuilder:default=false
-	Enabled bool `json:"enabled"`
+	// If not specified, the Couchbase Server default is used, which is disabled
+	// prior to Couchbase Server 8.5.0 and enabled from Couchbase Server 8.5.0.
+	// Set to false to opt out of application telemetry.
+	Enabled *bool `json:"enabled,omitempty"`
 
 	// MaxScrapeClientsPerNode sets the maximum number of scrape clients per node.
 	// Must be between 1 and 1024.

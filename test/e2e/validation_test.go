@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/utils/ptr"
 
 	utilErrors "github.com/couchbase/couchbase-operator/pkg/errors"
 )
@@ -2014,7 +2015,7 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Replace("/spec/image", "couchbase/server:8.0.0").
 				Add("/spec/cluster/appTelemetry", &couchbasev2.CouchbaseClusterAppTelemetrySettings{
-					Enabled:                 true,
+					Enabled:                 ptr.To(true),
 					MaxScrapeClientsPerNode: 2000,
 					ScrapeIntervalSeconds:   30,
 				})},

@@ -1453,9 +1453,14 @@ func (c *Cluster) reconcileAppTelemetrySettings() error {
 	}
 
 	requested := &couchbaseutil.AppTelemetrySettings{
-		Enabled:                 appTelemetrySettings.Enabled,
+		Enabled:                 current.Enabled,
 		MaxScrapeClientsPerNode: appTelemetrySettings.MaxScrapeClientsPerNode,
 		ScrapeIntervalSeconds:   appTelemetrySettings.ScrapeIntervalSeconds,
+	}
+
+	// Leave the server default in place unless explicitly configured.
+	if appTelemetrySettings.Enabled != nil {
+		requested.Enabled = *appTelemetrySettings.Enabled
 	}
 
 	if reflect.DeepEqual(current, requested) {
