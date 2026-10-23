@@ -613,3 +613,21 @@ func TestXDCRIsRemoteAuthError(t *testing.T) {
 		})
 	}
 }
+
+// A remote cluster the operator didn't create is never requested, so it gets deleted once its
+// replications are gone.
+func TestXDCRRemoteClusterDeletionsNotOperatorManaged(t *testing.T) {
+	current := couchbaseutil.RemoteClusters{
+		{Name: "remote"},
+		{Name: "remote-operator-managed"},
+	}
+
+	requested := couchbaseutil.RemoteClusters{
+		{Name: "remote-operator-managed"},
+	}
+
+	deletes := remoteClusterDeletions(current, requested)
+	if len(deletes) != 1 || deletes[0].Name != "remote" {
+		t.Fatalf("expected only remote to be deleted, got %v", deletes)
+	}
+}
