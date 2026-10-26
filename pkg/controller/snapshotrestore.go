@@ -415,6 +415,15 @@ func (r *CouchbaseSnapshotBackupRestoreReconciler) provision(ctx context.Context
 		return reconcile.Result{}, err
 	}
 
+	// Nodes named after the k8s nodes they run on get their new names from
+	// a list we fill in once their pods are placed. It starts empty, so the
+	// restored pods wait for it.
+	if k8sutil.UsesNodeHostnames(target) {
+		if err := r.resetRemapList(ctx, restore, target); err != nil {
+			return reconcile.Result{}, err
+		}
+	}
+
 	restore.Status.Phase = couchbasev2.CouchbaseSnapshotBackupRestorePhaseReadyToStart
 
 	return reconcile.Result{}, r.client.Status().Update(ctx, restore)
@@ -461,6 +470,18 @@ func (r *CouchbaseSnapshotBackupRestoreReconciler) seedTargetState(ctx context.C
 	state.Data[string(persistence.UUID)] = []byte(run.Spec.ClusterUUID)
 	state.Data[string(persistence.Version)] = []byte(run.Spec.ServerVersion)
 	state.Data[string(persistence.PodIndex)] = []byte(strconv.Itoa(podIndex))
+
+	// A cluster with a new name gets a new UUID from the node remap tool, so the operator reads it
+	// from the cluster once it's up.
+	if restoreSourceCluster(run) != target.Name {
+		state.Data[string(persistence.RefreshUUID)] = []byte("true")
+	}
+
+	// The restored volumes still list the backed up server certificate as loaded, so the
+	// operator reloads the cluster's own one once it's up.
+	if target.IsTLSEnabled() {
+		state.Data[string(persistence.ReloadTLS)] = []byte("true")
+	}
 
 	// The restored data only accepts the password from when the backup was taken. The operator
 	// logs in with it, then changes it to the target's admin secret like any password change.
@@ -511,19 +532,28 @@ func restorePodIndex(state *corev1.Secret, run *couchbasev2.CouchbaseSnapshotBac
 }
 
 // restoreVolumes returns every volume the restore has to make, one set per member in the run, each
-// made from the snapshot taken of it. The target is named the same as the backed up cluster, so the
-// members keep their names. All of the run's members are restored, even if the target asks for
-// fewer, the operator scales down afterwards.
+// made from the snapshot taken of it. Each member keeps its number and takes the target's cluster
+// name. All of the run's members are restored, even if the target asks for fewer, the operator
+// scales down afterwards.
 func restoreVolumes(target *couchbasev2.CouchbaseCluster, run *couchbasev2.CouchbaseSnapshotBackupRun, restoreID string) ([]*corev1.PersistentVolumeClaim, error) {
 	members, err := k8sutil.SnapshotRestoreMembers(target, run)
 	if err != nil {
 		return nil, err
 	}
 
+	// Each volume lists every backed up member's hostname, so the remap
+	// knows the old names.
+	pairs := make([]string, 0, len(members))
+	for i := range members {
+		pairs = append(pairs, members[i].Name+"="+run.Spec.Hostnames[members[i].Name])
+	}
+
+	remap := strings.Join(pairs, ",")
+
 	var volumes []*corev1.PersistentVolumeClaim
 
 	for i := range members {
-		memberVolumes, err := restoreMemberVolumes(target, &members[i], restoreID)
+		memberVolumes, err := restoreMemberVolumes(target, &members[i], remap, restoreID)
 		if err != nil {
 			return nil, err
 		}
@@ -534,9 +564,14 @@ func restoreVolumes(target *couchbasev2.CouchbaseCluster, run *couchbasev2.Couch
 	return volumes, nil
 }
 
-// restoreMemberVolumes returns the volumes for one member, each pointing at its snapshot and owned
-// by the target cluster, like the operator's own volumes.
-func restoreMemberVolumes(target *couchbasev2.CouchbaseCluster, restored *k8sutil.SnapshotRestoreMember, restoreID string) ([]*corev1.PersistentVolumeClaim, error) {
+// restoreMemberVolumes returns the volumes for one backed up member, each pointing at its snapshot
+// and owned by the target cluster, like the operator's own volumes.
+func restoreMemberVolumes(target *couchbasev2.CouchbaseCluster, restored *k8sutil.SnapshotRestoreMember, remap, restoreID string) ([]*corev1.PersistentVolumeClaim, error) {
+	name, err := restoreMemberName(target, restored.Name)
+	if err != nil {
+		return nil, err
+	}
+
 	config := restored.Config
 	image := target.Spec.ServerClassCouchbaseImage(config)
 
@@ -545,7 +580,7 @@ func restoreMemberVolumes(target *couchbasev2.CouchbaseCluster, restored *k8suti
 		return nil, err
 	}
 
-	member := couchbaseutil.NewMember(target.Namespace, target.Name, restored.Name, version, config.Name, target.IsTLSEnabled(), image)
+	member := couchbaseutil.NewMember(target.Namespace, target.Name, name, version, config.Name, target.IsTLSEnabled(), image)
 
 	volumes, err := k8sutil.MemberPersistentVolumeClaims(target, member, *config)
 	if err != nil {
@@ -566,8 +601,10 @@ func restoreMemberVolumes(target *couchbasev2.CouchbaseCluster, restored *k8suti
 		volume.OwnerReferences = []metav1.OwnerReference{target.AsOwner()}
 		volume.Spec.DataSource = &corev1.TypedLocalObjectReference{APIGroup: &snapshotGroup, Kind: "VolumeSnapshot", Name: snapshot}
 
-		// The member's pod runs a node remap before Couchbase starts, the restore removes the mark once it's done.
-		volume.Annotations[constants.AnnotationSnapshotRestoreRemap] = "true"
+		// The member's pod runs a node remap before Couchbase starts, and the restore removes the
+		// mark once it's done. If the target has a different name, the mark holds every backed up
+		// member's name, because each node needs the new names of all the others.
+		volume.Annotations[constants.AnnotationSnapshotRestoreRemap] = remap
 		volume.Annotations[constants.AnnotationSnapshotRestoreRemapID] = restoreID
 	}
 
@@ -580,6 +617,33 @@ func restoreMemberVolumes(target *couchbasev2.CouchbaseCluster, restored *k8suti
 	}
 
 	return volumes, nil
+}
+
+// restoreMemberName returns the target's name for a backed up member. It keeps the member's number
+// and uses the target's cluster name.
+func restoreMemberName(target *couchbasev2.CouchbaseCluster, member string) (string, error) {
+	index, err := couchbaseutil.GetIndexFromMemberName(member)
+	if err != nil {
+		return "", err
+	}
+
+	return couchbaseutil.CreateMemberName(target.Name, index), nil
+}
+
+// restoreSourceCluster returns the name of the cluster the run was taken from, from the run's label,
+// or for a run without it, from its member names.
+func restoreSourceCluster(run *couchbasev2.CouchbaseSnapshotBackupRun) string {
+	if name := run.Labels[constants.LabelCluster]; name != "" {
+		return name
+	}
+
+	for _, snapshot := range run.Status.Snapshots {
+		if len(snapshot.Member) > 5 {
+			return snapshot.Member[:len(snapshot.Member)-5]
+		}
+	}
+
+	return ""
 }
 
 // createVolumes makes any volume that doesn't exist yet, and returns the ones that aren't bound yet.
@@ -785,6 +849,22 @@ const snapshotRestoreRemapContainer = constants.CouchbaseContainerName + "-remap
 // remap waits for every restored member's pod to finish its node remap, then removes the mark from
 // the volumes, so pods made later don't run the remap step again.
 func (r *CouchbaseSnapshotBackupRestoreReconciler) remap(ctx context.Context, restore *couchbasev2.CouchbaseSnapshotBackupRestore) (reconcile.Result, error) {
+	target := &couchbasev2.CouchbaseCluster{}
+	if err := r.client.Get(ctx, types.NamespacedName{Namespace: restore.Namespace, Name: restore.Spec.Target.Name}, target); err != nil {
+		return reconcile.Result{}, err
+	}
+
+	if k8sutil.UsesNodeHostnames(target) {
+		filled, err := r.fillRemapList(ctx, restore, target)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+
+		if !filled {
+			return reconcile.Result{RequeueAfter: snapshotRestoreRecheck}, nil
+		}
+	}
+
 	volumes := &corev1.PersistentVolumeClaimList{}
 	if err := r.client.List(ctx, volumes, client.InNamespace(restore.Namespace), client.MatchingLabels{constants.LabelCluster: restore.Spec.Target.Name}); err != nil {
 		return reconcile.Result{}, err
@@ -846,9 +926,99 @@ func (r *CouchbaseSnapshotBackupRestoreReconciler) remap(ctx context.Context, re
 		}
 	}
 
+	// The list isn't needed once every node has its new name.
+	if k8sutil.UsesNodeHostnames(target) {
+		list := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: restore.Namespace, Name: k8sutil.SnapshotRestoreRemapConfigMap(target)}}
+		if err := r.client.Delete(ctx, list); err != nil && !errors.IsNotFound(err) {
+			return reconcile.Result{}, err
+		}
+	}
+
 	restore.Status.Phase = couchbasev2.CouchbaseSnapshotBackupRestorePhaseWaitingForCluster
 
 	return reconcile.Result{}, r.client.Status().Update(ctx, restore)
+}
+
+// resetRemapList creates an empty hostname list for the restored pods to wait on.
+// The restore owns it, so deleting the restore deletes it too.
+func (r *CouchbaseSnapshotBackupRestoreReconciler) resetRemapList(ctx context.Context, restore *couchbasev2.CouchbaseSnapshotBackupRestore, target *couchbasev2.CouchbaseCluster) error {
+	list := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            k8sutil.SnapshotRestoreRemapConfigMap(target),
+			Namespace:       restore.Namespace,
+			Labels:          map[string]string{snapshotRestoreLabel: restore.Name},
+			OwnerReferences: []metav1.OwnerReference{restore.AsOwner()},
+		},
+	}
+
+	err := r.client.Create(ctx, list)
+	if !errors.IsAlreadyExists(err) {
+		return err
+	}
+
+	// One left from an earlier restore of the cluster is emptied and taken over.
+	existing := &corev1.ConfigMap{}
+	if err := r.client.Get(ctx, client.ObjectKeyFromObject(list), existing); err != nil {
+		return err
+	}
+
+	existing.Data = nil
+	existing.Labels = list.Labels
+	existing.OwnerReferences = list.OwnerReferences
+
+	return r.client.Update(ctx, existing)
+}
+
+// fillRemapList writes each restored member's old and new hostname into the list.
+// The new hostname is the name of the k8s node the pod runs on, so it waits until
+// every pod is placed. It returns true once the list is written.
+func (r *CouchbaseSnapshotBackupRestoreReconciler) fillRemapList(ctx context.Context, restore *couchbasev2.CouchbaseSnapshotBackupRestore, target *couchbasev2.CouchbaseCluster) (bool, error) {
+	list := &corev1.ConfigMap{}
+	if err := r.client.Get(ctx, types.NamespacedName{Namespace: restore.Namespace, Name: k8sutil.SnapshotRestoreRemapConfigMap(target)}, list); err != nil {
+		return false, err
+	}
+
+	if list.Data[k8sutil.SnapshotRestoreRemapKey] != "" {
+		return true, nil
+	}
+
+	run, err := r.getRun(ctx, restore)
+	if err != nil {
+		return false, err
+	}
+
+	members, err := k8sutil.SnapshotRestoreMembers(target, run)
+	if err != nil {
+		return false, err
+	}
+
+	lines := make([]string, 0, len(members))
+
+	for i := range members {
+		name, err := restoreMemberName(target, members[i].Name)
+		if err != nil {
+			return false, err
+		}
+
+		pod := &corev1.Pod{}
+		if err := r.client.Get(ctx, types.NamespacedName{Namespace: restore.Namespace, Name: name}, pod); err != nil {
+			if errors.IsNotFound(err) {
+				return false, nil
+			}
+
+			return false, err
+		}
+
+		if pod.Spec.NodeName == "" {
+			return false, nil
+		}
+
+		lines = append(lines, run.Spec.Hostnames[members[i].Name]+" "+pod.Spec.NodeName)
+	}
+
+	list.Data = map[string]string{k8sutil.SnapshotRestoreRemapKey: strings.Join(lines, "\n") + "\n"}
+
+	return true, r.client.Update(ctx, list)
 }
 
 // remapState says if a pod's node remap has finished, or why it failed.
@@ -903,6 +1073,13 @@ func (r *CouchbaseSnapshotBackupRestoreReconciler) fail(ctx context.Context, res
 	restore.Status.CompletionTime = &now
 
 	log.Info("Snapshot restore failed", "restore", types.NamespacedName{Namespace: restore.Namespace, Name: restore.Name}, "reason", reason)
+
+	// The pods that bind volumes aren't needed once the restore has failed, and they'd hold the
+	// target's volumes for up to an hour. If removing them fails, it's logged, the restore still
+	// fails, and deleting the restore removes them too since it owns them.
+	if err := r.deleteBinderPods(ctx, restore); err != nil {
+		log.Info("[WARN] Failed to remove the restore's binder pods", "restore", types.NamespacedName{Namespace: restore.Namespace, Name: restore.Name}, "error", err)
+	}
 
 	return reconcile.Result{}, r.client.Status().Update(ctx, restore)
 }

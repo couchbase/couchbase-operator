@@ -11,6 +11,8 @@ licenses/APL2.txt.
 package v2
 
 import (
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"strings"
 	"time"
 
@@ -18,6 +20,7 @@ import (
 	couchbasefake "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned/fake"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	util_x509 "github.com/couchbase/couchbase-operator/pkg/util/x509"
 	"github.com/couchbase/couchbase-operator/pkg/validator/types"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1973,12 +1976,85 @@ func TestCheckConstraintsSnapshotBackupRestore(t *testing.T) {
 
 	withAdminSecret := changedCluster(func(c *couchbasev2.CouchbaseCluster) { c.Spec.Security.AdminSecret = "auth" })
 
+	withTLS := changedCluster(func(c *couchbasev2.CouchbaseCluster) {
+		c.Spec.Networking.TLS = &couchbasev2.TLSPolicy{SecretSource: &couchbasev2.TLSSecretSource{ServerSecretName: "target-tls"}}
+	})
+
 	// changedRun makes a Complete run with one change.
 	changedRun := func(change func(*couchbasev2.CouchbaseSnapshotBackupRun)) *couchbasev2.CouchbaseSnapshotBackupRun {
 		r := run("my-backup", couchbasev2.CouchbaseSnapshotBackupRunPhaseComplete, false)
 		change(r)
 
 		return r
+	}
+
+	// runWithSpec makes a Complete run of a cluster with the given spec.
+	runWithSpec := func(spec string) *couchbasev2.CouchbaseSnapshotBackupRun {
+		return changedRun(func(r *couchbasev2.CouchbaseSnapshotBackupRun) { r.Spec.ClusterSpec.Raw = []byte(spec) })
+	}
+
+	tlsSpec := `{"networking":{"tls":{"secretSource":{"serverSecretName":"source-tls"}}}}`
+
+	// otherRestore makes a second restore into the same target, in the given phase.
+	otherRestore := func(phase couchbasev2.CouchbaseSnapshotBackupRestorePhase) *couchbasev2.CouchbaseSnapshotBackupRestore {
+		return &couchbasev2.CouchbaseSnapshotBackupRestore{
+			ObjectMeta: metav1.ObjectMeta{Name: "other-restore", Namespace: namespace},
+			Spec: couchbasev2.CouchbaseSnapshotBackupRestoreSpec{
+				BackupName: "my-backup",
+				RunName:    "my-backup-run",
+				Target:     couchbasev2.CouchbaseSnapshotBackupRestoreTarget{Name: "target"},
+			},
+			Status: couchbasev2.CouchbaseSnapshotBackupRestoreStatus{Phase: phase},
+		}
+	}
+
+	indexSpec := `{"cluster":{"indexer":{"storageMode":"plasma"}},"servers":[{"name":"all","size":3,"services":["index"]}]}`
+
+	withPlasma := changedCluster(func(c *couchbasev2.CouchbaseCluster) {
+		c.Spec.ClusterSettings.Indexer = &couchbasev2.CouchbaseClusterIndexerSettings{StorageMode: "plasma"}
+	})
+
+	withNodeHostnames := changedCluster(func(c *couchbasev2.CouchbaseCluster) {
+		c.Spec.Networking.InitPodsWithNodeHostname = true
+		c.Spec.Networking.ImprovedHostNetwork = true
+	})
+
+	withHostnames := changedRun(func(r *couchbasev2.CouchbaseSnapshotBackupRun) {
+		r.Spec.Hostnames = map[string]string{"cb-0000": "node-1.example.com", "cb-0001": "node-2.example.com", "cb-0002": "node-3.example.com"}
+	})
+
+	// Two CAs, and a server certificate signed by each, for the CA warning.
+	caA, _ := util_x509.NewCertificateAuthority(util_x509.KeyTypeRSA, "ca-a", time.Now(), time.Now().Add(time.Hour), util_x509.CertTypeCA)
+	caB, _ := util_x509.NewCertificateAuthority(util_x509.KeyTypeRSA, "ca-b", time.Now(), time.Now().Add(time.Hour), util_x509.CertTypeCA)
+
+	runTrustingCA := func(ca *util_x509.CertificateAuthority) *couchbasev2.CouchbaseSnapshotBackupRun {
+		return changedRun(func(r *couchbasev2.CouchbaseSnapshotBackupRun) { r.Spec.TrustedCAs = []string{string(ca.Certificate)} })
+	}
+
+	tlsSecret := func(ca *util_x509.CertificateAuthority) *v1.Secret {
+		req := util_x509.KeyPairRequest{
+			KeyType:   util_x509.KeyTypeRSA,
+			CertType:  util_x509.CertTypeServer,
+			ValidFrom: time.Now(),
+			ValidTo:   time.Now().Add(time.Hour),
+			Req:       &x509.CertificateRequest{Subject: pkix.Name{CommonName: "target"}},
+		}
+		key, cert, _ := req.Generate(ca)
+
+		return &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "target-tls", Namespace: namespace},
+			Data:       map[string][]byte{"tls.crt": cert, "tls.key": key, "ca.crt": ca.Certificate},
+		}
+	}
+
+	tlsTarget := func(nodeToNode bool) *couchbasev2.CouchbaseCluster {
+		return changedCluster(func(c *couchbasev2.CouchbaseCluster) {
+			c.Spec.Networking.TLS = &couchbasev2.TLSPolicy{SecretSource: &couchbasev2.TLSSecretSource{ServerSecretName: "target-tls"}}
+			if nodeToNode {
+				all := couchbasev2.NodeToNodeAll
+				c.Spec.Networking.TLS.NodeToNodeEncryption = &all
+			}
+		})
 	}
 
 	// placedRun makes a Complete run whose members were in server class data-index, in the given
@@ -2129,6 +2205,38 @@ func TestCheckConstraintsSnapshotBackupRestore(t *testing.T) {
 			expectedErr: "create the cluster first",
 		},
 		{
+			name:    "target and backed up cluster both with TLS is valid",
+			objects: []runtime.Object{runWithSpec(tlsSpec), withTLS},
+		},
+		{
+			name:        "target with TLS when the backed up cluster had none",
+			objects:     []runtime.Object{runWithSpec(`{}`), withTLS},
+			expectedErr: "uses TLS but the backed up cluster didn't",
+		},
+		{
+			name:        "target without TLS when the backed up cluster had it",
+			objects:     []runtime.Object{runWithSpec(tlsSpec), newCluster},
+			expectedErr: "doesn't use TLS but the backed up cluster did",
+		},
+		{
+			name:        "another restore still running into the same target",
+			objects:     []runtime.Object{completeRun, newCluster, otherRestore(couchbasev2.CouchbaseSnapshotBackupRestorePhaseProvisioning)},
+			expectedErr: "restore other-restore is still restoring into cluster target",
+		},
+		{
+			name:    "another restore that finished into the same target is valid",
+			objects: []runtime.Object{completeRun, newCluster, otherRestore(couchbasev2.CouchbaseSnapshotBackupRestorePhaseComplete)},
+		},
+		{
+			name:    "target with the backed up index storage mode is valid",
+			objects: []runtime.Object{runWithSpec(indexSpec), withPlasma},
+		},
+		{
+			name:        "target with a different index storage mode",
+			objects:     []runtime.Object{runWithSpec(indexSpec), newCluster},
+			expectedErr: "the target must use the same one",
+		},
+		{
 			name:    "target on a newer version on the upgrade path is valid",
 			objects: []runtime.Object{completeRun, withImage("couchbase/server:8.0.1")},
 		},
@@ -2187,6 +2295,33 @@ func TestCheckConstraintsSnapshotBackupRestore(t *testing.T) {
 				}),
 			},
 			expectedErr: "but server class data-index in cluster target has",
+		},
+		{
+			name: "target still migrating",
+			objects: []runtime.Object{completeRun, changedCluster(func(c *couchbasev2.CouchbaseCluster) {
+				c.Spec.Migration = &couchbasev2.ClusterAssimilationSpec{UnmanagedClusterHost: "other-cluster"}
+			})},
+			expectedErr: "is still migrating",
+		},
+		{
+			name:    "target naming nodes after k8s nodes is valid",
+			objects: []runtime.Object{withHostnames, withNodeHostnames},
+		},
+		{
+			name:            "a different CA with node to node encryption warns",
+			objects:         []runtime.Object{runTrustingCA(caA), tlsTarget(true)},
+			secrets:         []runtime.Object{tlsSecret(caB)},
+			expectedWarning: "uses a different CA from the backed up cluster",
+		},
+		{
+			name:    "the same CA with node to node encryption doesn't warn",
+			objects: []runtime.Object{runTrustingCA(caA), tlsTarget(true)},
+			secrets: []runtime.Object{tlsSecret(caA)},
+		},
+		{
+			name:    "a different CA without node to node encryption doesn't warn",
+			objects: []runtime.Object{runTrustingCA(caA), tlsTarget(false)},
+			secrets: []runtime.Object{tlsSecret(caB)},
 		},
 		{
 			name:            "target with more nodes than the run warns",
@@ -2652,6 +2787,29 @@ func TestCheckClusterVersionUpgradePathOffline(t *testing.T) {
 			t.Errorf("expected hibernate + 7.1->7.6.0 with index nodes to be rejected, got: %v", err)
 		}
 	})
+}
+
+// TestCheckConstraintExternalMigrationTLS checks a migration from an external cluster with
+// spec.networking.dns needs TLS, and other clusters don't.
+func TestCheckConstraintExternalMigrationTLS(t *testing.T) {
+	c := &couchbasev2.CouchbaseCluster{}
+	c.Spec.Migration = &couchbasev2.ClusterAssimilationSpec{UnmanagedClusterHost: "other-cluster"}
+	c.Spec.Networking.DNS = &couchbasev2.DNS{Domain: "example.com"}
+
+	if err := checkConstraintExternalMigrationTLS(nil, c); err == nil {
+		t.Errorf("expected an external migration without TLS to be refused")
+	}
+
+	c.Spec.Networking.TLS = &couchbasev2.TLSPolicy{SecretSource: &couchbasev2.TLSSecretSource{ServerSecretName: "staging-tls"}}
+	if err := checkConstraintExternalMigrationTLS(nil, c); err != nil {
+		t.Errorf("expected an external migration with TLS to be allowed, got %v", err)
+	}
+
+	c.Spec.Networking.DNS = nil
+	c.Spec.Networking.TLS = nil
+	if err := checkConstraintExternalMigrationTLS(nil, c); err != nil {
+		t.Errorf("expected a migration without external dns to be allowed, got %v", err)
+	}
 }
 
 func TestCheckConstraintOfflineUpgradeHasVolumes(t *testing.T) {

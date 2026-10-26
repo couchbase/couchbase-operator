@@ -805,6 +805,21 @@ type CouchbaseSnapshotBackupRunSpec struct {
 	// as MaxSkew.
 	// +optional
 	ReadyTimeout *metav1.Duration `json:"readyTimeout,omitempty"`
+
+	// BackupRetention is how long the backup kept its runs when this run was taken. The run keeps
+	// following it after the backup is deleted, so its snapshots don't stay forever.
+	// +optional
+	BackupRetention *metav1.Duration `json:"backupRetention,omitempty"`
+
+	// Hostnames is each backed up member's hostname, by member.
+	// Restore uses them to rename the nodes.
+	// +optional
+	Hostnames map[string]string `json:"hostnames,omitempty"`
+
+	// TrustedCAs are the CAs the backed up cluster trusted, PEM encoded.
+	// The restored nodes start out trusting only these.
+	// +optional
+	TrustedCAs []string `json:"trustedCAs,omitempty"`
 }
 
 // CouchbaseSnapshotBackupRunStatus records the outcome of the capture attempt, whether it

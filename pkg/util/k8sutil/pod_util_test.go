@@ -1030,8 +1030,8 @@ func remapTestPod(t *testing.T, restored bool) *v1.Pod {
 
 	for _, pvc := range pvcs {
 		if restored && isPathPersisted(pvc, couchbaseVolumeDefaultConfigDir) {
-			pvc.Annotations[constants.AnnotationSnapshotRestoreRemap] = "true"
-			pvc.Annotations[constants.AnnotationSnapshotRestoreRemapID] = "3f2a9c1e-5b7d-4e8f-9a6c-2d1b0e4f7a83"
+			pvc.Annotations[constants.AnnotationSnapshotRestoreRemap] = "rx-0000=rx-0000.rx.default.svc"
+			pvc.Annotations[constants.AnnotationSnapshotRestoreRemapID] = "restore-1"
 		}
 	}
 
@@ -1079,7 +1079,7 @@ func TestRemapInitContainer(t *testing.T) {
 
 	// A done file that came back in the backup from an earlier restore mustn't stop the remap.
 	script := strings.Join(remap.Args, " ")
-	if !strings.Contains(script, `[ ! -e "$D/.snapshot-restore-remapped-3f2a9c1e-5b7d-4e8f-9a6c-2d1b0e4f7a83" ]`) || !strings.Contains(script, `"$D"/.snapshot-restore-remapped*`) {
+	if !strings.Contains(script, `[ ! -e "$D/.snapshot-restore-remapped-restore-1" ]`) || !strings.Contains(script, `"$D"/.snapshot-restore-remapped*`) {
 		t.Errorf("expected the done file to be named after the restore, and older ones removed, got %v", remap.Args)
 	}
 
@@ -1098,16 +1098,211 @@ func TestRemapInitContainer(t *testing.T) {
 	}
 }
 
+// TestRemapInitContainerTLS checks a cluster with TLS gets its own server certificate put in place
+// by the remap, since Couchbase would otherwise serve the backed up one.
+func TestRemapInitContainerTLS(t *testing.T) {
+	for _, tls := range []bool{false, true} {
+		t.Run(fmt.Sprintf("tls=%v", tls), func(t *testing.T) {
+			cluster := &couchbasev2.CouchbaseCluster{ObjectMeta: metav1.ObjectMeta{Name: "rx", Namespace: "default"}}
+			if tls {
+				cluster.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
+					SecretSource: &couchbasev2.TLSSecretSource{ServerSecretName: "rx-tls"},
+				}
+			}
+
+			remap, err := couchbaseRemapInitContainer(cluster, "data-volume", couchbasev2.ServerConfig{}, "couchbase/server:7.6.8", "rx-0000=rx-0000.rx.default.svc", "restore-1")
+			if err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+
+			script := strings.Join(remap.Args, " ")
+			copied := strings.Contains(script, `cp "$D/inbox/chain.pem" "$D/config/certs/chain.pem"`) &&
+				strings.Contains(script, `cp "$D/inbox/pkey.key" "$D/config/certs/pkey.pem"`)
+
+			if copied != tls {
+				t.Errorf("expected the certificate copied %v, got %v", tls, remap.Args)
+			}
+
+			mounted := false
+			for _, mount := range remap.VolumeMounts {
+				if mount.Name == constants.CouchbaseTLSVolumeName && mount.MountPath == couchbaseTLSVolumeMountDir && mount.ReadOnly {
+					mounted = true
+				}
+			}
+
+			if mounted != tls {
+				t.Errorf("expected the TLS secret mounted %v, got %v", tls, remap.VolumeMounts)
+			}
+		})
+	}
+}
+
 // TestRemapInitContainerBadRestoreID checks a restored volume whose restore UID isn't one k8s would
 // make doesn't get a pod, since the UID goes into the init container's script.
 func TestRemapInitContainerBadRestoreID(t *testing.T) {
 	cluster := &couchbasev2.CouchbaseCluster{ObjectMeta: metav1.ObjectMeta{Name: "rx", Namespace: "default"}}
 
-	if _, err := couchbaseRemapInitContainer(cluster, "rx-0000-default-00", couchbasev2.ServerConfig{}, "couchbase/server:7.6.8", "x\"; touch /tmp/y; \""); err == nil {
+	if _, err := couchbaseRemapInitContainer(cluster, "data-volume", couchbasev2.ServerConfig{}, "couchbase/server:7.6.8", "rx-0000=rx-0000.rx.default.svc", "x\"; touch /tmp/y; \""); err == nil {
 		t.Errorf("expected a bad restore UID to be refused")
 	}
 
-	if _, err := couchbaseRemapInitContainer(cluster, "rx-0000-default-00", couchbasev2.ServerConfig{}, "couchbase/server:7.6.8", ""); err == nil {
+	if _, err := couchbaseRemapInitContainer(cluster, "data-volume", couchbasev2.ServerConfig{}, "couchbase/server:7.6.8", "rx-0000=rx-0000.rx.default.svc", ""); err == nil {
 		t.Errorf("expected a missing restore UID to be refused")
+	}
+}
+
+// TestRemapArgs checks the node remap tool renames each backed up member whose hostname changes,
+// using the hostname the run recorded, only turns off auto failover when no hostname changes,
+// refuses a name or hostname it doesn't expect, and also turns off continuous backup from 8.5.
+func TestRemapArgs(t *testing.T) {
+	cluster := &couchbasev2.CouchbaseCluster{ObjectMeta: metav1.ObjectMeta{Name: "staging", Namespace: "default"}}
+
+	sameName := "staging-0000=staging-0000.staging.default.svc,staging-0001=staging-0001.staging.default.svc"
+	newName := "prod-0000=prod-0000.prod.default.svc,prod-0001=prod-0001.prod.default.svc"
+
+	rename := []string{
+		"--remap", "ns_1@prod-0000.prod.default.svc", "ns_1@staging-0000.staging.default.svc",
+		"--remap", "ns_1@prod-0001.prod.default.svc", "ns_1@staging-0001.staging.default.svc",
+	}
+
+	testcases := []struct {
+		name        string
+		mark        string
+		image       string
+		expected    []string
+		expectError bool
+	}{
+		{
+			name:     "same name",
+			mark:     sameName,
+			image:    "couchbase/server:7.6.8",
+			expected: []string{"--just-disable-auto-failover"},
+		},
+		{
+			name:     "new name",
+			mark:     newName,
+			image:    "couchbase/server:7.6.8",
+			expected: rename,
+		},
+		{
+			name:     "same name on 8.5",
+			mark:     sameName,
+			image:    "couchbase/server:8.5.0",
+			expected: []string{"--just-disable-auto-failover", "--disable-continuous-backup"},
+		},
+		{
+			name:     "new name on 8.5",
+			mark:     newName,
+			image:    "couchbase/server:8.5.0",
+			expected: append(append([]string{}, rename...), "--disable-continuous-backup"),
+		},
+		{
+			name:     "a version we can't read",
+			mark:     sameName,
+			image:    "couchbase/server:latest",
+			expected: []string{"--just-disable-auto-failover"},
+		},
+		{
+			name:     "a hostname that isn't made from the member name",
+			mark:     "prod-0000=node-1.example.com",
+			image:    "couchbase/server:7.6.8",
+			expected: []string{"--remap", "ns_1@node-1.example.com", "ns_1@staging-0000.staging.default.svc"},
+		},
+		{
+			name:        "a name the operator wouldn't give a pod",
+			mark:        "prod-0000';touch /tmp/x'=node-1.example.com",
+			image:       "couchbase/server:7.6.8",
+			expectError: true,
+		},
+		{
+			name:        "a hostname that isn't a hostname",
+			mark:        "prod-0000=node-1';touch /tmp/x'",
+			image:       "couchbase/server:7.6.8",
+			expectError: true,
+		},
+		{
+			name:        "a member without a hostname",
+			mark:        "prod-0000",
+			image:       "couchbase/server:7.6.8",
+			expectError: true,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			names, err := remapNameArgs(cluster, testcase.mark)
+			args := append(names, remapExtraArgs(testcase.image)...)
+
+			if testcase.expectError {
+				if err == nil {
+					t.Fatalf("expected an error, got %v", args)
+				}
+
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+
+			if !reflect.DeepEqual(args, testcase.expected) {
+				t.Errorf("expected %v, got %v", testcase.expected, args)
+			}
+		})
+	}
+}
+
+// TestRestoredHostname checks a restored member gets the hostname the operator would give it,
+// made from the member and cluster names.
+func TestRestoredHostname(t *testing.T) {
+	cluster := &couchbasev2.CouchbaseCluster{ObjectMeta: metav1.ObjectMeta{Name: "staging", Namespace: "default"}}
+
+	if got := RestoredHostname(cluster, "staging-0000"); got != "staging-0000.staging.default.svc" {
+		t.Errorf("expected staging-0000.staging.default.svc, got %s", got)
+	}
+}
+
+// TestRemapInitContainerNodeHostnames checks that when nodes are named after the k8s nodes they
+// run on, the remap waits for the restore's hostname list and mounts it, and that other clusters
+// don't get the list at all.
+func TestRemapInitContainerNodeHostnames(t *testing.T) {
+	cluster := &couchbasev2.CouchbaseCluster{ObjectMeta: metav1.ObjectMeta{Name: "staging", Namespace: "default"}}
+
+	container, err := couchbaseRemapInitContainer(cluster, "staging-0000-default-00", couchbasev2.ServerConfig{Name: "all"}, "couchbase/server:7.6.8", "staging-0000=staging-0000.staging.default.svc", "restore-1")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if strings.Contains(container.Args[2], snapshotRestoreRemapMountDir) || remapListVolumes(cluster) != nil {
+		t.Errorf("expected no hostname list for a cluster with the usual hostnames")
+	}
+
+	cluster.Spec.Networking.InitPodsWithNodeHostname = true
+	cluster.Spec.Networking.ImprovedHostNetwork = true
+
+	container, err = couchbaseRemapInitContainer(cluster, "staging-0000-default-00", couchbasev2.ServerConfig{Name: "all"}, "couchbase/server:8.5.0", "prod-0000=node-1.example.com", "restore-1")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	script := container.Args[2]
+	for _, want := range []string{"read_list() {", snapshotRestoreRemapMountDir + "/" + SnapshotRestoreRemapKey, `"${args[@]}"`, "'--disable-continuous-backup'"} {
+		if !strings.Contains(script, want) {
+			t.Errorf("expected the remap script to contain %q, got:\n%s", want, script)
+		}
+	}
+
+	mounted := false
+	for _, mount := range container.VolumeMounts {
+		mounted = mounted || mount.Name == snapshotRestoreRemapVolume
+	}
+
+	if !mounted {
+		t.Errorf("expected the hostname list mounted, got %v", container.VolumeMounts)
+	}
+
+	volumes := remapListVolumes(cluster)
+	if len(volumes) != 1 || volumes[0].ConfigMap == nil || volumes[0].ConfigMap.Name != "staging-snapshot-restore-remap" || !*volumes[0].ConfigMap.Optional {
+		t.Errorf("expected an optional volume for config map staging-snapshot-restore-remap, got %v", volumes)
 	}
 }

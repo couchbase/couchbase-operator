@@ -969,3 +969,61 @@ func TestSaveSnapshotBackupRunAdmin(t *testing.T) {
 		t.Errorf("expected a second save of the same run to fail")
 	}
 }
+
+// TestOrphanedSnapshotBackupRuns checks only this cluster's runs whose backup is gone are picked, by
+// the backup they came from.
+func TestOrphanedSnapshotBackupRuns(t *testing.T) {
+	run := func(name, cluster, backup string) *couchbasev2.CouchbaseSnapshotBackupRun {
+		return &couchbasev2.CouchbaseSnapshotBackupRun{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{constants.LabelCluster: cluster}},
+			Spec:       couchbasev2.CouchbaseSnapshotBackupRunSpec{SourceBackup: backup},
+		}
+	}
+
+	// The daily backup still exists and the weekly one was deleted. The last run is from another cluster.
+	runs := []*couchbasev2.CouchbaseSnapshotBackupRun{
+		run("daily-run", "cb", "daily"),
+		run("weekly-run-1", "cb", "weekly"),
+		run("weekly-run-2", "cb", "weekly"),
+		run("weekly-run-3", "other-cluster", "weekly"),
+	}
+
+	backups := []couchbasev2.CouchbaseBackup{{ObjectMeta: metav1.ObjectMeta{Name: "daily"}}}
+
+	orphaned := orphanedSnapshotBackupRuns(runs, "cb", backups)
+
+	if len(orphaned) != 1 || len(orphaned["weekly"]) != 2 {
+		t.Fatalf("expected the 2 runs of the deleted weekly backup, got %v", orphaned)
+	}
+
+	for _, r := range orphaned["weekly"] {
+		if r.Labels[constants.LabelCluster] != "cb" {
+			t.Errorf("expected only this cluster's runs, got %s", r.Name)
+		}
+	}
+}
+
+// TestSnapshotBackupRunRetention checks the runs of a deleted backup follow the retention recorded on
+// the newest run that has one, and older runs without it have none.
+func TestSnapshotBackupRunRetention(t *testing.T) {
+	now := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
+
+	run := func(age time.Duration, retention *metav1.Duration) *couchbasev2.CouchbaseSnapshotBackupRun {
+		return &couchbasev2.CouchbaseSnapshotBackupRun{
+			ObjectMeta: metav1.ObjectMeta{CreationTimestamp: metav1.NewTime(now.Add(-age))},
+			Spec:       couchbasev2.CouchbaseSnapshotBackupRunSpec{BackupRetention: retention},
+		}
+	}
+
+	week := &metav1.Duration{Duration: 7 * 24 * time.Hour}
+	month := &metav1.Duration{Duration: 30 * 24 * time.Hour}
+
+	if got := snapshotBackupRunRetention([]*couchbasev2.CouchbaseSnapshotBackupRun{run(time.Hour, nil), run(2*time.Hour, nil)}); got != nil {
+		t.Errorf("expected no retention for runs that didn't record one, got %v", got)
+	}
+
+	got := snapshotBackupRunRetention([]*couchbasev2.CouchbaseSnapshotBackupRun{run(3*time.Hour, month), run(2*time.Hour, week), run(time.Hour, nil)})
+	if got == nil || got.Duration != week.Duration {
+		t.Errorf("expected the newest recorded retention %v, got %v", week, got)
+	}
+}

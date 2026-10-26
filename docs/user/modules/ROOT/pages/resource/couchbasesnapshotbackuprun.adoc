@@ -20,12 +20,14 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbasesnapshotbackupruns-metadata-name,name>>: ""
 <<couchbasesnapshotbackupruns-spec,spec>>:
   <<couchbasesnapshotbackupruns-spec-adminsecretname,adminSecretName>>: ""
+  <<couchbasesnapshotbackupruns-spec-backupretention,backupRetention>>: ""
   <<couchbasesnapshotbackupruns-spec-buckets,buckets>>:
   - ""
   <<couchbasesnapshotbackupruns-spec-clusterspec,clusterSpec>>:
   <<couchbasesnapshotbackupruns-spec-clusteruuid,clusterUUID>>: ""
   <<couchbasesnapshotbackupruns-spec-collections,collections>>:
   - ""
+  <<couchbasesnapshotbackupruns-spec-hostnames,hostnames>>:
   <<couchbasesnapshotbackupruns-spec-maxskew,maxSkew>>: ""
   <<couchbasesnapshotbackupruns-spec-nodecount,nodeCount>>: 0
   <<couchbasesnapshotbackupruns-spec-readytimeout,readyTimeout>>: ""
@@ -33,6 +35,8 @@ The following is an example resource, depicting the overall structure and any de
   - ""
   <<couchbasesnapshotbackupruns-spec-serverversion,serverVersion>>: ""
   <<couchbasesnapshotbackupruns-spec-sourcebackup,sourceBackup>>: ""
+  <<couchbasesnapshotbackupruns-spec-trustedcas,trustedCAs>>:
+  - ""
 <<couchbasesnapshotbackupruns-status,status>>:
   <<couchbasesnapshotbackupruns-status-baselinebalanced,baselineBalanced>>: false
   <<couchbasesnapshotbackupruns-status-baselineorchestrator,baselineOrchestrator>>: ""
@@ -110,6 +114,18 @@ what credential and CR state the captured data expects on restore.
 AdminSecretName names the Secret holding the administrative credentials the
 captured data expects to authenticate with.
 
+=== couchbasesnapshotbackupruns.spec.backupRetention
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+BackupRetention is how long the backup kept its runs when this run was taken.
+The run keeps
+following it after the backup is deleted, so its snapshots don't stay forever.
+
 === couchbasesnapshotbackupruns.spec.buckets
 
 ==== Constraints
@@ -164,6 +180,17 @@ cluster.
 
 Collections is the set of collections captured in this run, each as
 bucket.scope.collection.
+
+=== couchbasesnapshotbackupruns.spec.hostnames
+
+==== Constraints
+
+*Type*: `map[string]string`
+
+==== Description
+
+Hostnames is each backed up member's hostname, by member.
+Restore uses them to rename the nodes.
 
 === couchbasesnapshotbackupruns.spec.maxSkew
 
@@ -238,6 +265,17 @@ SourceBackup names the CouchbaseBackup that produced this run, for listing
 purposes only.
 This is not an ownership relationship, a run must survive
 deletion of the schedule that created it.
+
+=== couchbasesnapshotbackupruns.spec.trustedCAs
+
+==== Constraints
+
+*Type*: `[]string`
+
+==== Description
+
+TrustedCAs are the CAs the backed up cluster trusted, PEM encoded.
+The restored nodes start out trusting only these.
 
 == couchbasesnapshotbackupruns.status
 

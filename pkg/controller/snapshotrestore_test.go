@@ -11,15 +11,19 @@ licenses/APL2.txt.
 package controller
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
 	couchbasefake "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned/fake"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	vtypes "github.com/couchbase/couchbase-operator/pkg/validator/types"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -40,7 +44,7 @@ const restoreTestNamespace = "default"
 // restoreTestRestore makes a restore of my-backup-run into cluster target, in the given phase.
 func restoreTestRestore(phase couchbasev2.CouchbaseSnapshotBackupRestorePhase) *couchbasev2.CouchbaseSnapshotBackupRestore {
 	return &couchbasev2.CouchbaseSnapshotBackupRestore{
-		ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: restoreTestNamespace, UID: "3f2a9c1e-5b7d-4e8f-9a6c-2d1b0e4f7a83"},
+		ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: restoreTestNamespace, UID: "restore-1"},
 		Spec: couchbasev2.CouchbaseSnapshotBackupRestoreSpec{
 			BackupName: "my-backup",
 			RunName:    "my-backup-run",
@@ -83,7 +87,7 @@ func restoreTestRun(phase couchbasev2.CouchbaseSnapshotBackupRunPhase) *couchbas
 		Status:     couchbasev2.CouchbaseSnapshotBackupRunStatus{Phase: phase},
 	}
 
-	for _, member := range []string{"cb-0000", "cb-0001", "cb-0002"} {
+	for _, member := range []string{"target-0000", "target-0001", "target-0002"} {
 		run.Status.Snapshots = append(run.Status.Snapshots, couchbasev2.CouchbaseSnapshotBackupRunSnapshot{
 			Member:       member,
 			SnapshotName: member + "-snapshot",
@@ -180,9 +184,9 @@ func newRestoreTestReconciler(t *testing.T, setup restoreTestSetup) (*CouchbaseS
 // readySnapshots makes a ready snapshot for every member of restoreTestRun.
 func readySnapshots() []runtime.Object {
 	return []runtime.Object{
-		restoreTestSnapshot("cb-0000-snapshot", true),
-		restoreTestSnapshot("cb-0001-snapshot", true),
-		restoreTestSnapshot("cb-0002-snapshot", true),
+		restoreTestSnapshot("target-0000-snapshot", true),
+		restoreTestSnapshot("target-0001-snapshot", true),
+		restoreTestSnapshot("target-0002-snapshot", true),
 	}
 }
 
@@ -241,7 +245,7 @@ func TestSnapshotRestoreValidate(t *testing.T) {
 				snapshots: readySnapshots()[:2],
 			},
 			expectedPhase:   couchbasev2.CouchbaseSnapshotBackupRestorePhaseFailed,
-			expectedFailure: "snapshot cb-0002-snapshot for member cb-0002 at /opt/couchbase/var/lib/couchbase doesn't exist",
+			expectedFailure: "snapshot target-0002-snapshot for member target-0002 at /opt/couchbase/var/lib/couchbase doesn't exist",
 		},
 		{
 			name: "a snapshot isn't ready, so the restore fails",
@@ -249,7 +253,7 @@ func TestSnapshotRestoreValidate(t *testing.T) {
 				restore:   restoreTestRestore(""),
 				cluster:   restoreTestCluster(true, 3),
 				run:       completeRun,
-				snapshots: append(readySnapshots()[:2], restoreTestSnapshot("cb-0002-snapshot", false)),
+				snapshots: append(readySnapshots()[:2], restoreTestSnapshot("target-0002-snapshot", false)),
 			},
 			expectedPhase:   couchbasev2.CouchbaseSnapshotBackupRestorePhaseFailed,
 			expectedFailure: "isn't ready to use",
@@ -443,7 +447,7 @@ func restoreTestBinderPod(member string) *corev1.Pod {
 // snapshot, owned by the target, binds unbound ones with a short lived pod, removes those pods once
 // everything is bound, and fails when a member has no server class to go into.
 func TestSnapshotRestoreProvision(t *testing.T) {
-	members := []string{"cb-0000", "cb-0001", "cb-0002"}
+	members := []string{"target-0000", "target-0001", "target-0002"}
 
 	recordedClass := func(class string) *couchbasev2.CouchbaseSnapshotBackupRun {
 		run := restoreTestRun(couchbasev2.CouchbaseSnapshotBackupRunPhaseComplete)
@@ -487,8 +491,8 @@ func TestSnapshotRestoreProvision(t *testing.T) {
 			cluster: restoreTestCluster(true, 3),
 			run:     restoreTestRun(couchbasev2.CouchbaseSnapshotBackupRunPhaseComplete),
 			volumes: []client.Object{
-				restoreTestBoundVolume("cb-0000"), restoreTestBoundVolume("cb-0001"), restoreTestBoundVolume("cb-0002"),
-				restoreTestBinderPod("cb-0000"), restoreTestBinderPod("cb-0001"), restoreTestBinderPod("cb-0002"),
+				restoreTestBoundVolume("target-0000"), restoreTestBoundVolume("target-0001"), restoreTestBoundVolume("target-0002"),
+				restoreTestBinderPod("target-0000"), restoreTestBinderPod("target-0001"), restoreTestBinderPod("target-0002"),
 				restoreTestState(nil),
 			},
 			expectSeeded:  true,
@@ -499,7 +503,7 @@ func TestSnapshotRestoreProvision(t *testing.T) {
 			cluster: restoreTestCluster(true, 3),
 			run:     restoreTestRun(couchbasev2.CouchbaseSnapshotBackupRunPhaseComplete),
 			volumes: []client.Object{
-				restoreTestBoundVolume("cb-0000"), restoreTestBoundVolume("cb-0001"), restoreTestBoundVolume("cb-0002"),
+				restoreTestBoundVolume("target-0000"), restoreTestBoundVolume("target-0001"), restoreTestBoundVolume("target-0002"),
 				restoreTestState(nil),
 				&corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{Name: "my-backup-run-admin", Namespace: restoreTestNamespace},
@@ -511,9 +515,10 @@ func TestSnapshotRestoreProvision(t *testing.T) {
 			expectedPhase:    couchbasev2.CouchbaseSnapshotBackupRestorePhaseReadyToStart,
 		},
 		{
-			name:            "a member whose server class isn't in the target fails the restore",
+			name:            "a member whose server class isn't in the target fails the restore, and its binder pods go",
 			cluster:         restoreTestCluster(true, 3),
 			run:             recordedClass("missing"),
+			volumes:         []client.Object{restoreTestBinderPod("target-0000"), restoreTestBinderPod("target-0001")},
 			expectedPhase:   couchbasev2.CouchbaseSnapshotBackupRestorePhaseFailed,
 			expectedFailure: "server class missing, which cluster target doesn't have",
 		},
@@ -602,7 +607,7 @@ func checkRestoreTestVolumes(t *testing.T, fakeClient client.Client, members []s
 			t.Errorf("expected %s to be marked for a node remap, got %v", volume.Name, volume.Annotations)
 		}
 
-		if id := volume.Annotations[constants.AnnotationSnapshotRestoreRemapID]; id != "3f2a9c1e-5b7d-4e8f-9a6c-2d1b0e4f7a83" {
+		if id := volume.Annotations[constants.AnnotationSnapshotRestoreRemapID]; id != "restore-1" {
 			t.Errorf("expected %s to carry the restore's UID for the node remap, got %q", volume.Name, id)
 		}
 	}
@@ -830,7 +835,7 @@ func TestRestoreBinderPod(t *testing.T) {
 	restore := restoreTestRestore(couchbasev2.CouchbaseSnapshotBackupRestorePhaseProvisioning)
 
 	t.Run("no pod security set on the cluster gets the safest values", func(t *testing.T) {
-		pod := restoreBinderPod(restore, restoreTestCluster(true, 3), nil, "cb-0000", []string{"cb-0000-default-00"}, "")
+		pod := restoreBinderPod(restore, restoreTestCluster(true, 3), nil, "target-0000", []string{"target-0000-default-00"}, "")
 
 		security := pod.Spec.SecurityContext
 		if security.RunAsNonRoot == nil || !*security.RunAsNonRoot || security.RunAsUser == nil || *security.RunAsUser != 1000 {
@@ -872,7 +877,7 @@ func TestRestoreBinderPod(t *testing.T) {
 			}},
 		}
 
-		pod := restoreBinderPod(restore, cluster, config, "cb-0000", []string{"cb-0000-default-00"}, "zone-b")
+		pod := restoreBinderPod(restore, cluster, config, "target-0000", []string{"target-0000-default-00"}, "zone-b")
 
 		if *pod.Spec.SecurityContext.RunAsUser != 2000 || *pod.Spec.SecurityContext.FSGroup != 3000 {
 			t.Errorf("expected the cluster's user and fsGroup, got %+v", pod.Spec.SecurityContext)
@@ -914,7 +919,7 @@ func TestRestoreVolumesPlacement(t *testing.T) {
 		"older run": restoreTestRun(couchbasev2.CouchbaseSnapshotBackupRunPhaseComplete),
 	} {
 		t.Run(name, func(t *testing.T) {
-			volumes, err := restoreVolumes(target, run, "3f2a9c1e-5b7d-4e8f-9a6c-2d1b0e4f7a83")
+			volumes, err := restoreVolumes(target, run, "restore-1")
 			if err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
@@ -1065,6 +1070,268 @@ func TestSnapshotRestoreRemap(t *testing.T) {
 
 			if _, ok := volume.Annotations[constants.AnnotationSnapshotRestoreRemap]; ok != testcase.expectMarked {
 				t.Errorf("expected the volume marked %v, got %v", testcase.expectMarked, volume.Annotations)
+			}
+		})
+	}
+}
+
+// TestRestoreVolumesRename checks a restore into a differently named cluster gives each member the
+// target's name with the same number, makes its volumes from the backed up member's snapshots, and
+// marks every volume with all the backed up members and their hostnames for the node remap.
+func TestRestoreVolumesRename(t *testing.T) {
+	target := restoreTestCluster(true, 3)
+
+	run := restoreTestRun(couchbasev2.CouchbaseSnapshotBackupRunPhaseComplete)
+	run.Labels = map[string]string{constants.LabelCluster: "src"}
+
+	for i := range run.Status.Snapshots {
+		run.Status.Snapshots[i].Member = strings.Replace(run.Status.Snapshots[i].Member, "target", "src", 1)
+		run.Status.Snapshots[i].SnapshotName = strings.Replace(run.Status.Snapshots[i].SnapshotName, "target", "src", 1)
+	}
+
+	run.Spec.Hostnames = map[string]string{
+		"src-0000": "src-0000.src.default.svc",
+		"src-0001": "src-0001.src.default.svc",
+		"src-0002": "src-0002.src.default.svc",
+	}
+
+	volumes, err := restoreVolumes(target, run, "restore-1")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(volumes) != 3 {
+		t.Fatalf("expected 3 volumes, got %d", len(volumes))
+	}
+
+	for i, volume := range volumes {
+		member := fmt.Sprintf("target-%04d", i)
+
+		if volume.Name != member+"-default-00" || volume.Labels[constants.LabelNode] != member {
+			t.Errorf("expected volume %s-default-00 for member %s, got %s with labels %v", member, member, volume.Name, volume.Labels)
+		}
+
+		if snapshot := fmt.Sprintf("src-%04d-snapshot", i); volume.Spec.DataSource == nil || volume.Spec.DataSource.Name != snapshot {
+			t.Errorf("expected %s to come from snapshot %s, got %v", volume.Name, snapshot, volume.Spec.DataSource)
+		}
+
+		if mark := volume.Annotations[constants.AnnotationSnapshotRestoreRemap]; mark != "src-0000=src-0000.src.default.svc,src-0001=src-0001.src.default.svc,src-0002=src-0002.src.default.svc" {
+			t.Errorf("expected %s to list every backed up member for the remap, got %q", volume.Name, mark)
+		}
+	}
+}
+
+// TestRestoreVolumesHostnames checks each volume carries every backed up member's
+// recorded hostname for the node remap, when the run recorded them.
+func TestRestoreVolumesHostnames(t *testing.T) {
+	run := restoreTestRun(couchbasev2.CouchbaseSnapshotBackupRunPhaseComplete)
+	run.Spec.Hostnames = map[string]string{
+		"target-0000": "node-1.example.com",
+		"target-0001": "node-2.example.com",
+		"target-0002": "node-3.example.com",
+	}
+
+	volumes, err := restoreVolumes(restoreTestCluster(true, 3), run, "restore-1")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	want := "target-0000=node-1.example.com,target-0001=node-2.example.com,target-0002=node-3.example.com"
+
+	for _, volume := range volumes {
+		if mark := volume.Annotations[constants.AnnotationSnapshotRestoreRemap]; mark != want {
+			t.Errorf("expected %s marked %q, got %q", volume.Name, want, mark)
+		}
+	}
+}
+
+// TestSnapshotRestoreRemapNodeHostnames checks that for nodes named after the k8s
+// nodes they run on, the restore waits until every pod is placed, then writes each
+// old and new hostname, and removes the list once every node remap has finished.
+func TestSnapshotRestoreRemapNodeHostnames(t *testing.T) {
+	target := restoreTestCluster(false, 2)
+	target.Spec.Networking.InitPodsWithNodeHostname = true
+	target.Spec.Networking.ImprovedHostNetwork = true
+
+	run := restoreTestRun(couchbasev2.CouchbaseSnapshotBackupRunPhaseComplete)
+	run.Status.Snapshots = run.Status.Snapshots[:2]
+	run.Spec.Hostnames = map[string]string{"target-0000": "node-1.example.com", "target-0001": "node-2.example.com"}
+
+	marked := func(member string) *corev1.PersistentVolumeClaim {
+		volume := restoreTestVolume(member+"-default-00", "target", member)
+		volume.Annotations = map[string]string{constants.AnnotationSnapshotRestoreRemap: member + "=" + run.Spec.Hostnames[member]}
+
+		return volume
+	}
+
+	placed := func(member, node string, status corev1.ContainerStatus) *corev1.Pod {
+		pod := restoreTestRemapPod(member, status)
+		pod.Spec.NodeName = node
+
+		return pod
+	}
+
+	list := func(data string) *corev1.ConfigMap {
+		return &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{Name: "target-snapshot-restore-remap", Namespace: restoreTestNamespace},
+			Data:       map[string]string{k8sutil.SnapshotRestoreRemapKey: data},
+		}
+	}
+
+	waiting := corev1.ContainerStatus{}
+	finished := corev1.ContainerStatus{State: restoreTestExited(0)}
+	filled := "node-1.example.com node-3.example.com\nnode-2.example.com node-4.example.com\n"
+
+	testcases := []struct {
+		name          string
+		objects       []client.Object
+		expectedPhase couchbasev2.CouchbaseSnapshotBackupRestorePhase
+		// expectedList is what the list should hold afterwards, "-" if it should be gone.
+		expectedList string
+	}{
+		{
+			name:          "a pod isn't placed yet, so the list stays empty",
+			objects:       []client.Object{marked("target-0000"), marked("target-0001"), list(""), placed("target-0000", "node-3.example.com", waiting), placed("target-0001", "", waiting)},
+			expectedPhase: couchbasev2.CouchbaseSnapshotBackupRestorePhaseRemapping,
+		},
+		{
+			name:          "every pod is placed, so the list is written",
+			objects:       []client.Object{marked("target-0000"), marked("target-0001"), list(""), placed("target-0000", "node-3.example.com", waiting), placed("target-0001", "node-4.example.com", waiting)},
+			expectedPhase: couchbasev2.CouchbaseSnapshotBackupRestorePhaseRemapping,
+			expectedList:  filled,
+		},
+		{
+			name:          "every node remap finished, so the list is removed",
+			objects:       []client.Object{marked("target-0000"), marked("target-0001"), list(filled), placed("target-0000", "node-3.example.com", finished), placed("target-0001", "node-4.example.com", finished)},
+			expectedPhase: couchbasev2.CouchbaseSnapshotBackupRestorePhaseWaitingForCluster,
+			expectedList:  "-",
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			r, fakeClient := newRestoreTestReconciler(t, restoreTestSetup{
+				restore: restoreTestRestore(couchbasev2.CouchbaseSnapshotBackupRestorePhaseRemapping),
+				cluster: target,
+				run:     run,
+				volumes: testcase.objects,
+			})
+			key := types.NamespacedName{Namespace: restoreTestNamespace, Name: "restore"}
+
+			if _, err := r.Reconcile(t.Context(), reconcile.Request{NamespacedName: key}); err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+
+			got := &couchbasev2.CouchbaseSnapshotBackupRestore{}
+			if err := fakeClient.Get(t.Context(), key, got); err != nil {
+				t.Fatalf("failed to get restore: %v", err)
+			}
+
+			checkRestoreTestResult(t, got, testcase.expectedPhase, "", false, "")
+
+			saved := &corev1.ConfigMap{}
+			err := fakeClient.Get(t.Context(), types.NamespacedName{Namespace: restoreTestNamespace, Name: "target-snapshot-restore-remap"}, saved)
+
+			switch {
+			case testcase.expectedList == "-":
+				if !errors.IsNotFound(err) {
+					t.Errorf("expected the list removed, got %v", err)
+				}
+			case err != nil:
+				t.Fatalf("failed to get the list: %v", err)
+			case saved.Data[k8sutil.SnapshotRestoreRemapKey] != testcase.expectedList:
+				t.Errorf("expected the list %q, got %q", testcase.expectedList, saved.Data[k8sutil.SnapshotRestoreRemapKey])
+			}
+		})
+	}
+}
+
+// TestResetRemapList checks a list left from an earlier restore of the cluster is emptied and
+// taken over by the new restore.
+func TestResetRemapList(t *testing.T) {
+	leftover := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "target-snapshot-restore-remap", Namespace: restoreTestNamespace},
+		Data:       map[string]string{k8sutil.SnapshotRestoreRemapKey: "node-1.example.com node-3.example.com\n"},
+	}
+
+	restore := restoreTestRestore(couchbasev2.CouchbaseSnapshotBackupRestorePhaseProvisioning)
+	r, fakeClient := newRestoreTestReconciler(t, restoreTestSetup{restore: restore, cluster: restoreTestCluster(true, 3), volumes: []client.Object{leftover}})
+
+	if err := r.resetRemapList(t.Context(), restore, restoreTestCluster(true, 3)); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	got := &corev1.ConfigMap{}
+	if err := fakeClient.Get(t.Context(), client.ObjectKeyFromObject(leftover), got); err != nil {
+		t.Fatalf("failed to get the list: %v", err)
+	}
+
+	if len(got.Data) != 0 || len(got.OwnerReferences) != 1 || got.OwnerReferences[0].Name != restore.Name {
+		t.Errorf("expected an empty list owned by restore %s, got data %v owners %v", restore.Name, got.Data, got.OwnerReferences)
+	}
+}
+
+// TestSeedTargetStateRefreshUUID checks the restore asks the operator to read the cluster's UUID
+// again only when the target has a new name, since only then does the node remap tool change it.
+func TestSeedTargetStateRefreshUUID(t *testing.T) {
+	for _, source := range []string{"target", "src"} {
+		t.Run("backed up from "+source, func(t *testing.T) {
+			target := restoreTestCluster(true, 3)
+			r, _ := newRestoreTestReconciler(t, restoreTestSetup{
+				restore: restoreTestRestore(couchbasev2.CouchbaseSnapshotBackupRestorePhaseProvisioning),
+				cluster: target,
+				volumes: []client.Object{restoreTestState(nil)},
+			})
+
+			run := restoreTestRun(couchbasev2.CouchbaseSnapshotBackupRunPhaseComplete)
+			run.Labels = map[string]string{constants.LabelCluster: source}
+
+			if err := r.seedTargetState(t.Context(), target, run); err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+
+			state, err := r.kubeClient.CoreV1().Secrets(restoreTestNamespace).Get(t.Context(), "target", metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("failed to get saved state: %v", err)
+			}
+
+			_, refresh := state.Data[string(persistence.RefreshUUID)]
+			if refresh != (source != "target") {
+				t.Errorf("expected a refresh %v for a run backed up from %s, got %v", source != "target", source, refresh)
+			}
+		})
+	}
+}
+
+// TestSeedTargetStateReloadTLS checks the restore asks the operator to reload the server
+// certificate only when the target has TLS.
+func TestSeedTargetStateReloadTLS(t *testing.T) {
+	for _, tls := range []bool{false, true} {
+		t.Run(fmt.Sprintf("tls=%v", tls), func(t *testing.T) {
+			target := restoreTestCluster(true, 3)
+			if tls {
+				target.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
+					SecretSource: &couchbasev2.TLSSecretSource{ServerSecretName: "target-tls"},
+				}
+			}
+
+			r, _ := newRestoreTestReconciler(t, restoreTestSetup{
+				restore: restoreTestRestore(couchbasev2.CouchbaseSnapshotBackupRestorePhaseProvisioning),
+				cluster: target,
+				volumes: []client.Object{restoreTestState(nil)},
+			})
+
+			if err := r.seedTargetState(t.Context(), target, restoreTestRun(couchbasev2.CouchbaseSnapshotBackupRunPhaseComplete)); err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+
+			state, err := r.kubeClient.CoreV1().Secrets(restoreTestNamespace).Get(t.Context(), "target", metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("failed to get saved state: %v", err)
+			}
+
+			if _, reload := state.Data[string(persistence.ReloadTLS)]; reload != tls {
+				t.Errorf("expected a reload %v, got %v", tls, reload)
 			}
 		})
 	}

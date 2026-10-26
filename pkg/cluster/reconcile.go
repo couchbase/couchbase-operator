@@ -1678,6 +1678,23 @@ func (c *Cluster) reconcilePDB() error {
 // dependant cluster status, in case someone or something thought it wise to
 // delete it!
 func (c *Cluster) reconcilePersistentStatus() error {
+	// After a snapshot restore into a cluster with a new name, the node remap tool gave the cluster
+	// a new UUID that the restore couldn't know, so we read it from the cluster once it's up.
+	refresh, err := c.state.Exists(persistence.RefreshUUID)
+	if err != nil {
+		return err
+	}
+
+	if refresh {
+		if _, err := c.fetchAndPersistClusterUUID(c.readyMembers()); err != nil {
+			return err
+		}
+
+		if err := c.state.Delete(persistence.RefreshUUID); err != nil {
+			return err
+		}
+	}
+
 	uuid, err := c.state.Get(persistence.UUID)
 	if err != nil {
 		return err

@@ -350,6 +350,31 @@ func (c *Cluster) snapshotBackupResourceNames() (bucketNames, scopeNames, collec
 	return bucketNames, scopeNames, collectionNames, nil
 }
 
+// snapshotBackupTrustedCAs returns the CAs the cluster trusts, so a
+// restore can tell if the target uses a different one. Before 7.1
+// the CAs can't be listed.
+func (c *Cluster) snapshotBackupTrustedCAs() ([]string, error) {
+	if !c.cluster.IsTLSEnabled() {
+		return nil, nil
+	}
+
+	if ok, err := c.RunningVersionIsAtLeast("7.1.0"); err != nil || !ok {
+		return nil, err
+	}
+
+	var cas couchbaseutil.TrustedCAList
+	if err := couchbaseutil.ListCAs(&cas).On(c.api, c.members); err != nil {
+		return nil, err
+	}
+
+	pems := make([]string, 0, len(cas))
+	for _, ca := range cas {
+		pems = append(pems, ca.PEM)
+	}
+
+	return pems, nil
+}
+
 // createSnapshotBackupRun creates a new CouchbaseSnapshotBackupRun for the given backup,
 // in the InProgress phase, before any snapshot API call is made. If the operator crashes
 // midway through, this run stays sitting there marked InProgress instead of quietly
@@ -366,6 +391,16 @@ func (c *Cluster) createSnapshotBackupRun(backup *couchbasev2.CouchbaseBackup, b
 	bucketNames, scopeNames, collectionNames, err := c.snapshotBackupResourceNames()
 	if err != nil {
 		return nil, err
+	}
+
+	trustedCAs, err := c.snapshotBackupTrustedCAs()
+	if err != nil {
+		return nil, err
+	}
+
+	hostnames := map[string]string{}
+	for _, member := range c.members {
+		hostnames[member.Name()] = member.GetDNSName()
 	}
 
 	run := &couchbasev2.CouchbaseSnapshotBackupRun{
@@ -388,6 +423,9 @@ func (c *Cluster) createSnapshotBackupRun(backup *couchbasev2.CouchbaseBackup, b
 			Collections:     collectionNames,
 			MaxSkew:         &backup.Spec.SnapshotBackup.MaxSkew,
 			ReadyTimeout:    &backup.Spec.SnapshotBackup.ReadyTimeout,
+			BackupRetention: backup.Spec.BackupRetention,
+			Hostnames:       hostnames,
+			TrustedCAs:      trustedCAs,
 		},
 	}
 
@@ -545,9 +583,9 @@ func (c *Cluster) captureIndividualSnapshots(backup *couchbasev2.CouchbaseBackup
 			}
 
 			volumes = append(volumes, volumeToSnapshot{
-				member:      member.Name(),
-				pvc:         pvc.Name,
-				mountPath:   pvc.Annotations[constants.AnnotationVolumeMountPath],
+				member:           member.Name(),
+				pvc:              pvc.Name,
+				mountPath:        pvc.Annotations[constants.AnnotationVolumeMountPath],
 				serverClass:      pvc.Annotations[constants.AnnotationVolumeNodeConf],
 				serverGroup:      k8sutil.PVCServerGroup(pvc),
 				availabilityZone: k8sutil.PVCAvailabilityZone(pvc),
@@ -570,10 +608,10 @@ func (c *Cluster) captureIndividualSnapshots(backup *couchbasev2.CouchbaseBackup
 			}
 
 			snapshots[i] = couchbasev2.CouchbaseSnapshotBackupRunSnapshot{
-				Member:       volume.member,
-				VolumeName:   volume.pvc,
-				SnapshotName: snapshotName,
-				MountPath:    volume.mountPath,
+				Member:           volume.member,
+				VolumeName:       volume.pvc,
+				SnapshotName:     snapshotName,
+				MountPath:        volume.mountPath,
 				ServerClass:      volume.serverClass,
 				ServerGroup:      volume.serverGroup,
 				AvailabilityZone: volume.availabilityZone,
@@ -1197,6 +1235,68 @@ func (c *Cluster) cleanupOldSnapshotBackupRuns(backup *couchbasev2.CouchbaseBack
 	return nil
 }
 
+// cleanupOrphanedSnapshotBackupRuns deletes runs past their retention when their backup is gone.
+// The runs are kept when a backup is deleted, but nothing else would ever remove them. The newest
+// Complete run of each one is kept, the same as while the backup existed. Runs taken before the
+// retention was recorded are left alone.
+func (c *Cluster) cleanupOrphanedSnapshotBackupRuns(backups []couchbasev2.CouchbaseBackup) error {
+	for backup, runs := range orphanedSnapshotBackupRuns(c.k8s.CouchbaseSnapshotBackupRuns.List(), c.cluster.Name, backups) {
+		retention := snapshotBackupRunRetention(runs)
+		if retention == nil {
+			continue
+		}
+
+		for _, run := range snapshotBackupRunsToDelete(runs, retention.Duration, time.Now()) {
+			if err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseSnapshotBackupRuns(c.cluster.Namespace).Delete(context.Background(), run.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
+
+			c.log.Info("Deleted snapshot backup run past its retention, its backup no longer exists", "cluster", c.namespacedName(), "backup", backup, "run", run.Name)
+		}
+	}
+
+	return nil
+}
+
+// orphanedSnapshotBackupRuns returns the cluster's runs whose backup no longer exists, by the name of
+// the backup they came from.
+func orphanedSnapshotBackupRuns(runs []*couchbasev2.CouchbaseSnapshotBackupRun, cluster string, backups []couchbasev2.CouchbaseBackup) map[string][]*couchbasev2.CouchbaseSnapshotBackupRun {
+	existing := map[string]bool{}
+	for i := range backups {
+		existing[backups[i].Name] = true
+	}
+
+	orphaned := map[string][]*couchbasev2.CouchbaseSnapshotBackupRun{}
+
+	for _, run := range runs {
+		if run.Labels[constants.LabelCluster] != cluster || existing[run.Spec.SourceBackup] {
+			continue
+		}
+
+		orphaned[run.Spec.SourceBackup] = append(orphaned[run.Spec.SourceBackup], run)
+	}
+
+	return orphaned
+}
+
+// snapshotBackupRunRetention returns the retention recorded on the newest run that has one, so the
+// runs follow the backup's last setting.
+func snapshotBackupRunRetention(runs []*couchbasev2.CouchbaseSnapshotBackupRun) *metav1.Duration {
+	var newest *couchbasev2.CouchbaseSnapshotBackupRun
+
+	for _, run := range runs {
+		if run.Spec.BackupRetention != nil && (newest == nil || run.CreationTimestamp.After(newest.CreationTimestamp.Time)) {
+			newest = run
+		}
+	}
+
+	if newest == nil {
+		return nil
+	}
+
+	return newest.Spec.BackupRetention
+}
+
 // snapshotBackupRunsToDelete returns the runs older than the retention period. The newest
 // Complete run is always kept, so a long run of failures can't leave the backup with nothing
 // to restore from, and InProgress runs are never deleted.
@@ -1263,6 +1363,11 @@ func (c *Cluster) reconcileSnapshotBackup() error {
 		if err := c.reconcileSnapshotBackupFor(&backups[i]); err != nil {
 			errs = append(errs, fmt.Errorf("snapshot backup %s: %w", backups[i].Name, err))
 		}
+	}
+
+	// Only when backups are managed, otherwise we don't list them and every run would look orphaned.
+	if c.cluster.Spec.Backup.Managed {
+		errs = append(errs, c.cleanupOrphanedSnapshotBackupRuns(backups))
 	}
 
 	// Errors are logged, not returned, so a snapshot problem doesn't stop the rest of the

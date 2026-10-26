@@ -322,6 +322,11 @@ func (f fakeSavedState) Get(kind persistence.PersistentKind) (string, error) {
 	return value, nil
 }
 
+func (f fakeSavedState) Exists(kind persistence.PersistentKind) (bool, error) {
+	_, ok := f[kind]
+	return ok, nil
+}
+
 func (f fakeSavedState) Clear() error {
 	return nil
 }
@@ -368,6 +373,27 @@ func TestReloadSavedPassword(t *testing.T) {
 				t.Errorf("expected password %q, got %q", testcase.expected, c.password)
 			}
 		})
+	}
+}
+
+// TestReconcilePersistentStatusWithoutRefresh checks a cluster that wasn't restored under a new name
+// keeps the UUID it has saved.
+func TestReconcilePersistentStatusWithoutRefresh(t *testing.T) {
+	stored := &couchbasev2.CouchbaseCluster{ObjectMeta: metav1.ObjectMeta{Name: fakeClusterName, Namespace: fakeClusterNamespace}}
+
+	c := &Cluster{
+		k8s:     &client.Client{CouchbaseClient: cbfake.NewSimpleClientset(stored)},
+		cluster: stored.DeepCopy(),
+		state:   fakeSavedState{persistence.UUID: "f50608c895e226375ef4a3a6fb76229f"},
+		log:     logf.Log.WithName("test"),
+	}
+
+	if err := c.reconcilePersistentStatus(); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if c.cluster.Status.ClusterID != "f50608c895e226375ef4a3a6fb76229f" {
+		t.Errorf("expected the saved UUID, got %q", c.cluster.Status.ClusterID)
 	}
 }
 

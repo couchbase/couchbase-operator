@@ -1392,6 +1392,10 @@ func (c *Cluster) updateTLS() error {
 		return nil
 	}
 
+	if err := c.reloadRestoredTLS(); err != nil {
+		return err
+	}
+
 	// Parse the certificate chain.
 	chainPem := util_x509.DecodePEM(c.tlsCache.serverCert)
 
@@ -1427,6 +1431,28 @@ func (c *Cluster) updateTLS() error {
 	}
 
 	return c.updateClientCA()
+}
+
+// reloadRestoredTLS reloads the server certificate on every member once after a snapshot
+// restore, because the restored volumes still list the backed up certificate as loaded.
+func (c *Cluster) reloadRestoredTLS() error {
+	reload, err := c.state.Exists(persistence.ReloadTLS)
+	if err != nil || !reload {
+		return err
+	}
+
+	// Wait until we can reach every member, so none of them is missed.
+	if c.callableMembers.Size() != c.members.Size() {
+		return nil
+	}
+
+	for _, member := range c.callableMembers {
+		if err := c.reloadChain(member); err != nil {
+			return err
+		}
+	}
+
+	return c.state.Delete(persistence.ReloadTLS)
 }
 
 func (c *Cluster) updateClientCA() error {

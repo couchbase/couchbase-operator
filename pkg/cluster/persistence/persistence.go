@@ -51,6 +51,14 @@ const (
 	// Version is the lowest Couchbase version we are on or upgrading from.
 	Version PersistentKind = "version"
 
+	// RefreshUUID is set by a snapshot restore into a cluster with a new name. The node remap tool
+	// gives the cluster a new UUID, so we read it from the cluster again once it's up.
+	RefreshUUID PersistentKind = "refreshUUID"
+
+	// ReloadTLS is set by a snapshot restore into a cluster with TLS. The restored volumes still
+	// list the backed up certificate as loaded, so we reload it once the cluster is up.
+	ReloadTLS PersistentKind = "reloadTLS"
+
 	// Upgrading is flagged when an upgrade starts and removed on termination.
 	Upgrading PersistentKind = "upgrading"
 
@@ -154,6 +162,8 @@ type PersistentStorage interface {
 	DeleteXDCR(string) error
 	// Get a value.
 	Get(PersistentKind) (string, error)
+	// Exists reports whether a key is set, without waiting for it to appear.
+	Exists(PersistentKind) (bool, error)
 	// Clear clears persistent storage (e.g. ephemeral disaster recovery)
 	Clear() error
 }
@@ -400,6 +410,17 @@ func (p *persistentStorageImpl) DeleteXDCR(connectionName string) error {
 }
 
 // Get a value.
+func (p *persistentStorageImpl) Exists(kind PersistentKind) (bool, error) {
+	secret, err := p.get()
+	if err != nil {
+		return false, err
+	}
+
+	_, ok := secret.Data[string(kind)]
+
+	return ok, nil
+}
+
 func (p *persistentStorageImpl) Get(kind PersistentKind) (string, error) {
 	var value string
 

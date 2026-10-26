@@ -1356,13 +1356,14 @@ func CreateCouchbasePodSpec(m couchbaseutil.Member, cluster *couchbasev2.Couchba
 				pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
 
 				// A volume made by a snapshot restore needs a node remap before Couchbase starts.
-				if _, ok := pvc.Annotations[constants.AnnotationSnapshotRestoreRemap]; ok {
-					remap, err := couchbaseRemapInitContainer(cluster, pvc.Name, serverConfig, image, pvc.Annotations[constants.AnnotationSnapshotRestoreRemapID])
+				if mark, ok := pvc.Annotations[constants.AnnotationSnapshotRestoreRemap]; ok {
+					remap, err := couchbaseRemapInitContainer(cluster, pvc.Name, serverConfig, image, mark, pvc.Annotations[constants.AnnotationSnapshotRestoreRemapID])
 					if err != nil {
 						return nil, err
 					}
 
 					pod.Spec.InitContainers = append(pod.Spec.InitContainers, remap)
+					pod.Spec.Volumes = append(pod.Spec.Volumes, remapListVolumes(cluster)...)
 				}
 			}
 		}
@@ -2309,11 +2310,12 @@ func couchbaseInitContainer(cluster *couchbasev2.CouchbaseCluster, claimName str
 }
 
 // couchbaseRemapInitContainer runs the Couchbase node remap tool on a restored volume before
-// Couchbase starts, to turn off auto failover. The operator turns it back on from the cluster
-// spec once the cluster is up. The tool can't write over the folder it reads from, so we write to
-// a separate folder on the volume and copy that back. It only runs once, it leaves a file on the
-// volume, and a restarted pod sees the file and skips it.
-func couchbaseRemapInitContainer(cluster *couchbasev2.CouchbaseCluster, claimName string, config couchbasev2.ServerConfig, image, restoreID string) (v1.Container, error) {
+// Couchbase starts. It turns off auto failover, and when the cluster has a new name it also gives
+// the nodes their new names. The operator turns auto failover back on from the cluster spec once
+// the cluster is up. The tool can't write over the folder it reads from, so we write to a separate
+// folder on the volume and copy that back. It only runs once, it leaves a file on the volume, and a
+// restarted pod sees the file and skips it.
+func couchbaseRemapInitContainer(cluster *couchbasev2.CouchbaseCluster, claimName string, config couchbasev2.ServerConfig, image, mark, restoreID string) (v1.Container, error) {
 	// A restored volume can carry done files from earlier restores in its backup, so the file is
 	// named after the restore. Older ones are removed so they don't end up in later backups.
 	if !remapRestoreID.MatchString(restoreID) {
@@ -2322,6 +2324,11 @@ func couchbaseRemapInitContainer(cluster *couchbasev2.CouchbaseCluster, claimNam
 
 	done := "$D/.snapshot-restore-remapped-" + restoreID
 
+	names, err := remapNameArgs(cluster, mark)
+	if err != nil {
+		return v1.Container{}, err
+	}
+
 	container := couchbaseInitContainer(cluster, claimName, config, image)
 	container.Name = fmt.Sprintf("%s-remap", constants.CouchbaseContainerName)
 
@@ -2329,14 +2336,47 @@ func couchbaseRemapInitContainer(cluster *couchbasev2.CouchbaseCluster, claimNam
 	// same CPU and memory as the Couchbase container.
 	container.Resources = couchbaseContainer(cluster, &config, image).Resources
 
-	container.Args = []string{"bash", "-c", `D=/opt/couchbase/var/lib/couchbase
-if [ ! -e "` + done + `" ]; then
-  rm -rf "$D/.snapshot-restore-remap" &&
-  /opt/couchbase/bin/node_remap --initargs "$D/initargs" --output-path "$D/.snapshot-restore-remap" --just-disable-auto-failover &&
-  cp -Rf "$D/.snapshot-restore-remap/." "$D/" &&
-  rm -rf "$D/.snapshot-restore-remap" "$D"/.snapshot-restore-remapped* &&
-  touch "` + done + `"
-fi`}
+	// Nodes named after the k8s nodes they run on only learn their new names once every pod is
+	// placed, so read_list waits for the restore to write them and puts them in args.
+	nameArgs := quoteArgs(names)
+	if UsesNodeHostnames(cluster) {
+		nameArgs = `"${args[@]}"`
+	}
+
+	// Each step only runs if the one before it worked.
+	steps := []string{`rm -rf "$D/.snapshot-restore-remap"`}
+
+	if UsesNodeHostnames(cluster) {
+		steps = append(steps, "read_list")
+	}
+
+	steps = append(steps,
+		`/opt/couchbase/bin/node_remap --initargs "$D/initargs" --output-path "$D/.snapshot-restore-remap" `+nameArgs+" "+quoteArgs(remapExtraArgs(image)),
+		`cp -Rf "$D/.snapshot-restore-remap/." "$D/"`,
+		`rm -rf "$D/.snapshot-restore-remap" "$D"/.snapshot-restore-remapped*`,
+	)
+
+	// The restored volume still has the backed up cluster's server certificate loaded, and we
+	// can't reach the node to reload it when the names in it don't match. So we put the
+	// cluster's own certificate in place before Couchbase starts.
+	if cluster.IsTLSEnabled() {
+		steps = append(steps,
+			`cp "$D/inbox/chain.pem" "$D/config/certs/chain.pem"`,
+			`cp "$D/inbox/pkey.key" "$D/config/certs/pkey.pem"`,
+		)
+	}
+
+	steps = append(steps, `touch "`+done+`"`)
+
+	script := "D=/opt/couchbase/var/lib/couchbase\n" +
+		`if [ ! -e "` + done + `" ]; then` + "\n  " +
+		strings.Join(steps, " &&\n  ") + "\nfi"
+
+	if UsesNodeHostnames(cluster) {
+		script = remapListScript + script
+	}
+
+	container.Args = []string{"bash", "-c", script}
 
 	// Mounted the same way as the Couchbase container, since the node remap tool reads the paths saved in initargs.
 	container.VolumeMounts = []v1.VolumeMount{
@@ -2344,7 +2384,172 @@ fi`}
 		{Name: claimName, MountPath: couchbaseVolumeDefaultEtcDir, SubPath: etcSubPathName},
 	}
 
+	if cluster.IsTLSEnabled() {
+		container.VolumeMounts = append(container.VolumeMounts, v1.VolumeMount{
+			Name:      constants.CouchbaseTLSVolumeName,
+			ReadOnly:  true,
+			MountPath: couchbaseTLSVolumeMountDir,
+		})
+	}
+
+	if UsesNodeHostnames(cluster) {
+		container.VolumeMounts = append(container.VolumeMounts, v1.VolumeMount{
+			Name:      snapshotRestoreRemapVolume,
+			ReadOnly:  true,
+			MountPath: snapshotRestoreRemapMountDir,
+		})
+	}
+
 	return container, nil
+}
+
+// UsesNodeHostnames says if the cluster names its nodes after the k8s
+// nodes they run on.
+func UsesNodeHostnames(cluster *couchbasev2.CouchbaseCluster) bool {
+	return cluster.Spec.Networking.InitPodsWithNodeHostname && cluster.Spec.Networking.ImprovedHostNetwork
+}
+
+// SnapshotRestoreRemapConfigMap is where a restore puts the old and new hostnames
+// when they're only known once the pods are placed. A cluster only has one restore
+// running at a time.
+func SnapshotRestoreRemapConfigMap(cluster *couchbasev2.CouchbaseCluster) string {
+	return cluster.Name + "-snapshot-restore-remap"
+}
+
+const (
+	// snapshotRestoreRemapVolume mounts the restore's hostname list into the remap container.
+	snapshotRestoreRemapVolume = "snapshot-restore-remap"
+
+	// snapshotRestoreRemapMountDir is where the remap container finds the list.
+	snapshotRestoreRemapMountDir = "/etc/couchbase-restore"
+
+	// SnapshotRestoreRemapKey holds the list, one "old new" pair of hostnames on each line.
+	SnapshotRestoreRemapKey = "hostnames"
+)
+
+// remapListScript defines read_list, which waits for the restore to write the
+// hostname list, then fills args with what the node remap tool needs. It's used
+// when nodes are named after the k8s nodes they run on, since their new names
+// are only known once every pod is placed.
+const remapListScript = `read_list() {
+  list=` + snapshotRestoreRemapMountDir + `/` + SnapshotRestoreRemapKey + `
+
+  # Wait up to 30 minutes for the restore to write the list.
+  for i in $(seq 360); do
+    if [ -s "$list" ]; then
+      break
+    fi
+    sleep 5
+  done
+
+  if [ ! -s "$list" ]; then
+    echo "the restore didn't write the hostname list"
+    return 1
+  fi
+
+  # Each line has a node's old and new hostname.
+  args=()
+  while read -r old new; do
+    if [ "$old" != "$new" ]; then
+      args+=(--remap "ns_1@$old" "ns_1@$new")
+    fi
+  done < "$list"
+
+  # No hostname changed, so only auto failover needs turning off.
+  if [ ${#args[@]} -eq 0 ]; then
+    args=(--just-disable-auto-failover)
+  fi
+}
+`
+
+// remapListVolumes returns the volume holding the restore's hostname list,
+// for clusters whose nodes are named after the k8s nodes they run on.
+// The list may not exist yet, so it's optional.
+func remapListVolumes(cluster *couchbasev2.CouchbaseCluster) []v1.Volume {
+	if !UsesNodeHostnames(cluster) {
+		return nil
+	}
+
+	optional := true
+
+	return []v1.Volume{{
+		Name: snapshotRestoreRemapVolume,
+		VolumeSource: v1.VolumeSource{
+			ConfigMap: &v1.ConfigMapVolumeSource{
+				LocalObjectReference: v1.LocalObjectReference{Name: SnapshotRestoreRemapConfigMap(cluster)},
+				Optional:             &optional,
+			},
+		},
+	}}
+}
+
+// remapMemberName matches the member names the operator gives its pods.
+var remapMemberName = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?-[0-9]{4}$`)
+
+// quoteArgs puts each argument in single quotes for the shell and joins them with spaces.
+func quoteArgs(args []string) string {
+	quoted := make([]string, len(args))
+	for i, arg := range args {
+		quoted[i] = "'" + arg + "'"
+	}
+
+	return strings.Join(quoted, " ")
+}
+
+// remapExtraArgs returns the arguments that don't depend on the node names. From 8.5
+// the tool can also turn off continuous backup. A restored node would otherwise carry
+// on writing to the same backup location as the cluster it was backed up from, but
+// from an older point. The user turns it back on once the cluster is up.
+func remapExtraArgs(image string) []string {
+	version, _ := couchbaseutil.CouchbaseImageVersion(image)
+	if after85, _ := couchbaseutil.VersionAfter(version, "8.5.0"); after85 {
+		return []string{"--disable-continuous-backup"}
+	}
+
+	return nil
+}
+
+// remapHostname matches a valid hostname. Each hostname goes into the remap script,
+// so anything that isn't a hostname is refused.
+var remapHostname = regexp.MustCompile(`^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$`)
+
+// remapNameArgs returns the arguments that say what to do with the node names. The mark
+// lists each backed up member with its hostname. Only the nodes whose hostname changes are
+// renamed, and if none do, the tool only turns off auto failover.
+func remapNameArgs(cluster *couchbasev2.CouchbaseCluster, mark string) ([]string, error) {
+	var args []string
+
+	for _, entry := range strings.Split(mark, ",") {
+		old, oldHostname, _ := strings.Cut(entry, "=")
+		if !remapMemberName.MatchString(old) {
+			return nil, fmt.Errorf("volume remap mark has a bad member name %q", old)
+		}
+
+		if !remapHostname.MatchString(oldHostname) {
+			return nil, fmt.Errorf("volume remap mark has a bad hostname %q", oldHostname)
+		}
+
+		index, err := couchbaseutil.GetIndexFromMemberName(old)
+		if err != nil {
+			return nil, err
+		}
+
+		newHostname := RestoredHostname(cluster, couchbaseutil.CreateMemberName(cluster.Name, index))
+		if newHostname != oldHostname {
+			args = append(args, "--remap", "ns_1@"+oldHostname, "ns_1@"+newHostname)
+		}
+	}
+
+	if len(args) == 0 {
+		return []string{"--just-disable-auto-failover"}, nil
+	}
+
+	return args, nil
+}
+
+// RestoredHostname returns the hostname the operator gives a member of the cluster.
+func RestoredHostname(cluster *couchbasev2.CouchbaseCluster, member string) string {
+	return couchbaseutil.NewMember(cluster.Namespace, cluster.Name, member, "", "", false, "").GetDNSName()
 }
 
 // remapRestoreID matches a k8s UID, the only thing that goes into the done file's name.

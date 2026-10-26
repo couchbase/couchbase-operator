@@ -12,6 +12,7 @@ package v2
 
 import (
 	"crypto/x509"
+	"encoding/json"
 	goerrors "errors"
 	"fmt"
 	"reflect"
@@ -133,6 +134,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintCloudNativeGatewayPreserveReadyInstances,
 		checkConstraintXDCRConnectionTLS,
 		checkConstraintPublicNetworking,
+		checkConstraintExternalMigrationTLS,
 		checkConstraintBucketNames,
 		checkConstraintBucketSynchronization,
 		checkConstraintMTLSPaths,
@@ -2054,6 +2056,17 @@ func checkConstraintXDCRConnectionTLS(v *types.Validator, cluster *couchbasev2.C
 	return nil
 }
 
+// checkConstraintExternalMigrationTLS checks a cluster migrating from an external cluster with
+// spec.networking.dns also uses TLS. The operator talks to its nodes over TLS, so without it
+// the cluster can't be managed once the migration finishes.
+func checkConstraintExternalMigrationTLS(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if !cluster.IsExternalMigrationCluster() || cluster.IsTLSEnabled() {
+		return nil
+	}
+
+	return errors.Required("spec.networking.tls", "body", nil)
+}
+
 // checkConstraintPublicNetworking checks that when the intention (this is implicit, thus
 // probably bad) is to use public networking, then both TLS and DNS are configured.
 func checkConstraintPublicNetworking(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
@@ -3827,6 +3840,7 @@ func CheckConstraintsSnapshotBackupRestore(v *types.Validator, restore *couchbas
 		checkSnapshotBackupRestoreFits,
 		checkSnapshotBackupRestoreAdminUser,
 		checkSnapshotBackupRestorePlacement,
+		checkSnapshotBackupRestoreNotRunning,
 	}
 
 	var errs []error
@@ -3855,6 +3869,30 @@ func checkConstraintSnapshotBackupRestoreNameLength(_ *types.Validator, restore 
 	const maxLabelValueLength = 63
 	if len(restore.Name) > maxLabelValueLength {
 		return fmt.Errorf("snapshot backup restore name %q cannot be longer than %d characters", restore.Name, maxLabelValueLength)
+	}
+
+	return nil
+}
+
+// checkSnapshotBackupRestoreNotRunning checks no other restore is still working on the same
+// target. Two at once would each replace the volumes the other just made.
+func checkSnapshotBackupRestoreNotRunning(v *types.Validator, restore *couchbasev2.CouchbaseSnapshotBackupRestore, _ *couchbasev2.CouchbaseSnapshotBackupRun, _ *couchbasev2.CouchbaseCluster) error {
+	restores, err := v.Abstraction.ListCouchbaseSnapshotBackupRestores(restore.Namespace)
+	if err != nil {
+		return err
+	}
+
+	for _, other := range restores.Items {
+		if other.Name == restore.Name || other.Spec.Target.Name != restore.Spec.Target.Name {
+			continue
+		}
+
+		switch other.Status.Phase {
+		case couchbasev2.CouchbaseSnapshotBackupRestorePhaseComplete, couchbasev2.CouchbaseSnapshotBackupRestorePhaseFailed:
+			continue
+		}
+
+		return fmt.Errorf("restore %s is still restoring into cluster %s, wait for it to finish or delete it first", other.Name, restore.Spec.Target.Name)
 	}
 
 	return nil
@@ -3903,6 +3941,12 @@ func checkSnapshotBackupRestoreTarget(_ *types.Validator, restore *couchbasev2.C
 		return fmt.Errorf("spec.target.name %s doesn't exist, create the cluster first with spec.hibernate set to true", target.Name)
 	}
 
+	// A migrating cluster doesn't hibernate, and it removes pods that aren't set up yet,
+	// so a restore into it would never finish.
+	if cluster.IsMigrationCluster() {
+		return fmt.Errorf("cluster %s is still migrating, remove spec.migration once the migration has finished, then restore", target.Name)
+	}
+
 	hasData := cluster.Status.ClusterID != ""
 	acknowledged := target.AcknowledgeDataLoss != nil && *target.AcknowledgeDataLoss
 
@@ -3930,11 +3974,46 @@ func checkSnapshotBackupRestoreFits(v *types.Validator, restore *couchbasev2.Cou
 		return err
 	}
 
+	if err := checkSnapshotBackupRestoreSettings(run, cluster); err != nil {
+		return err
+	}
+
 	if err := checkSnapshotBackupRestoreCoverage(v, restore, run, cluster); err != nil {
 		return err
 	}
 
 	return checkSnapshotBackupRestoreContinuousBackup(v, run, cluster)
+}
+
+// checkSnapshotBackupRestoreSettings checks the target matches the backed up cluster on settings
+// that can't change once the restored data is up, or the restore never finishes.
+func checkSnapshotBackupRestoreSettings(run *couchbasev2.CouchbaseSnapshotBackupRun, cluster *couchbasev2.CouchbaseCluster) error {
+	if len(run.Spec.ClusterSpec.Raw) == 0 {
+		return nil
+	}
+
+	backedUp := &couchbasev2.CouchbaseCluster{}
+	if err := json.Unmarshal(run.Spec.ClusterSpec.Raw, &backedUp.Spec); err != nil {
+		return fmt.Errorf("spec.runName %s has a cluster spec that can't be read: %w", run.Name, err)
+	}
+
+	// The restored nodes come back with the backed up cluster's TLS settings.
+	// Turning TLS on or off needs the nodes running together, so the target must match.
+	if backedUp.IsTLSEnabled() && !cluster.IsTLSEnabled() {
+		return fmt.Errorf("cluster %s doesn't use TLS but the backed up cluster did, the target must use TLS the same way", cluster.Name)
+	}
+
+	if !backedUp.IsTLSEnabled() && cluster.IsTLSEnabled() {
+		return fmt.Errorf("cluster %s uses TLS but the backed up cluster didn't, the target must use TLS the same way", cluster.Name)
+	}
+
+	// Couchbase won't change the index storage mode while there are index nodes, and the
+	// restored nodes come back with the services they had.
+	if backedUp.IsIndexerEnabled() && backedUp.IndexStorageMode() != cluster.IndexStorageMode() {
+		return fmt.Errorf("cluster %s uses index storage mode %s but the backed up cluster used %s, the target must use the same one", cluster.Name, cluster.IndexStorageMode(), backedUp.IndexStorageMode())
+	}
+
+	return nil
 }
 
 // checkSnapshotBackupRestoreContinuousBackup rejects a restore when a restored bucket's CR has continuous
@@ -4222,7 +4301,7 @@ func (c *snapshotBackupRestoreCoverage) addCollections(v *types.Validator, names
 
 // snapshotBackupRestoreWarnings warns about things a restore allows but the user may not expect,
 // like restoring a target with a different number of nodes, which the restore then has to scale.
-func snapshotBackupRestoreWarnings(_ *types.Validator, _ *couchbasev2.CouchbaseSnapshotBackupRestore, run *couchbasev2.CouchbaseSnapshotBackupRun, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+func snapshotBackupRestoreWarnings(v *types.Validator, _ *couchbasev2.CouchbaseSnapshotBackupRestore, run *couchbasev2.CouchbaseSnapshotBackupRun, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
 	if run == nil || cluster == nil {
 		return nil, nil
 	}
@@ -4249,7 +4328,43 @@ func snapshotBackupRestoreWarnings(_ *types.Validator, _ *couchbasev2.CouchbaseS
 		warnings = append(warnings, fmt.Sprintf("the run doesn't record which server group each member was in, so cluster %s's members may not go back to the same server groups", cluster.Name))
 	}
 
+	if warning := snapshotBackupRestoreCAWarning(v, run, cluster); warning != "" {
+		warnings = append(warnings, warning)
+	}
+
 	return warnings, nil
+}
+
+// snapshotBackupRestoreCAWarning warns when the target uses node to node encryption
+// with a CA the backed up cluster didn't trust. The operator loads the new CA once
+// the nodes are up, but until then the nodes can't talk to each other.
+func snapshotBackupRestoreCAWarning(v *types.Validator, run *couchbasev2.CouchbaseSnapshotBackupRun, cluster *couchbasev2.CouchbaseCluster) string {
+	if len(run.Spec.TrustedCAs) == 0 || !cluster.IsTLSEnabled() || cluster.Spec.Networking.TLS.NodeToNodeEncryption == nil || !v.Options.ValidateSecrets {
+		return ""
+	}
+
+	key, chain, keystore, ok, passphrase, err := getServerTLS(v, cluster)
+	if err != nil || !ok {
+		return ""
+	}
+
+	if keystore != nil {
+		if chain, key, _, err = util_x509.DecodePKCS12file(keystore, passphrase, cluster); err != nil {
+			return ""
+		}
+	}
+
+	cas := make([][]byte, 0, len(run.Spec.TrustedCAs))
+	for _, ca := range run.Spec.TrustedCAs {
+		cas = append(cas, []byte(ca))
+	}
+
+	if _, err := util_x509.Verify(cas, chain, key, x509.ExtKeyUsageServerAuth, nil, !cluster.IsTLSShadowed(), false); err == nil {
+		return ""
+	}
+
+	return fmt.Sprintf("cluster %s uses a different CA from the backed up cluster with node to node encryption on, "+
+		"so its nodes can't talk to each other for a short time after the restore, until the operator loads the new CA", cluster.Name)
 }
 
 // checkSnapshotBackupRestoreAdminUser rejects a restore when the target's admin secret has a

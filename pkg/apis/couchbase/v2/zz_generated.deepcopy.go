@@ -4562,6 +4562,23 @@ func (in *CouchbaseSnapshotBackupRunSpec) DeepCopyInto(out *CouchbaseSnapshotBac
 		*out = new(v1.Duration)
 		**out = **in
 	}
+	if in.BackupRetention != nil {
+		in, out := &in.BackupRetention, &out.BackupRetention
+		*out = new(v1.Duration)
+		**out = **in
+	}
+	if in.Hostnames != nil {
+		in, out := &in.Hostnames, &out.Hostnames
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.TrustedCAs != nil {
+		in, out := &in.TrustedCAs, &out.TrustedCAs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
