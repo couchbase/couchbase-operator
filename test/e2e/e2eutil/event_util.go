@@ -271,6 +271,34 @@ func ClusterCreateSequence(size int) eventschema.Validatable {
 	}
 }
 
+// ClusterCreateSequenceWithNetworkChange is a common function for generating cluster creation
+// events, when the first pod's network settings are updated and/or N2N encryption is enabled.
+// The first pod is CBS-initialized, then the post topology reconcilers run, updating its network
+// settings and enabling N2N encryption before the remaining pods are CBS-added.
+func ClusterCreateSequenceWithNetworkChange(size int, networkChange bool, n2n *couchbasev2.NodeToNodeEncryptionType) eventschema.Validatable {
+	validators := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+	}
+
+	if networkChange {
+		validators = append(validators, eventschema.Event{Reason: k8sutil.EventNetworkSettingsModified})
+	}
+
+	return eventschema.Sequence{
+		Validators: append(validators,
+			EnableN2NEncryptionSequence(n2n),
+			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
+			eventschema.Repeat{
+				Times:     size - 1,
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+			},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
+		),
+	}
+}
+
 // ClusterCreateSequenceWithExposedFeatures is a common function for generating cluster
 // creation events, with specific featuresets.
 // With async pod creation, BucketCreated timing relative to rebalance is

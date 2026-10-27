@@ -665,7 +665,10 @@ func testNetworkAddressFamilyAndNodeToNode(t *testing.T, nodeToNode *couchbasev2
 	var cluster *couchbasev2.CouchbaseCluster
 	var ctx *e2eutil.TLSContext
 	if nodeToNode != nil {
-		cluster, ctx = MustInitClusterWithTLSAndNodeToNode(t, kubernetes, clusterSize, nodeToNode)
+		cluster, ctx = MustGenerateClusterWithTLSAndNodeToNode(t, kubernetes, clusterSize, nodeToNode)
+		// TODO: We should be able to remove this once the index service + ipv6 + strict encryption works.
+		cluster.Spec.Servers[0].Services = []couchbasev2.Service{couchbasev2.DataService}
+		cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 		expectedEncryption = couchbaseutil.On
 	} else {
 		cluster = clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
@@ -704,22 +707,19 @@ func testNetworkAddressFamilyAndNodeToNode(t *testing.T, nodeToNode *couchbasev2
 	e2eutil.MustWaitForClusterPodsReady(t, kubernetes, cluster, 2*time.Minute)
 
 	// Ensure the expected events were raised.
+	// N2N encryption is enabled as part of cluster creation.
 	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
+		e2eutil.ClusterCreateSequenceWithNetworkChange(clusterSize, kubernetes.IPv6, nodeToNode),
 	}
 
 	// IPv6 clusters start with IPv6Only. Changing from IPv6Priority -> deprecated IPv6 requires a change, whereas IPv4 clusters change from IPv4Only -> deprecatedIPv4 (no change).
 	networkSettingsEvents := 1
 
 	if kubernetes.IPv6 {
-		expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventNetworkSettingsModified})
 		networkSettingsEvents++
 	}
 
 	if nodeToNode != nil {
-		// Enabled as part of cluster creation.
-		expectedEvents = append(expectedEvents, e2eutil.EnableN2NEncryptionSequence(nodeToNode))
-
 		// Changing N2N encryption requires n2n encryption to be turned off. Following the change we expect it to be turned on again.
 		for i := 0; i < networkSettingsEvents; i++ {
 			expectedEvents = append(expectedEvents, e2eutil.DisableN2NEncryptionSequence(nodeToNode))
@@ -820,11 +820,7 @@ func testNetworkAddressFamilyAndNodeToNodeEnabled(t *testing.T, nodeToNode *couc
 	e2eutil.MustWaitForClusterPodsReady(t, kubernetes, cluster, 2*time.Minute)
 
 	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
-	}
-
-	if kubernetes.IPv6 {
-		expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventNetworkSettingsModified})
+		e2eutil.ClusterCreateSequenceWithNetworkChange(clusterSize, kubernetes.IPv6, nil),
 	}
 
 	expectedEvents = append(expectedEvents,
@@ -880,7 +876,10 @@ func testNetworkAddressFamilyAndNodeToNodeDisabled(t *testing.T, nodeToNode *cou
 	}
 
 	// Create the cluster.
-	cluster, ctx := MustInitClusterWithTLSAndNodeToNode(t, kubernetes, clusterSize, nodeToNode)
+	cluster, ctx := MustGenerateClusterWithTLSAndNodeToNode(t, kubernetes, clusterSize, nodeToNode)
+	// TODO: We should be able to remove this once the index service + ipv6 + strict encryption works.
+	cluster.Spec.Servers[0].Services = []couchbasev2.Service{couchbasev2.DataService}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Check the ports and listener.
 	e2eutil.MustExposePortsTLS(t, kubernetes, cluster, aFamily, ctx, time.Minute)
@@ -905,14 +904,9 @@ func testNetworkAddressFamilyAndNodeToNodeDisabled(t *testing.T, nodeToNode *cou
 	e2eutil.MustWaitForClusterPodsReady(t, kubernetes, cluster, 2*time.Minute)
 
 	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
+		e2eutil.ClusterCreateSequenceWithNetworkChange(clusterSize, kubernetes.IPv6, nodeToNode),
 	}
 
-	if kubernetes.IPv6 {
-		expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventNetworkSettingsModified})
-	}
-
-	expectedEvents = append(expectedEvents, e2eutil.EnableN2NEncryptionSequence(nodeToNode))
 	expectedEvents = append(expectedEvents, e2eutil.DisableN2NEncryptionSequence(nodeToNode))
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -1040,15 +1034,11 @@ func testNetworkAddressFamilyAndNodeToNodeChange(t *testing.T, nodeToNode *couch
 
 	// Ensure the expected events were raised.
 	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
-		// Clusters are always initiated with dual stack listeners. The following reconcile loop will update these to single stack.
-		eventschema.Event{Reason: k8sutil.EventNetworkSettingsModified},
+		// Clusters are always initiated with dual stack listeners, the first pod is updated to single stack during creation.
+		e2eutil.ClusterCreateSequenceWithNetworkChange(clusterSize, true, nodeToNode),
 	}
 
 	if encryption {
-		// Enable N2N encryption after cluster startup.
-		expectedEvents = append(expectedEvents, e2eutil.EnableN2NEncryptionSequence(nodeToNode))
-
 		// Update to dual stack.
 		expectedEvents = append(expectedEvents, e2eutil.DisableN2NEncryptionSequence(nodeToNode))
 		expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventNetworkSettingsModified})
@@ -1191,15 +1181,11 @@ func testNetworkAddressFamilyChangeToOppositePriorityAndNodeToNode(t *testing.T,
 	}, time.Minute)
 
 	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
-		// Clusters are always initiated with dual stack listeners. The following reconcile loop will update these to single stack.
-		eventschema.Event{Reason: k8sutil.EventNetworkSettingsModified},
+		// Clusters are always initiated with dual stack listeners, the first pod is updated to single stack during creation.
+		e2eutil.ClusterCreateSequenceWithNetworkChange(clusterSize, true, nodeToNode),
 	}
 
 	if encryption {
-		// Enable N2N encryption after cluster startup.
-		expectedEvents = append(expectedEvents, e2eutil.EnableN2NEncryptionSequence(nodeToNode))
-
 		// Update to opposite address family dual stack.
 		expectedEvents = append(expectedEvents, e2eutil.DisableN2NEncryptionSequence(nodeToNode))
 		expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventNetworkSettingsModified})
