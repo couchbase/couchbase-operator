@@ -128,6 +128,9 @@ type Framework struct {
 
 	// VolumeSnapshotClassName is the VolumeSnapshotClass used by snapshot backup tests.
 	VolumeSnapshotClassName string
+
+	// VolumeGroupSnapshotClassName is the VolumeGroupSnapshotClass used by group snapshot backup tests.
+	VolumeGroupSnapshotClassName string
 }
 
 // RegistryConfig defines a container image registry.  Registry configurations will

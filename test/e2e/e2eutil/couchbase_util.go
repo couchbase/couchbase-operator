@@ -2119,6 +2119,16 @@ func GetTerseClusterInfo(client *CouchbaseClient) (*couchbaseutil.TerseClusterIn
 	return info, nil
 }
 
+// GetClusterInfo returns what Couchbase says about the cluster and its nodes.
+func GetClusterInfo(client *CouchbaseClient) (*couchbaseutil.ClusterInfo, error) {
+	info := &couchbaseutil.ClusterInfo{}
+	if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
+		return nil, err
+	}
+
+	return info, nil
+}
+
 func MustChangeServicesOnNode(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, victim string, service couchbaseutil.ServiceName) {
 	info := &couchbaseutil.ClusterInfo{}
 

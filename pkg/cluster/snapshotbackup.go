@@ -1379,6 +1379,19 @@ func (c *Cluster) reconcileSnapshotBackup() error {
 	return nil
 }
 
+// snapshotBackupTopologyError refuses a cluster with a server class that keeps no data on a volume.
+// Those nodes aren't in the snapshots, but the restored nodes still remember them, so a restore
+// would wait for them forever.
+func snapshotBackupTopologyError(cluster *couchbasev2.CouchbaseCluster) error {
+	for i := range cluster.Spec.Servers {
+		if len(k8sutil.SnapshotMountPaths(cluster.Spec.Servers[i].GetVolumeMounts())) == 0 {
+			return fmt.Errorf("server class %s has no default volume, so its nodes can't be backed up with snapshots, every server class needs volumeMounts.default", cluster.Spec.Servers[i].Name)
+		}
+	}
+
+	return nil
+}
+
 // usesSnapshotBackup reports whether any of the backups asks for snapshot backups.
 func usesSnapshotBackup(backups []couchbasev2.CouchbaseBackup) bool {
 	for i := range backups {
@@ -1436,7 +1449,11 @@ func (c *Cluster) reconcileSnapshotBackupFor(backup *couchbasev2.CouchbaseBackup
 		return err
 	}
 
-	captureErr := c.saveSnapshotBackupRunAdmin(run)
+	captureErr := snapshotBackupTopologyError(c.cluster)
+	if captureErr == nil {
+		captureErr = c.saveSnapshotBackupRunAdmin(run)
+	}
+
 	if captureErr == nil {
 		captureErr = c.captureSnapshots(backup, run)
 	}

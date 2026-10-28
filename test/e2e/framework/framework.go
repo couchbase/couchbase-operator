@@ -504,6 +504,9 @@ func configure() (err error) {
 	flag.StringVar(&params.VolumeSnapshotClassName, "volume-snapshot-class",
 		"",
 		"VolumeSnapshotClass to use for snapshot backup tests. They're skipped if not set.")
+	flag.StringVar(&params.VolumeGroupSnapshotClassName, "volume-group-snapshot-class",
+		"",
+		"VolumeGroupSnapshotClass to use for group snapshot backup tests. They're skipped if not set.")
 
 	params.SharedTestFlags.BindSharedFlags(nil)
 	flag.Parse()
@@ -1869,6 +1872,21 @@ func (r *TestRequirement) VolumeSnapshots() *TestRequirement {
 
 	if driver, _, _ := unstructured.NestedString(snapshotClass.Object, "driver"); driver != sc.Provisioner {
 		r.t.Skipf("Volume snapshot class driver %s can't snapshot storage class %s volumes (%s)", driver, storageClassName, sc.Provisioner)
+	}
+
+	return r
+}
+
+// VolumeGroupSnapshots skips the test unless a group snapshot class is set and exists.
+func (r *TestRequirement) VolumeGroupSnapshots() *TestRequirement {
+	if Global.VolumeGroupSnapshotClassName == "" {
+		r.t.Skip("No volume group snapshot class configured")
+	}
+
+	gvr := schema.GroupVersionResource{Group: "groupsnapshot.storage.k8s.io", Version: "v1beta1", Resource: "volumegroupsnapshotclasses"}
+
+	if _, err := r.kubernetes.DynamicClient.Resource(gvr).Get(r.t.Context(), Global.VolumeGroupSnapshotClassName, metav1.GetOptions{}); err != nil {
+		r.t.Skipf("Volume group snapshot class %s not found: %v", Global.VolumeGroupSnapshotClassName, err)
 	}
 
 	return r

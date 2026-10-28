@@ -761,6 +761,8 @@ type TLSOpts struct {
 	PKCS12 bool
 	// PKCS12Passphrase is the passphrase to use for the generated .p12 file
 	PKCS12Passphrase string
+	// CA signs the certificates instead of a new one, so two clusters can share a CA.
+	CA *CertificateAuthority
 }
 
 // clusterSANs generates a valid set of SANs for a cluster.
@@ -842,8 +844,10 @@ func InitClusterTLS(k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, err err
 
 	ctx.Source = opts.Source
 
-	// Generate the CA.
-	if ctx.CA, err = NewCertificateAuthority(keyType, caCN, validFrom, validTo, caCertType); err != nil {
+	// Generate the CA, unless one was given.
+	if opts.CA != nil {
+		ctx.CA = opts.CA
+	} else if ctx.CA, err = NewCertificateAuthority(keyType, caCN, validFrom, validTo, caCertType); err != nil {
 		return
 	}
 

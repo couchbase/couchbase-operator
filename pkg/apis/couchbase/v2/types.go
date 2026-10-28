@@ -376,6 +376,8 @@ type CouchbaseBackupSpec struct {
 	// approach, which captures each member's underlying persistent volumes directly. This
 	// is faster to take and restore for large datasets, at the cost of a weaker consistency
 	// guarantee. Scheduling and retention behave the same as an archive based backup.
+	// Every server class must keep its data on a volume, with volumeMounts.default set.
+	// A cluster with a class that doesn't can't use snapshot backups yet.
 	// +optional
 	SnapshotBackup *CouchbaseSnapshotBackupSpec `json:"snapshotBackup,omitempty"`
 }

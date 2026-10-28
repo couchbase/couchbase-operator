@@ -438,6 +438,30 @@ func TestListSnapshotBackupRunSnapshots(t *testing.T) {
 	}
 }
 
+// TestSnapshotBackupTopologyError checks a cluster with a server class that keeps no data on a
+// volume is refused, naming the class, and that classes with a default volume are fine.
+func TestSnapshotBackupTopologyError(t *testing.T) {
+	cluster := &couchbasev2.CouchbaseCluster{
+		Spec: couchbasev2.ClusterSpec{
+			Servers: []couchbasev2.ServerConfig{
+				{Name: "data", VolumeMounts: &couchbasev2.VolumeMounts{DefaultClaim: "couchbase"}},
+				{Name: "query", VolumeMounts: &couchbasev2.VolumeMounts{LogsClaim: "couchbase"}},
+			},
+		},
+	}
+
+	err := snapshotBackupTopologyError(cluster)
+	if err == nil || !strings.Contains(err.Error(), "server class query has no default volume") {
+		t.Errorf("expected server class query to be refused, got %v", err)
+	}
+
+	cluster.Spec.Servers[1].VolumeMounts.DefaultClaim = "couchbase"
+
+	if err := snapshotBackupTopologyError(cluster); err != nil {
+		t.Errorf("expected every class with a default volume to be fine, got %v", err)
+	}
+}
+
 // TestSnapshotBackupRunEntries checks that a group snapshot's snapshots are recorded on the
 // run with the member, volume, snapshot name, mount path, server class, server group and zone
 // for each one.

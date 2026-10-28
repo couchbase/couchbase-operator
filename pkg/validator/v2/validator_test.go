@@ -2299,7 +2299,7 @@ func TestCheckConstraintsSnapshotBackupRestore(t *testing.T) {
 		{
 			name: "target still migrating",
 			objects: []runtime.Object{completeRun, changedCluster(func(c *couchbasev2.CouchbaseCluster) {
-				c.Spec.Migration = &couchbasev2.ClusterAssimilationSpec{UnmanagedClusterHost: "other-cluster"}
+				c.Spec.Migration = &couchbasev2.ClusterAssimilationSpec{UnmanagedClusterHost: "other-cluster.example.com"}
 			})},
 			expectedErr: "is still migrating",
 		},
@@ -2793,7 +2793,7 @@ func TestCheckClusterVersionUpgradePathOffline(t *testing.T) {
 // spec.networking.dns needs TLS, and other clusters don't.
 func TestCheckConstraintExternalMigrationTLS(t *testing.T) {
 	c := &couchbasev2.CouchbaseCluster{}
-	c.Spec.Migration = &couchbasev2.ClusterAssimilationSpec{UnmanagedClusterHost: "other-cluster"}
+	c.Spec.Migration = &couchbasev2.ClusterAssimilationSpec{UnmanagedClusterHost: "other-cluster.example.com"}
 	c.Spec.Networking.DNS = &couchbasev2.DNS{Domain: "example.com"}
 
 	if err := checkConstraintExternalMigrationTLS(nil, c); err == nil {

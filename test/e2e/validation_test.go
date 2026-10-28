@@ -1119,6 +1119,14 @@ func TestNegValidationCreateCouchbaseClusterNetworking(t *testing.T) {
 			expectedErrors: []string{`spec.networking.tls.clientCertificatePaths`},
 		},
 		{
+			name: "TestValidateTLSRequiredWithExternalMigration",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/spec/migration", map[string]string{"unmanagedClusterHost": "other-cluster.example.com"}).
+				Remove("/spec/networking/tls")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.networking.tls`},
+		},
+		{
 			name: "TestValidateDNSReqiredWithPublicAdminConsoleService",
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Replace("/spec/networking/adminConsoleServiceType", corev1.ServiceTypeLoadBalancer).

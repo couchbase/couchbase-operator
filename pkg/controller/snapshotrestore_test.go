@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
@@ -154,16 +155,20 @@ func newRestoreTestReconciler(t *testing.T, setup restoreTestSetup) (*CouchbaseS
 		Build()
 
 	// Secrets are read through the typed client, so they go there.
-	var secrets []runtime.Object
+	var kubeObjects []runtime.Object
 
 	for _, object := range setup.volumes {
 		if secret, ok := object.(*corev1.Secret); ok {
-			secrets = append(secrets, secret)
+			kubeObjects = append(kubeObjects, secret)
+		}
+
+		if event, ok := object.(*corev1.Event); ok {
+			kubeObjects = append(kubeObjects, event)
 		}
 	}
 
 	// The snapshot API is installed, so the validator's add on check passes.
-	kubeClient := k8sfake.NewSimpleClientset(secrets...)
+	kubeClient := k8sfake.NewSimpleClientset(kubeObjects...)
 	kubeClient.Discovery().(*discoveryfake.FakeDiscovery).Resources = []*metav1.APIResourceList{{GroupVersion: "snapshot.storage.k8s.io/v1"}}
 
 	dynamicClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(
@@ -350,6 +355,8 @@ func TestSnapshotRestoreDestroy(t *testing.T) {
 		expectedLeft  []string
 		// woken means the user set hibernate to false on the target in the middle of the restore.
 		woken bool
+		// deleted means the target cluster was removed in the middle of the restore.
+		deleted bool
 	}{
 		{
 			name: "old member volumes are deleted, the backup volume is kept",
@@ -380,13 +387,25 @@ func TestSnapshotRestoreDestroy(t *testing.T) {
 			expectedPhase: couchbasev2.CouchbaseSnapshotBackupRestorePhaseFailed,
 			expectedLeft:  []string{"target-0000-default-00"},
 		},
+		{
+			name:          "a target deleted in the middle fails the restore",
+			volumes:       []client.Object{restoreTestVolume("target-0000-default-00", "target", "target-0000")},
+			deleted:       true,
+			expectedPhase: couchbasev2.CouchbaseSnapshotBackupRestorePhaseFailed,
+			expectedLeft:  []string{"target-0000-default-00"},
+		},
 	}
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
+			cluster := restoreTestCluster(!testcase.woken, 3)
+			if testcase.deleted {
+				cluster = nil
+			}
+
 			r, fakeClient := newRestoreTestReconciler(t, restoreTestSetup{
 				restore: restoreTestRestore(couchbasev2.CouchbaseSnapshotBackupRestorePhaseDestroying),
-				cluster: restoreTestCluster(!testcase.woken, 3),
+				cluster: cluster,
 				volumes: testcase.volumes,
 			})
 			key := types.NamespacedName{Namespace: restoreTestNamespace, Name: "restore"}
@@ -521,6 +540,12 @@ func TestSnapshotRestoreProvision(t *testing.T) {
 			volumes:         []client.Object{restoreTestBinderPod("target-0000"), restoreTestBinderPod("target-0001")},
 			expectedPhase:   couchbasev2.CouchbaseSnapshotBackupRestorePhaseFailed,
 			expectedFailure: "server class missing, which cluster target doesn't have",
+		},
+		{
+			name:            "a target deleted in the middle fails the restore before any volume is made",
+			run:             restoreTestRun(couchbasev2.CouchbaseSnapshotBackupRunPhaseComplete),
+			expectedPhase:   couchbasev2.CouchbaseSnapshotBackupRestorePhaseFailed,
+			expectedFailure: "was deleted before the restore finished",
 		},
 		{
 			name:            "a target woken in the middle fails the restore before any volume is made",
@@ -1332,6 +1357,54 @@ func TestSeedTargetStateReloadTLS(t *testing.T) {
 
 			if _, reload := state.Data[string(persistence.ReloadTLS)]; reload != tls {
 				t.Errorf("expected a reload %v, got %v", tls, reload)
+			}
+		})
+	}
+}
+
+// TestStuckVolume checks the restore only gives up on a volume once it's been unbound for longer
+// than the limit, and says what the storage said when there's a message.
+func TestStuckVolume(t *testing.T) {
+	now := time.Now()
+
+	volume := func(name string, age time.Duration) *corev1.PersistentVolumeClaim {
+		return &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+			Name:              name,
+			Namespace:         restoreTestNamespace,
+			CreationTimestamp: metav1.NewTime(now.Add(-age)),
+		}}
+	}
+
+	failed := &corev1.Event{
+		ObjectMeta:     metav1.ObjectMeta{Name: "stuck-volume-failed", Namespace: restoreTestNamespace},
+		InvolvedObject: corev1.ObjectReference{Kind: "PersistentVolumeClaim", Name: "stuck-volume"},
+		Reason:         "ProvisioningFailed",
+		Message:        "volume source not found",
+		LastTimestamp:  metav1.NewTime(now),
+	}
+
+	r, _ := newRestoreTestReconciler(t, restoreTestSetup{
+		restore: restoreTestRestore(couchbasev2.CouchbaseSnapshotBackupRestorePhaseProvisioning),
+		volumes: []client.Object{failed},
+	})
+
+	cases := []struct {
+		name     string
+		volumes  []*corev1.PersistentVolumeClaim
+		expected string
+	}{
+		{"volume made a minute ago", []*corev1.PersistentVolumeClaim{volume("recent-volume", time.Minute)}, ""},
+		{"volume made in this pass", []*corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "data-volume"}}}, ""},
+		{"stuck volume with a message", []*corev1.PersistentVolumeClaim{volume("stuck-volume", time.Hour)}, "the storage said: volume source not found"},
+		{"stuck volume without a message", []*corev1.PersistentVolumeClaim{volume("other-volume", time.Hour)}, "volume other-volume still isn't bound"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			reason := r.stuckVolume(t.Context(), c.volumes, now)
+
+			if (c.expected == "") != (reason == "") || !strings.Contains(reason, c.expected) {
+				t.Errorf("expected %q, got %q", c.expected, reason)
 			}
 		})
 	}

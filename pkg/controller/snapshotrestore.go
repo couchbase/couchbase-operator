@@ -396,6 +396,12 @@ func (r *CouchbaseSnapshotBackupRestoreReconciler) provision(ctx context.Context
 		return reconcile.Result{}, err
 	}
 
+	// A volume that still isn't bound long after it was made isn't going to be, so we fail with
+	// what the storage said instead of waiting forever.
+	if reason := r.stuckVolume(ctx, unbound, time.Now()); reason != "" {
+		return r.fail(ctx, restore, reason)
+	}
+
 	if len(unbound) > 0 {
 		if err := r.bindVolumes(ctx, restore, target, unbound); err != nil {
 			return reconcile.Result{}, err
@@ -675,6 +681,57 @@ func (r *CouchbaseSnapshotBackupRestoreReconciler) createVolumes(ctx context.Con
 	}
 
 	return unbound, nil
+}
+
+// snapshotRestoreBindLimit is how long a restored volume can stay unbound before the restore gives
+// up on it. Binding only waits for the storage to make the volume, not to copy the data into it, so
+// it's normally quick.
+const snapshotRestoreBindLimit = 30 * time.Minute
+
+// stuckVolume returns why a restored volume has been unbound for longer than the limit, or an empty
+// string if none has. Volumes made in this pass have no creation time yet, so they're skipped.
+func (r *CouchbaseSnapshotBackupRestoreReconciler) stuckVolume(ctx context.Context, unbound []*corev1.PersistentVolumeClaim, now time.Time) string {
+	for _, volume := range unbound {
+		if volume.CreationTimestamp.IsZero() || now.Sub(volume.CreationTimestamp.Time) < snapshotRestoreBindLimit {
+			continue
+		}
+
+		reason := fmt.Sprintf("volume %s still isn't bound after %s", volume.Name, snapshotRestoreBindLimit)
+
+		if message := r.lastProvisioningError(ctx, volume); message != "" {
+			reason += ", the storage said: " + message
+		}
+
+		return reason
+	}
+
+	return ""
+}
+
+// lastProvisioningError returns the latest message the storage gave for failing to make the volume,
+// or an empty string if there isn't one.
+func (r *CouchbaseSnapshotBackupRestoreReconciler) lastProvisioningError(ctx context.Context, volume *corev1.PersistentVolumeClaim) string {
+	events, err := r.kubeClient.CoreV1().Events(volume.Namespace).List(ctx, metav1.ListOptions{
+		FieldSelector: "involvedObject.kind=PersistentVolumeClaim,involvedObject.name=" + volume.Name + ",reason=ProvisioningFailed",
+	})
+	if err != nil {
+		return ""
+	}
+
+	var latest *corev1.Event
+
+	for i := range events.Items {
+		event := &events.Items[i]
+		if latest == nil || event.LastTimestamp.After(latest.LastTimestamp.Time) {
+			latest = event
+		}
+	}
+
+	if latest == nil {
+		return ""
+	}
+
+	return latest.Message
 }
 
 // bindVolumes starts one short lived pod per member that just mounts its unbound volumes. Some
