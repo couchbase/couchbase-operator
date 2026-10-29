@@ -1327,7 +1327,7 @@ func TestRBACUpdateUser(t *testing.T) {
 	fullName := "Administrator"
 	e2eutil.MustPatchUser(t, kubernetes, user, jsonpatch.NewPatchSet().Replace("/spec/fullName", &fullName), time.Minute)
 
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.UserEditedEvent(cluster, user), 1*time.Minute)
+	e2eutil.MustObserveClusterEventFrom(t, kubernetes, cluster, e2eutil.UserEditedEvent(cluster, user), 15*time.Second, 1*time.Minute)
 	e2eutil.MustPatchUserInfo(t, kubernetes, cluster, user.GetUserID(), couchbaseutil.AuthDomain(user.Spec.AuthDomain), jsonpatch.NewPatchSet().Test("/Name", fullName), time.Minute)
 
 	patchCycles := 1
@@ -1336,7 +1336,7 @@ func TestRBACUpdateUser(t *testing.T) {
 		locked := true
 		e2eutil.MustPatchUser(t, kubernetes, user, jsonpatch.NewPatchSet().Replace("/spec/locked", &locked), time.Minute)
 
-		e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.UserEditedEvent(cluster, user), 1*time.Minute)
+		e2eutil.MustObserveClusterEventFrom(t, kubernetes, cluster, e2eutil.UserEditedEvent(cluster, user), 15*time.Second, 1*time.Minute)
 		e2eutil.MustPatchUserInfo(t, kubernetes, cluster, user.GetUserID(), couchbaseutil.AuthDomain(user.Spec.AuthDomain), jsonpatch.NewPatchSet().Test("/Locked", &locked), time.Minute)
 		patchCycles++
 	}
@@ -1482,7 +1482,7 @@ func TestRBACUserPasswordSpec(t *testing.T) {
 		PasswordResetOnPolicyChangeExemptUsers: exemptUser,
 		MinLength:                              util.IntPtr(2),
 	}), time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.ClusterSettingsEditedEvent(cluster, "password policy"), 1*time.Minute)
+	e2eutil.MustPatchPasswordPolicySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/MinLength", util.IntPtr(2)), time.Minute)
 
 	expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited})
 
@@ -1503,7 +1503,7 @@ func TestRBACUserPasswordSpec(t *testing.T) {
 		PasswordResetOnPolicyChangeExemptUsers: exemptUser,
 		MinLength:                              util.IntPtr(3),
 	}), time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.ClusterSettingsEditedEvent(cluster, "password policy"), 1*time.Minute)
+	e2eutil.MustPatchPasswordPolicySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/MinLength", util.IntPtr(3)), time.Minute)
 
 	expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited})
 

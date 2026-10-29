@@ -1404,6 +1404,21 @@ func (c *Cluster) updateTLS() error {
 	// work if some are still open.
 	c.api.CloseIdleConnections()
 
+	// A recovered pod is pending but already clustered and still serves the old
+	// chain from its volume. Rotating the others and switching the client CA would
+	// leave it unreachable over TLS, so wait until it's initialized.
+	for _, member := range c.members {
+		pod, found := c.k8s.Pods.Get(member.Name())
+		if !found || !k8sutil.HasPendingInitializationCondition(pod) {
+			continue
+		}
+
+		if _, ok := pod.Annotations[constants.PodInitializedAnnotation]; ok {
+			c.log.Info("Deferring certificate rotation, recovered member pending initialization", "cluster", c.namespacedName(), "name", member.Name())
+			return nil
+		}
+	}
+
 	// Update the CA and any server certificate chains that require it.
 	for _, member := range c.members {
 		if err := c.reconcileMemberTLS(member, cert); err != nil {

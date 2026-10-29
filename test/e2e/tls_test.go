@@ -792,7 +792,7 @@ func TestTLSRotateCAKillPodAndKillOperator(t *testing.T) {
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
 
-	// When the cluster is ready, kill a stateful pod,  restart the operator and swap out the all certificates for new ones and verify
+	// When the cluster is ready, kill a stateful pod, restart the operator and swap out the all certificates for new ones and verify
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, time.Minute)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
@@ -1002,7 +1002,8 @@ func testMutualTLSDisable(t *testing.T, policy couchbasev2.ClientCertificatePoli
 	// * Settings updated
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
+		// The above create sequence may swallow the ClusterSettingsEdited event, so make this optional. As long as the cluster ends up healthy we're good.
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonDeleteClientAuth)},
 	}
 

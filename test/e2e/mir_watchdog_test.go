@@ -501,7 +501,6 @@ func TestMirWatchdogOnClientCertTLSExpiration(t *testing.T) {
 	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 0, 5*time.Minute)
 
 	// Check that we enter the manual intervention required state once the CA expires.
-
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.ManualInterventionRequiredEvent(cluster, "TLS certificate has expired"), 5*time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionManualInterventionRequired, v1.ConditionTrue, cluster, 5*time.Minute)
 	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 1, 1*time.Minute)

@@ -2127,20 +2127,27 @@ func MustGetLatestKeyVersionCreationTime(t *testing.T, kubernetes *types.Cluster
 	return ts
 }
 
-// MustWaitForKeyRotation waits until the latest key versions for the given keys have rotated.
-// Fails the test if rotation doesn't happen within the timeout.
-func MustWaitForKeyRotation(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, keys ...string) {
+// MustGetLatestKeyVersionCreationTimes captures the latest key version timestamps for the given keys.
+// Call this before triggering a rotation and pass the result to MustWaitForKeyRotation.
+func MustGetLatestKeyVersionCreationTimes(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, keys ...string) map[string]string {
 	t.Helper()
 
-	// Capture initial key version timestamps
-	keyVersionsBefore := make(map[string]string)
+	keyVersions := make(map[string]string)
 	for _, key := range keys {
-		keyVersionsBefore[key] = MustGetLatestKeyVersionCreationTime(t, kubernetes, cluster, key)
+		keyVersions[key] = MustGetLatestKeyVersionCreationTime(t, kubernetes, cluster, key)
 	}
+
+	return keyVersions
+}
+
+// MustWaitForKeyRotation waits until the latest key versions have rotated since keyVersionsBefore was captured.
+// Fails the test if rotation doesn't happen within the timeout.
+func MustWaitForKeyRotation(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, keyVersionsBefore map[string]string) {
+	t.Helper()
 
 	// Retry until keys rotate or timeout
 	err := retryutil.RetryFor(2*time.Minute, func() error {
-		for _, key := range keys {
+		for key := range keyVersionsBefore {
 			before, err := time.Parse(time.RFC3339, keyVersionsBefore[key])
 			if err != nil {
 				return err

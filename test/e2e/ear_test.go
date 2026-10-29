@@ -493,6 +493,9 @@ func TestRotateEncryptionKey(t *testing.T) {
 			strings.ReplaceAll(constants.AnnotationRotateEncryptionKey, "/", "~1"))
 		annotationValue := fmt.Sprintf("%d,%d", keyID1, keyID2)
 
+		// Capture key versions before triggering rotation, the operator may rotate before we can observe it.
+		keyVersionsBefore := e2eutil.MustGetLatestKeyVersionCreationTimes(t, kubernetes, cluster, keyName1, keyName2)
+
 		cluster = e2eutil.MustPatchCluster(
 			t,
 			kubernetes,
@@ -525,7 +528,7 @@ func TestRotateEncryptionKey(t *testing.T) {
 		}
 
 		// Wait for keys to rotate
-		e2eutil.MustWaitForKeyRotation(t, kubernetes, cluster, keyName1, keyName2)
+		e2eutil.MustWaitForKeyRotation(t, kubernetes, cluster, keyVersionsBefore)
 	})
 }
 

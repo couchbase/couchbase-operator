@@ -189,13 +189,13 @@ func (c *Cluster) recreatePod(m couchbaseutil.Member, recovery bool) error {
 		return err
 	}
 
-	// createPod now flags the pod with PendingInitializationCondition.
-	// The pod will be initialized asynchronously. SetPodInitialized will
-	// be called after the pending initialization is cleared.
+	// createPod flags the pod with PendingInitializationCondition, which
+	// handleReadyPendingPod clears once the pod is ready.
 	c.log.V(1).Info("Pod recreated with pending initialization", "cluster", c.namespacedName(), "pod", m.Name())
 
-	// To get here the pod would need to be initialized and clustered, so this is
-	// safe.
+	// The node on the volume is already initialized and clustered, so mark it
+	// initialized now, while it is still pending. handleReadyPendingPod uses
+	// this to skip initMember and addNode for the recreated pod.
 	if err := k8sutil.SetPodInitialized(c.k8s, m.Name()); err != nil {
 		return err
 	}

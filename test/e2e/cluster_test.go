@@ -1587,9 +1587,12 @@ func TestSecuritySettings(t *testing.T) {
 	patchCycles++
 
 	// Check that the cluster is edited the expected number of times.
+	// ClusterCreateSequence may consume the first edit with its optional rebalance
+	// mode settings edit, so allow for that here.
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Repeat{Times: patchCycles, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
+		eventschema.Repeat{Times: patchCycles - 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
