@@ -23,6 +23,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 )
 
 // Scope is used to model a scope and provide a flexible and terse
@@ -547,8 +548,23 @@ func MustCreateScopeGroup(t *testing.T, kubernetes *types.Cluster, scopeGroup *c
 }
 
 // MustUpdateScopeGroup updates a scope group and returns the updated version.
+// The operator writes status to scope groups, which bumps the resource version, so on
+// conflict the latest resource version is taken and the update retried.
 func MustUpdateScopeGroup(t *testing.T, kubernetes *types.Cluster, scopeGroup *couchbasev2.CouchbaseScopeGroup) *couchbasev2.CouchbaseScopeGroup {
-	newScopeGroup, err := kubernetes.CRClient.CouchbaseV2().CouchbaseScopeGroups(kubernetes.Namespace).Update(context.Background(), scopeGroup, metav1.UpdateOptions{})
+	var newScopeGroup *couchbasev2.CouchbaseScopeGroup
+
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		current, err := kubernetes.CRClient.CouchbaseV2().CouchbaseScopeGroups(kubernetes.Namespace).Get(context.Background(), scopeGroup.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		scopeGroup.ResourceVersion = current.ResourceVersion
+
+		newScopeGroup, err = kubernetes.CRClient.CouchbaseV2().CouchbaseScopeGroups(kubernetes.Namespace).Update(context.Background(), scopeGroup, metav1.UpdateOptions{})
+
+		return err
+	})
 	if err != nil {
 		Die(t, err)
 	}
@@ -567,8 +583,23 @@ func MustCreateCollection(t *testing.T, kubernetes *types.Cluster, collection *c
 }
 
 // MustUpateCollection updates the specified collection and returns the updated version.
+// The operator writes status to collections, which bumps the resource version, so on
+// conflict the latest resource version is taken and the update retried.
 func MustUpdateCollection(t *testing.T, kubernetes *types.Cluster, collection *couchbasev2.CouchbaseCollection) *couchbasev2.CouchbaseCollection {
-	newCollection, err := kubernetes.CRClient.CouchbaseV2().CouchbaseCollections(kubernetes.Namespace).Update(context.Background(), collection, metav1.UpdateOptions{})
+	var newCollection *couchbasev2.CouchbaseCollection
+
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		current, err := kubernetes.CRClient.CouchbaseV2().CouchbaseCollections(kubernetes.Namespace).Get(context.Background(), collection.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		collection.ResourceVersion = current.ResourceVersion
+
+		newCollection, err = kubernetes.CRClient.CouchbaseV2().CouchbaseCollections(kubernetes.Namespace).Update(context.Background(), collection, metav1.UpdateOptions{})
+
+		return err
+	})
 	if err != nil {
 		Die(t, err)
 	}
@@ -594,8 +625,23 @@ func MustCreateCollectionGroup(t *testing.T, kubernetes *types.Cluster, collecti
 }
 
 // MustUpdateCollectionGroup updates a collection group and returns the updated version.
+// The operator writes status to collection groups, which bumps the resource version, so on
+// conflict the latest resource version is taken and the update retried.
 func MustUpdateCollectionGroup(t *testing.T, kubernetes *types.Cluster, collectionGroup *couchbasev2.CouchbaseCollectionGroup) *couchbasev2.CouchbaseCollectionGroup {
-	newCollectionGroup, err := kubernetes.CRClient.CouchbaseV2().CouchbaseCollectionGroups(kubernetes.Namespace).Update(context.Background(), collectionGroup, metav1.UpdateOptions{})
+	var newCollectionGroup *couchbasev2.CouchbaseCollectionGroup
+
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		current, err := kubernetes.CRClient.CouchbaseV2().CouchbaseCollectionGroups(kubernetes.Namespace).Get(context.Background(), collectionGroup.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		collectionGroup.ResourceVersion = current.ResourceVersion
+
+		newCollectionGroup, err = kubernetes.CRClient.CouchbaseV2().CouchbaseCollectionGroups(kubernetes.Namespace).Update(context.Background(), collectionGroup, metav1.UpdateOptions{})
+
+		return err
+	})
 	if err != nil {
 		Die(t, err)
 	}

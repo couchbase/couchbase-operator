@@ -88,6 +88,11 @@ func convertCouchbaseBucketToAPIBucket(bucket *couchbaseutil.Bucket, namer Bucke
 				Resources: []couchbasev2.ScopeLocalObjectReference{},
 			},
 			DurabilityImpossibleFallback: couchbasev2.DurabilityImpossibleFallback(bucket.DurabilityImpossibleFallback),
+			AccessScannerEnabled:         valueOrDefault(bucket.AccessScannerEnabled, true),
+			ExpiryPagerSleepTime:         convertExpiryPagerSleepTime(bucket.ExpiryPagerSleepTime),
+			WarmupBehavior:               convertWarmupBehavior(bucket.WarmupBehavior),
+			MemoryLowWatermark:           valueOrDefault(bucket.MemoryLowWatermark, constants.MemoryLowWatermarkDefault),
+			MemoryHighWatermark:          valueOrDefault(bucket.MemoryHighWatermark, constants.MemoryHighWatermarkDefault),
 		},
 	}
 
@@ -148,8 +153,44 @@ func convertCouchbaseEphemeralBucketToAPIBucket(bucket *couchbaseutil.Bucket, na
 				Resources: []couchbasev2.ScopeLocalObjectReference{},
 			},
 			DurabilityImpossibleFallback: couchbasev2.DurabilityImpossibleFallback(bucket.DurabilityImpossibleFallback),
+			ExpiryPagerSleepTime:         convertExpiryPagerSleepTime(bucket.ExpiryPagerSleepTime),
+			WarmupBehavior:               convertWarmupBehavior(bucket.WarmupBehavior),
+			MemoryLowWatermark:           valueOrDefault(bucket.MemoryLowWatermark, constants.MemoryLowWatermarkDefault),
+			MemoryHighWatermark:          valueOrDefault(bucket.MemoryHighWatermark, constants.MemoryHighWatermarkDefault),
 		},
 	}
+}
+
+// The 8.0.0 bucket settings below are defaulted by the CRD, so any that Couchbase Server
+// doesn't report (anything older than 8.0.0) must be filled in with the same default,
+// otherwise the synchronized resource will never match what the API server stored.
+
+// valueOrDefault returns the value if set, otherwise the default.
+func valueOrDefault[T any](value *T, defaultValue T) *T {
+	if value != nil {
+		return value
+	}
+
+	return &defaultValue
+}
+
+// convertExpiryPagerSleepTime converts the expiry pager sleep time reported by Couchbase,
+// in seconds, into a duration.
+func convertExpiryPagerSleepTime(seconds *uint64) *metav1.Duration {
+	if seconds == nil {
+		return &metav1.Duration{Duration: constants.ExpiryPagerSleepTimeDefaultSeconds * time.Second}
+	}
+
+	return &metav1.Duration{Duration: time.Duration(*seconds) * time.Second}
+}
+
+// convertWarmupBehavior converts the warmup behavior reported by Couchbase.
+func convertWarmupBehavior(warmupBehavior string) couchbasev2.CouchbaseBucketWarmupBehavior {
+	if warmupBehavior == "" {
+		return constants.BucketWarmupBehaviorDefault
+	}
+
+	return couchbasev2.CouchbaseBucketWarmupBehavior(warmupBehavior)
 }
 
 // convertCouchbaseMemcachedBucketToAPIBucket takes a raw bucket from the Couchbase API and converts
