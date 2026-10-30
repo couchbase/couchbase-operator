@@ -1031,6 +1031,7 @@ Used to define whether bucket migration routines should be enabled.
 When true, the operator cycles nodes that have per-node overrides for storage backend or
 eviction policy that differ from the bucket spec, by swap rebalance or, when the upgrade
 process is InPlaceUpgrade, by failover and recovery.
+This does not prevent bucket storage backend or eviction policy settings from being updated.
 This value defaults to false.
 
 === couchbaseclusters.spec.buckets.managed

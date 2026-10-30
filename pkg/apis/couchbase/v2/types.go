@@ -5764,12 +5764,16 @@ type Buckets struct {
 
 	// Allows the operator to reconcile the storage backend for unmanaged buckets to match
 	// this value.
+	// The bucket storage backend setting is updated regardless of EnableBucketMigrationRoutines,
+	// however existing data is only rebuilt with the new backend once nodes are cycled, which
+	// requires EnableBucketMigrationRoutines to be true.
 	TargetUnmanagedBucketStorageBackend *CouchbaseStorageBackend `json:"-" annotation:"targetUnmanagedBucketStorageBackend"`
 
 	// Used to define whether bucket migration routines should be enabled.
 	// When true, the operator cycles nodes that have per-node overrides for storage backend or
 	// eviction policy that differ from the bucket spec, by swap rebalance or, when the upgrade
 	// process is InPlaceUpgrade, by failover and recovery.
+	// This does not prevent bucket storage backend or eviction policy settings from being updated.
 	// This value defaults to false.
 	EnableBucketMigrationRoutines bool `json:"enableBucketMigrationRoutines,omitempty" annotation:"enableBucketMigrationRoutines"`
 
