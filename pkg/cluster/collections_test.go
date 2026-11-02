@@ -272,3 +272,21 @@ func collectionSpecCommon(history bool, maxTTL time.Duration) couchbasev2.Couchb
 func boolPtr(b bool) *bool {
 	return &b
 }
+
+func TestUniqueByCouchbaseName(t *testing.T) {
+	collection := func(name string) *couchbasev2.CouchbaseCollection {
+		return &couchbasev2.CouchbaseCollection{Spec: couchbasev2.CouchbaseCollectionSpec{Name: couchbasev2.ScopeOrCollectionName(name)}}
+	}
+
+	// A collection group both referenced and selected by a scope is gathered twice.
+	gathered := []*couchbasev2.CouchbaseCollection{collection("coll0"), collection("coll1"), collection("coll0"), collection("coll1"), collection("_default")}
+
+	var names []string
+	for _, c := range uniqueByCouchbaseName(gathered) {
+		names = append(names, c.CouchbaseName())
+	}
+
+	if diff := cmp.Diff([]string{"coll0", "coll1", "_default"}, names); diff != "" {
+		t.Errorf("unexpected collections (-want +got):\n%s", diff)
+	}
+}

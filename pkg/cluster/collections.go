@@ -12,6 +12,7 @@ package cluster
 
 import (
 	"reflect"
+	"slices"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
@@ -235,7 +236,7 @@ func (c *Cluster) gatherScopes(bucket couchbasev2.AbstractBucket) ([]*couchbasev
 		})
 	}
 
-	return scopes, nil
+	return uniqueByCouchbaseName(scopes), nil
 }
 
 // gatherScopesExplicit collects all scopes that are explicitly referenced by
@@ -552,7 +553,20 @@ func (c *Cluster) gatherCollections(scope *couchbasev2.CouchbaseScope) ([]*couch
 		})
 	}
 
-	return collections, nil
+	return uniqueByCouchbaseName(collections), nil
+}
+
+// uniqueByCouchbaseName keeps the first of each name, as a resource referenced and selected is gathered twice.
+func uniqueByCouchbaseName[T interface{ CouchbaseName() string }](items []T) []T {
+	seen := map[string]bool{}
+
+	return slices.DeleteFunc(items, func(item T) bool {
+		name := item.CouchbaseName()
+		dup := seen[name]
+		seen[name] = true
+
+		return dup
+	})
 }
 
 // gatherCollectionsExplicit collects all collections that are explicitly referenced by

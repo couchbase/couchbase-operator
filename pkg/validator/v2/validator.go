@@ -6123,6 +6123,18 @@ type nameFirstDefinition struct {
 // of a collision.  The map key is the couchbase name.
 type nameFirstDefinitionMap map[string]nameFirstDefinition
 
+// claim records def for name, returning the first definition if another resource already has it.
+// The same resource reached twice, by reference and by label, is not a clash.
+func (m nameFirstDefinitionMap) claim(name string, def nameFirstDefinition) (nameFirstDefinition, bool) {
+	if first, ok := m[name]; ok {
+		return first, first != def
+	}
+
+	m[name] = def
+
+	return def, false
+}
+
 // checkScopeCollectionsUnique accepts a collection selector from either a scope or scope group
 // and runs through every referenced collection and checks for duplicate names.
 func checkScopeCollectionsUnique(v *types.Validator, namespace, kind, resourceName string, selector *couchbasev2.CollectionSelector) error {
@@ -6154,13 +6166,9 @@ func checkScopeCollectionsUniqueExplicit(v *types.Validator, namespace, kind, re
 				break
 			}
 
-			if first, ok := names[collection.CouchbaseName()]; ok {
+			def := nameFirstDefinition{kind: couchbasev2.CollectionCRDResourceKind, name: collection.Name}
+			if first, clash := names.claim(collection.CouchbaseName(), def); clash {
 				return fmt.Errorf("couchbase collection name `%v` in %s/%s redefined by %s/%s, first seen in %s/%s", collection.CouchbaseName(), kind, resourceName, couchbasev2.CollectionCRDResourceKind, collection.Name, first.kind, first.name)
-			}
-
-			names[collection.CouchbaseName()] = nameFirstDefinition{
-				kind: couchbasev2.CollectionCRDResourceKind,
-				name: collection.Name,
 			}
 		case couchbasev2.CollectionGroupCRDResourceKind:
 			collectionGroup, found, err := v.Abstraction.GetCouchbaseCollectionGroup(namespace, resource.StrName())
@@ -6172,14 +6180,11 @@ func checkScopeCollectionsUniqueExplicit(v *types.Validator, namespace, kind, re
 				break
 			}
 
-			for _, name := range collectionGroup.Spec.Names {
-				if first, ok := names[string(name)]; ok {
-					return fmt.Errorf("couchbase collection name `%v` in %s/%s redefined by %s/%s, first seen in %s/%s", name, kind, resourceName, couchbasev2.CollectionGroupCRDResourceKind, collectionGroup.Name, first.kind, first.name)
-				}
+			def := nameFirstDefinition{kind: couchbasev2.CollectionGroupCRDResourceKind, name: collectionGroup.Name}
 
-				names[string(name)] = nameFirstDefinition{
-					kind: couchbasev2.CollectionGroupCRDResourceKind,
-					name: collectionGroup.Name,
+			for _, name := range collectionGroup.Spec.Names {
+				if first, clash := names.claim(string(name), def); clash {
+					return fmt.Errorf("couchbase collection name `%v` in %s/%s redefined by %s/%s, first seen in %s/%s", name, kind, resourceName, couchbasev2.CollectionGroupCRDResourceKind, collectionGroup.Name, first.kind, first.name)
 				}
 			}
 		}
@@ -6201,13 +6206,9 @@ func checkScopeCollectionsUniqueImplicit(v *types.Validator, namespace, kind, re
 	}
 
 	for _, collection := range collections.Items {
-		if first, ok := names[collection.CouchbaseName()]; ok {
+		def := nameFirstDefinition{kind: couchbasev2.CollectionCRDResourceKind, name: collection.Name}
+		if first, clash := names.claim(collection.CouchbaseName(), def); clash {
 			return fmt.Errorf("couchbase collection name `%v` in %s/%s redefined by %s/%s, first seen in %s/%s", collection.CouchbaseName(), kind, resourceName, couchbasev2.CollectionCRDResourceKind, collection.Name, first.kind, first.name)
-		}
-
-		names[collection.CouchbaseName()] = nameFirstDefinition{
-			kind: couchbasev2.CollectionCRDResourceKind,
-			name: collection.Name,
 		}
 	}
 
@@ -6217,14 +6218,11 @@ func checkScopeCollectionsUniqueImplicit(v *types.Validator, namespace, kind, re
 	}
 
 	for _, collectionGroup := range collectionGroups.Items {
-		for _, name := range collectionGroup.Spec.Names {
-			if first, ok := names[string(name)]; ok {
-				return fmt.Errorf("couchbase collection name `%v` in %s/%s redefined by %s/%s, first seen in %s/%s", name, kind, resourceName, couchbasev2.CollectionGroupCRDResourceKind, collectionGroup.Name, first.kind, first.name)
-			}
+		def := nameFirstDefinition{kind: couchbasev2.CollectionGroupCRDResourceKind, name: collectionGroup.Name}
 
-			names[string(name)] = nameFirstDefinition{
-				kind: couchbasev2.CollectionGroupCRDResourceKind,
-				name: collectionGroup.Name,
+		for _, name := range collectionGroup.Spec.Names {
+			if first, clash := names.claim(string(name), def); clash {
+				return fmt.Errorf("couchbase collection name `%v` in %s/%s redefined by %s/%s, first seen in %s/%s", name, kind, resourceName, couchbasev2.CollectionGroupCRDResourceKind, collectionGroup.Name, first.kind, first.name)
 			}
 		}
 	}
@@ -6292,13 +6290,9 @@ func checkBucketScopesUniqueExplicit(v *types.Validator, namespace, kind, resour
 				break
 			}
 
-			if first, ok := names[scope.CouchbaseName()]; ok {
+			def := nameFirstDefinition{kind: couchbasev2.ScopeCRDResourceKind, name: scope.Name}
+			if first, clash := names.claim(scope.CouchbaseName(), def); clash {
 				return fmt.Errorf("couchbase scope name `%v` in %s/%s redefined by %s/%s, first seen in %s/%s", scope.CouchbaseName(), kind, resourceName, couchbasev2.ScopeCRDResourceKind, scope.Name, first.kind, first.name)
-			}
-
-			names[scope.CouchbaseName()] = nameFirstDefinition{
-				kind: couchbasev2.ScopeCRDResourceKind,
-				name: scope.Name,
 			}
 		case couchbasev2.ScopeGroupCRDResourceKind:
 			scopeGroup, found, err := v.Abstraction.GetCouchbaseScopeGroup(namespace, resource.StrName())
@@ -6310,14 +6304,11 @@ func checkBucketScopesUniqueExplicit(v *types.Validator, namespace, kind, resour
 				break
 			}
 
-			for _, name := range scopeGroup.Spec.Names {
-				if first, ok := names[string(name)]; ok {
-					return fmt.Errorf("couchbase scope name `%v` in %s/%s redefined by %s/%s, first seen in %s/%s", name, kind, resourceName, couchbasev2.ScopeGroupCRDResourceKind, scopeGroup.Name, first.kind, first.name)
-				}
+			def := nameFirstDefinition{kind: couchbasev2.ScopeGroupCRDResourceKind, name: scopeGroup.Name}
 
-				names[string(name)] = nameFirstDefinition{
-					kind: couchbasev2.ScopeGroupCRDResourceKind,
-					name: scopeGroup.Name,
+			for _, name := range scopeGroup.Spec.Names {
+				if first, clash := names.claim(string(name), def); clash {
+					return fmt.Errorf("couchbase scope name `%v` in %s/%s redefined by %s/%s, first seen in %s/%s", name, kind, resourceName, couchbasev2.ScopeGroupCRDResourceKind, scopeGroup.Name, first.kind, first.name)
 				}
 			}
 		}
@@ -6339,13 +6330,9 @@ func checkBucketScopesUniqueImplicit(v *types.Validator, namespace, kind, resour
 	}
 
 	for _, scope := range scopes.Items {
-		if first, ok := names[scope.CouchbaseName()]; ok {
+		def := nameFirstDefinition{kind: couchbasev2.ScopeCRDResourceKind, name: scope.Name}
+		if first, clash := names.claim(scope.CouchbaseName(), def); clash {
 			return fmt.Errorf("couchbase scope name `%v` in %s/%s redefined by %s/%s, first seen in %s/%s", scope.CouchbaseName(), kind, resourceName, couchbasev2.ScopeCRDResourceKind, scope.Name, first.kind, first.name)
-		}
-
-		names[scope.CouchbaseName()] = nameFirstDefinition{
-			kind: couchbasev2.ScopeCRDResourceKind,
-			name: scope.Name,
 		}
 	}
 
@@ -6355,14 +6342,11 @@ func checkBucketScopesUniqueImplicit(v *types.Validator, namespace, kind, resour
 	}
 
 	for _, scopeGroup := range scopeGroups.Items {
-		for _, name := range scopeGroup.Spec.Names {
-			if first, ok := names[string(name)]; ok {
-				return fmt.Errorf("couchbase scope name `%v` in %s/%s redefined by %s/%s, first seen in %s/%s", name, kind, resourceName, couchbasev2.ScopeGroupCRDResourceKind, scopeGroup.Name, first.kind, first.name)
-			}
+		def := nameFirstDefinition{kind: couchbasev2.ScopeGroupCRDResourceKind, name: scopeGroup.Name}
 
-			names[string(name)] = nameFirstDefinition{
-				kind: couchbasev2.ScopeGroupCRDResourceKind,
-				name: scopeGroup.Name,
+		for _, name := range scopeGroup.Spec.Names {
+			if first, clash := names.claim(string(name), def); clash {
+				return fmt.Errorf("couchbase scope name `%v` in %s/%s redefined by %s/%s, first seen in %s/%s", name, kind, resourceName, couchbasev2.ScopeGroupCRDResourceKind, scopeGroup.Name, first.kind, first.name)
 			}
 		}
 	}

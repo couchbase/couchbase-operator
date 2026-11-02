@@ -2175,3 +2175,85 @@ func TestCheckConstraintAutoFailoverMaxCountDeprecated(t *testing.T) {
 		})
 	}
 }
+
+func TestNamesUniqueSameResourceReachedTwice(t *testing.T) {
+	labels := map[string]string{"cluster": "cb"}
+	selector := &metav1.LabelSelector{MatchLabels: labels}
+	meta := func(name string) metav1.ObjectMeta {
+		return metav1.ObjectMeta{Name: name, Namespace: "default", Labels: labels}
+	}
+
+	collectionGroup := func(name string, names ...couchbasev2.ScopeOrCollectionName) runtime.Object {
+		return &couchbasev2.CouchbaseCollectionGroup{ObjectMeta: meta(name), Spec: couchbasev2.CouchbaseCollectionGroupSpec{Names: names}}
+	}
+
+	scopeGroup := func(name string, names ...couchbasev2.ScopeOrCollectionName) runtime.Object {
+		return &couchbasev2.CouchbaseScopeGroup{ObjectMeta: meta(name), Spec: couchbasev2.CouchbaseScopeGroupSpec{Names: names}}
+	}
+
+	// Each case references grp-a / scope-a by name and also selects everything labelled.
+	collections := &couchbasev2.CollectionSelector{
+		Resources: []couchbasev2.CollectionLocalObjectReference{{Kind: couchbasev2.CollectionGroupCRDResourceKind, Name: "grp-a"}},
+		Selector:  selector,
+	}
+
+	scopes := &couchbasev2.ScopeSelector{
+		Resources: []couchbasev2.ScopeLocalObjectReference{{Kind: couchbasev2.ScopeGroupCRDResourceKind, Name: "scope-a"}},
+		Selector:  selector,
+	}
+
+	checkCollections := func(v *types.Validator) error {
+		return checkScopeCollectionsUnique(v, "default", couchbasev2.ScopeGroupCRDResourceKind, "scope-grp", collections)
+	}
+
+	checkScopes := func(v *types.Validator) error {
+		return checkBucketScopesUnique(v, "default", couchbasev2.BucketCRDResourceKind, "bucket0", scopes)
+	}
+
+	testcases := []struct {
+		name        string
+		objects     []runtime.Object
+		check       func(v *types.Validator) error
+		expectedErr string
+	}{
+		{
+			name:    "collection group referenced and selected",
+			objects: []runtime.Object{collectionGroup("grp-a", "coll0", "coll1")},
+			check:   checkCollections,
+		},
+		{
+			name:        "collection name in two collection groups",
+			objects:     []runtime.Object{collectionGroup("grp-a", "coll0"), collectionGroup("grp-b", "coll0")},
+			check:       checkCollections,
+			expectedErr: "redefined by CouchbaseCollectionGroup/grp-b, first seen in CouchbaseCollectionGroup/grp-a",
+		},
+		{
+			name:    "scope group referenced and selected",
+			objects: []runtime.Object{scopeGroup("scope-a", "scope0")},
+			check:   checkScopes,
+		},
+		{
+			name:        "scope name in two scope groups",
+			objects:     []runtime.Object{scopeGroup("scope-a", "scope0"), scopeGroup("scope-b", "scope0")},
+			check:       checkScopes,
+			expectedErr: "redefined by CouchbaseScopeGroup/scope-b, first seen in CouchbaseScopeGroup/scope-a",
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			v := types.New(k8sfake.NewSimpleClientset(), couchbasefake.NewSimpleClientset(testcase.objects...), nil)
+
+			err := testcase.check(v)
+
+			switch {
+			case testcase.expectedErr == "" && err != nil:
+				t.Errorf("expected no error but got: %s", err.Error())
+			case testcase.expectedErr != "" && err == nil:
+				t.Errorf("expected error containing %q but got none", testcase.expectedErr)
+			case testcase.expectedErr != "" && !strings.Contains(err.Error(), testcase.expectedErr):
+				t.Errorf("expected error containing %q but got %q", testcase.expectedErr, err.Error())
+			}
+		})
+	}
+}
