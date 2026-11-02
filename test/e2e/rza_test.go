@@ -411,6 +411,55 @@ func TestServerGroupEnable(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
+// TestServerGroupEnableWithServerGroupsUpgradeOrder turns on server groups and the
+// ServerGroups upgrade order together on a running cluster. The pods were created
+// without server groups, so they have no zone. They must still be replaced one by
+// one, in name order, without the cluster getting stuck.
+func TestServerGroupEnableWithServerGroupsUpgradeOrder(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).ServerGroups(2)
+
+	// Dynamic configuration.
+	availableServerGroups := getAvailabilityZones(t, kubernetes)
+	clusterSize := len(availableServerGroups)
+
+	// Create the cluster.
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	// Turn on server groups and the ServerGroups upgrade order in one change.
+	upgradeSpec := &couchbasev2.UpgradeSpec{
+		UpgradeOrderType: couchbasev2.UpgradeOrderTypeServerGroups,
+	}
+
+	patchset := jsonpatch.NewPatchSet().
+		Add("/spec/serverGroups", availableServerGroups).
+		Add("/spec/upgrade", upgradeSpec)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Check things are spread out as we expect.
+	expected := getExpectedRzaResultMap(clusterSize, availableServerGroups)
+	expected.mustValidateRzaMap(t, kubernetes, cluster)
+
+	// Each pod is replaced once. If the cluster got stuck adding and removing
+	// pods, there would be extra events here and this check would fail.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
 // TestServerGroupDisable tests server groups can be removed from a running cluster...
 // the ultimate "get out of jail free" card for support.
 func TestServerGroupDisable(t *testing.T) {

@@ -12,6 +12,7 @@ package cluster
 
 import (
 	"encoding/json"
+	goerrors "errors"
 	"slices"
 	"sort"
 	"strings"
@@ -267,14 +268,40 @@ func (c *Cluster) groupCandidatesByUpgradeOrder(candidates couchbaseutil.MemberS
 	}
 
 	if rest.Size() > 0 {
-		groups = append(groups, rest.ToList())
+		groups = append(groups, orderCandidatesByName(rest, nil, c.getOrchestratorName()))
 	}
 
 	return groups
 }
 
 func (c *Cluster) selectCandidatesByNodesOrder(candidates couchbaseutil.MemberSet) couchbaseutil.MemberList {
-	nodeOrder := append([]string(nil), c.cluster.Spec.Upgrade.UpgradeOrder...)
+	return orderCandidatesByName(candidates, c.cluster.Spec.Upgrade.UpgradeOrder, c.getOrchestratorName())
+}
+
+// getOrchestratorName asks Couchbase Server which node is the orchestrator.
+// If there is nobody to ask or the server can't be reached it returns an empty
+// name, and the orchestrator is then sorted like any other pod.
+func (c *Cluster) getOrchestratorName() string {
+	// When the cluster is hibernated there is no node to ask, so we skip the
+	// lookup instead of logging an error every cycle.
+	ready := c.readyMembers()
+	if len(ready) == 0 {
+		return ""
+	}
+
+	clusterInfo := &couchbaseutil.TerseClusterInfo{}
+	if err := couchbaseutil.GetTerseClusterInfo(clusterInfo).On(c.api, ready); err != nil {
+		c.log.Error(err, "failed to get cluster info", "cluster", c.namespacedName())
+		return ""
+	}
+
+	return clusterInfo.Orchestrator
+}
+
+// orderCandidatesByName puts the pods named in nodeOrder first, then the rest
+// sorted by name. The orchestrator goes last, so it only moves once.
+// Other upgrade orders also use this for pods they can't place in a group.
+func orderCandidatesByName(candidates couchbaseutil.MemberSet, nodeOrder []string, orchestratorName string) couchbaseutil.MemberList {
 	finalCandidates := couchbaseutil.MemberList{}
 
 	for _, node := range nodeOrder {
@@ -284,17 +311,7 @@ func (c *Cluster) selectCandidatesByNodesOrder(candidates couchbaseutil.MemberSe
 	}
 
 	// Hold the orchestrator back so that it can be upgraded last.
-	var orchestrator couchbaseutil.Member
-
-	// Nobody to ask while hibernated; skip rather than log an error each cycle.
-	if ready := c.readyMembers(); len(ready) > 0 {
-		clusterInfo := &couchbaseutil.TerseClusterInfo{}
-		if err := couchbaseutil.GetTerseClusterInfo(clusterInfo).On(c.api, ready); err != nil {
-			c.log.Error(err, "failed to get cluster info", "cluster", c.namespacedName())
-		} else {
-			candidates, orchestrator = separateCandidatesAndOrchestrator(candidates, clusterInfo.Orchestrator)
-		}
-	}
+	candidates, orchestrator := separateCandidatesAndOrchestrator(candidates, orchestratorName)
 
 	// Go through the rest in alphabetical order
 	sortedNodes := candidates.Names()
@@ -314,6 +331,15 @@ func (c *Cluster) selectCandidatesByNodesOrder(candidates couchbaseutil.MemberSe
 }
 
 func (c *Cluster) groupCandidatesByServerGroupsOrder(candidates couchbaseutil.MemberSet) []couchbaseutil.MemberList {
+	return c.groupCandidatesByServerGroups(candidates, func(name string) (string, error) {
+		return k8sutil.GetServerGroup(c.k8s, name, c.cluster.ServerGroupLabel())
+	})
+}
+
+// groupCandidatesByServerGroups splits the candidates by server group, in upgrade
+// order. getServerGroup looks up the server group of a pod. It is passed in so unit
+// tests can use a fake one.
+func (c *Cluster) groupCandidatesByServerGroups(candidates couchbaseutil.MemberSet, getServerGroup func(string) (string, error)) []couchbaseutil.MemberList {
 	serverGroupOrder := slices.Clone(c.cluster.Spec.Upgrade.UpgradeOrder)
 
 	// Append all the server groups to the end of the order, to ensure we upgrade
@@ -326,11 +352,24 @@ func (c *Cluster) groupCandidatesByServerGroupsOrder(candidates couchbaseutil.Me
 	// Group the external members by server group
 	groupedCandidates := map[string]couchbaseutil.MemberSet{}
 
+	// Pods that are not in any server group yet.
+	noServerGroup := couchbaseutil.MemberSet{}
+
 	for _, candidate := range candidates {
-		// The pod is likely down; groupCandidatesByUpgradeOrder puts it in the final group.
-		scheduledServerGroup, err := k8sutil.GetServerGroup(c.k8s, candidate.Name(), c.cluster.ServerGroupLabel())
-		if err != nil {
+		scheduledServerGroup, err := getServerGroup(candidate.Name())
+
+		switch {
+		case goerrors.Is(err, errors.ErrResourceAttributeRequired):
+			// The pod has no node selector, so it has no server group.
+			scheduledServerGroup = ""
+		case err != nil:
+			// The pod is likely down, so we leave it for the final group.
 			c.log.Error(err, "failed to get server group for candidate", "cluster", c.namespacedName(), "candidate", candidate.Name())
+			continue
+		}
+
+		if scheduledServerGroup == "" {
+			noServerGroup.Add(candidate)
 			continue
 		}
 
@@ -341,10 +380,19 @@ func (c *Cluster) groupCandidatesByServerGroupsOrder(candidates couchbaseutil.Me
 		}
 	}
 
-	// Only nodes from one server group can be upgraded at a time.
-	// Arbiter nodes go to the end of each group so they are upgraded last.
 	groups := []couchbaseutil.MemberList{}
 
+	// A pod with no server group was created before server groups were turned
+	// on. We can't tell which group it belongs to, so we upgrade these pods
+	// first, in name order. After that, the server group order takes over.
+	if noServerGroup.Size() > 0 {
+		c.log.V(1).Info("Upgrading pods with no server group first, in name order", "cluster", c.namespacedName(), "pods", noServerGroup.Names())
+
+		groups = append(groups, orderCandidatesByName(noServerGroup, nil, c.getOrchestratorName()))
+	}
+
+	// Only nodes from one server group can be upgraded at a time.
+	// Arbiter nodes go to the end of each group so they are upgraded last.
 	for _, group := range serverGroupOrder {
 		members, ok := groupedCandidates[group]
 		if !ok {

@@ -329,6 +329,7 @@ func registerTests() {
 		framework.NewTestDef(TestSyncGatewayCreateRemoteMutualTLS).WithTags(TagSuiteP0, TagFeatureTLS, TagFeatureSyncGateway),
 		framework.NewTestDef(TestRzaResizeCluster).WithTags(TagSuiteP0, TagFeatureServerGroups, TagSuitePlatform),
 		framework.NewTestDef(TestServerGroupEnable).WithTags(TagSuiteP0, TagFeatureServerGroups),
+		framework.NewTestDef(TestServerGroupEnableWithServerGroupsUpgradeOrder).WithTags(TagSuiteP0, TagFeatureServerGroups),
 		framework.NewTestDef(TestServerGroupDisable).WithTags(TagSuiteP0, TagFeatureServerGroups),
 		framework.NewTestDef(TestServerGroupAddGroup).WithTags(TagSuiteP0, TagFeatureServerGroups, TagSuitePlatform),
 		framework.NewTestDef(TestServerGroupRemoveGroup).WithTags(TagSuiteP0, TagFeatureServerGroups),

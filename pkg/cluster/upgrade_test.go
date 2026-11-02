@@ -11,16 +11,19 @@ licenses/APL2.txt.
 package cluster
 
 import (
+	"fmt"
 	"slices"
 	"testing"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 
+	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // TestDetectZoneChange covers the swap-vs-in-place decision. Under an override every server class
@@ -368,5 +371,144 @@ func TestBuildClassOrder(t *testing.T) {
 		if got := c.buildClassOrder(); !slices.Equal(got, tc.want) {
 			t.Errorf("%s: got %v, want %v", tc.orderType, got, tc.want)
 		}
+	}
+}
+
+// upgradeTestMembers makes a member for each pod name, all in the given server class.
+func upgradeTestMembers(config string, names ...string) couchbaseutil.MemberSet {
+	ms := couchbaseutil.MemberSet{}
+	for _, name := range names {
+		ms.Add(couchbaseutil.NewMember("default", "cb-example", name, "", config, false, ""))
+	}
+
+	return ms
+}
+
+// memberNames returns the pod names in the list, keeping their order.
+func memberNames(ml couchbaseutil.MemberList) []string {
+	names := []string{}
+	for _, m := range ml {
+		names = append(names, m.Name())
+	}
+
+	return names
+}
+
+// TestOrderCandidatesByName checks the name order. Pods the user listed go
+// first, then the rest by name, and the orchestrator goes last.
+func TestOrderCandidatesByName(t *testing.T) {
+	cases := []struct {
+		name         string
+		nodeOrder    []string
+		orchestrator string
+		want         []string
+	}{
+		{"sorted by name", nil, "", []string{"cb-example-0000", "cb-example-0001", "cb-example-0002"}},
+		{"orchestrator goes last", nil, "ns_1@cb-example-0000.cb-example.default.svc", []string{"cb-example-0001", "cb-example-0002", "cb-example-0000"}},
+		{"listed pods go first", []string{"cb-example-0002"}, "", []string{"cb-example-0002", "cb-example-0000", "cb-example-0001"}},
+		// The list may hold names that are not pods, such as server group names.
+		{"names that are not pods are ignored", []string{"az-a", "az-b"}, "", []string{"cb-example-0000", "cb-example-0001", "cb-example-0002"}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			candidates := upgradeTestMembers("data", "cb-example-0002", "cb-example-0000", "cb-example-0001")
+
+			got := memberNames(orderCandidatesByName(candidates, tc.nodeOrder, tc.orchestrator))
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestGroupCandidatesByServerGroups checks the ServerGroups upgrade order when some
+// pods were created before server groups were turned on, so they have no zone.
+// Those pods must be upgraded first, in name order, instead of being skipped.
+func TestGroupCandidatesByServerGroups(t *testing.T) {
+	noNodeSelector := fmt.Errorf("%w: pod has no node selector", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+	notFound := fmt.Errorf("%w: pod not found", errors.NewStackTracedError(errors.ErrResourceRequired))
+
+	type lookup struct {
+		group string
+		err   error
+	}
+
+	cases := []struct {
+		name string
+		pods map[string]lookup
+		want [][]string
+	}{
+		{
+			name: "no pod has a node selector, so all go in name order",
+			pods: map[string]lookup{
+				"cb-example-0002": {err: noNodeSelector},
+				"cb-example-0000": {err: noNodeSelector},
+				"cb-example-0001": {err: noNodeSelector},
+			},
+			want: [][]string{{"cb-example-0000", "cb-example-0001", "cb-example-0002"}},
+		},
+		{
+			name: "pods with no zone go before pods with a zone",
+			pods: map[string]lookup{
+				"cb-example-0000": {group: "az-a"},
+				"cb-example-0001": {err: noNodeSelector},
+				"cb-example-0002": {group: ""}, // node selector, but no zone key
+			},
+			want: [][]string{{"cb-example-0001", "cb-example-0002"}, {"cb-example-0000"}},
+		},
+		{
+			name: "every pod has a zone, so pods go by server group",
+			pods: map[string]lookup{
+				"cb-example-0000": {group: "az-b"},
+				"cb-example-0001": {group: "az-a"},
+				"cb-example-0002": {group: "az-b"},
+			},
+			want: [][]string{{"cb-example-0001"}, {"cb-example-0000", "cb-example-0002"}},
+		},
+		{
+			name: "a pod that can't be found is left for the final group",
+			pods: map[string]lookup{
+				"cb-example-0000": {err: notFound},
+				"cb-example-0001": {group: "az-a"},
+			},
+			want: [][]string{{"cb-example-0001"}},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &Cluster{
+				cluster: &couchbasev2.CouchbaseCluster{
+					ObjectMeta: metav1.ObjectMeta{Name: "cb-example", Namespace: "default"},
+					Spec: couchbasev2.ClusterSpec{
+						ServerGroups: []string{"az-a", "az-b"},
+						Servers: []couchbasev2.ServerConfig{
+							{Name: "data", Services: []couchbasev2.Service{couchbasev2.DataService}},
+						},
+						Upgrade: &couchbasev2.UpgradeSpec{UpgradeOrderType: couchbasev2.UpgradeOrderTypeServerGroups},
+					},
+				},
+				log: logf.Log.WithName("test"),
+			}
+
+			candidates := couchbaseutil.MemberSet{}
+			for name := range tc.pods {
+				candidates.Merge(upgradeTestMembers("data", name))
+			}
+
+			groups := c.groupCandidatesByServerGroups(candidates, func(name string) (string, error) {
+				return tc.pods[name].group, tc.pods[name].err
+			})
+
+			got := [][]string{}
+			for _, group := range groups {
+				got = append(got, memberNames(group))
+			}
+
+			if !slices.EqualFunc(got, tc.want, slices.Equal[[]string]) {
+				t.Errorf("got %v, want %v", got, tc.want)
+			}
+		})
 	}
 }
