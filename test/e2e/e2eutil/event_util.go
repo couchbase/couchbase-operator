@@ -249,7 +249,7 @@ func ClusterCreateSequence(size int) eventschema.Validatable {
 		return eventschema.Sequence{
 			Validators: []eventschema.Validatable{
 				eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
-				eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
+				eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited, FuzzyMessage: "file based rebalance"}},
 			},
 		}
 	}
@@ -259,14 +259,14 @@ func ClusterCreateSequence(size int) eventschema.Validatable {
 			// The first pod is CBS-initialized, then the post topology reconcilers run, so a
 			// rebalance mode write lands here before the remaining pods are CBS-added.
 			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
-			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
+			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited, FuzzyMessage: "file based rebalance"}},
 			eventschema.Repeat{
 				Times:     size - 1,
 				Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 			},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
-			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
+			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited, FuzzyMessage: "file based rebalance"}},
 		},
 	}
 }

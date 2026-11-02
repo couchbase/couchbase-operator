@@ -19,6 +19,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
@@ -155,7 +156,10 @@ func TestCAOValidationOperatorRestart(t *testing.T) {
 
 	clusterSize := 1
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	// Use empty indexer settings so the API defaults storageMode to memory_optimized.
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.Indexer = &couchbasev2.CouchbaseClusterIndexerSettings{}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Disable DAC validation
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/metadata/annotations", map[string]string{
@@ -167,8 +171,8 @@ func TestCAOValidationOperatorRestart(t *testing.T) {
 		t.Fatalf("Failed to marshal cluster spec: %v", err)
 	}
 
-	// Replace the default memory_optimized index storage setting with an invalid value (plasma).
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexStorageSetting", couchbasev2.CouchbaseClusterIndexStorageSettingStandard), time.Minute)
+	// Replace the default memory_optimized index storage mode with an invalid value (plasma).
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/storageMode", couchbasev2.CouchbaseClusterIndexStorageSettingStandard), time.Minute)
 	// Wait for the oeprator to register the change is invalid.
 	e2eutil.MustWaitForClusterWithErrorMessage(t, kubernetes, "spec.cluster.indexStorageSetting/spec.cluster.indexer.storageMode in body cannot be modified if there are any nodes in the cluster running the index service", cluster, 2*time.Minute)
 	// Check that the last reconciled spec is the same as the old spec.
@@ -183,8 +187,8 @@ func TestCAOValidationOperatorRestart(t *testing.T) {
 	e2eutil.MustWaitForClusterWithErrorMessage(t, kubernetes, "spec.cluster.indexStorageSetting/spec.cluster.indexer.storageMode in body cannot be modified if there are any nodes in the cluster running the index service", cluster, 2*time.Minute)
 	e2eutil.MustWaitForClusterWithAnnotation(t, kubernetes, cluster, constants.AnnotationLastReconciledSpec, string(oldSpecJSON), 2*time.Minute)
 
-	// Patch the index storage setting back to a valid value.
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexStorageSetting", couchbasev2.CouchbaseClusterIndexStorageSettingMemoryOptimized), time.Minute)
+	// Patch the index storage mode back to a valid value.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/storageMode", couchbasev2.CouchbaseClusterIndexStorageSettingMemoryOptimized), time.Minute)
 
 	newSpecJSON, err := json.Marshal(cluster.Spec)
 	if err != nil {
@@ -196,9 +200,13 @@ func TestCAOValidationOperatorRestart(t *testing.T) {
 	e2eutil.MustWaitForClusterWithAnnotation(t, kubernetes, cluster, constants.AnnotationLastReconciledSpec, string(newSpecJSON), 2*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
-	// Check the cluster scales correctly once the spec is valid.
+	// Check the cluster scales correctly once the spec is valid.  The indexer settings get applied
+	// once, either during creation or after the operator restarts. They are always applied before
+	// the file based rebalance setting.
 	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited, FuzzyMessage: "index service"},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited, FuzzyMessage: "file based rebalance"}},
 		e2eutil.ClusterScaleUpSequence(1),
 	}
 
