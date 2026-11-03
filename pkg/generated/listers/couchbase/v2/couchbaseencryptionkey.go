@@ -12,10 +12,10 @@
 package v2
 
 import (
-	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // CouchbaseEncryptionKeyLister helps list CouchbaseEncryptionKeys.
@@ -23,7 +23,7 @@ import (
 type CouchbaseEncryptionKeyLister interface {
 	// List lists all CouchbaseEncryptionKeys in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseEncryptionKey, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseEncryptionKey, err error)
 	// CouchbaseEncryptionKeys returns an object that can list and get CouchbaseEncryptionKeys.
 	CouchbaseEncryptionKeys(namespace string) CouchbaseEncryptionKeyNamespaceLister
 	CouchbaseEncryptionKeyListerExpansion
@@ -31,25 +31,17 @@ type CouchbaseEncryptionKeyLister interface {
 
 // couchbaseEncryptionKeyLister implements the CouchbaseEncryptionKeyLister interface.
 type couchbaseEncryptionKeyLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*couchbasev2.CouchbaseEncryptionKey]
 }
 
 // NewCouchbaseEncryptionKeyLister returns a new CouchbaseEncryptionKeyLister.
 func NewCouchbaseEncryptionKeyLister(indexer cache.Indexer) CouchbaseEncryptionKeyLister {
-	return &couchbaseEncryptionKeyLister{indexer: indexer}
-}
-
-// List lists all CouchbaseEncryptionKeys in the indexer.
-func (s *couchbaseEncryptionKeyLister) List(selector labels.Selector) (ret []*v2.CouchbaseEncryptionKey, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseEncryptionKey))
-	})
-	return ret, err
+	return &couchbaseEncryptionKeyLister{listers.New[*couchbasev2.CouchbaseEncryptionKey](indexer, couchbasev2.Resource("couchbaseencryptionkey"))}
 }
 
 // CouchbaseEncryptionKeys returns an object that can list and get CouchbaseEncryptionKeys.
 func (s *couchbaseEncryptionKeyLister) CouchbaseEncryptionKeys(namespace string) CouchbaseEncryptionKeyNamespaceLister {
-	return couchbaseEncryptionKeyNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return couchbaseEncryptionKeyNamespaceLister{listers.NewNamespaced[*couchbasev2.CouchbaseEncryptionKey](s.ResourceIndexer, namespace)}
 }
 
 // CouchbaseEncryptionKeyNamespaceLister helps list and get CouchbaseEncryptionKeys.
@@ -57,36 +49,15 @@ func (s *couchbaseEncryptionKeyLister) CouchbaseEncryptionKeys(namespace string)
 type CouchbaseEncryptionKeyNamespaceLister interface {
 	// List lists all CouchbaseEncryptionKeys in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseEncryptionKey, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseEncryptionKey, err error)
 	// Get retrieves the CouchbaseEncryptionKey from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v2.CouchbaseEncryptionKey, error)
+	Get(name string) (*couchbasev2.CouchbaseEncryptionKey, error)
 	CouchbaseEncryptionKeyNamespaceListerExpansion
 }
 
 // couchbaseEncryptionKeyNamespaceLister implements the CouchbaseEncryptionKeyNamespaceLister
 // interface.
 type couchbaseEncryptionKeyNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all CouchbaseEncryptionKeys in the indexer for a given namespace.
-func (s couchbaseEncryptionKeyNamespaceLister) List(selector labels.Selector) (ret []*v2.CouchbaseEncryptionKey, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseEncryptionKey))
-	})
-	return ret, err
-}
-
-// Get retrieves the CouchbaseEncryptionKey from the indexer for a given namespace and name.
-func (s couchbaseEncryptionKeyNamespaceLister) Get(name string) (*v2.CouchbaseEncryptionKey, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v2.Resource("couchbaseencryptionkey"), name)
-	}
-	return obj.(*v2.CouchbaseEncryptionKey), nil
+	listers.ResourceIndexer[*couchbasev2.CouchbaseEncryptionKey]
 }

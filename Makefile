@@ -108,10 +108,9 @@ PRODUCT := couchbase-autonomous-operator
 VERSION ?= 2.9.0
 BLD_NUM ?= 999
 
-# This controls the golang version of the docker container used
-# to build binaries. This version takes precedence over the build
-# version specified by the build system.
-GO_VERSION := 1.26.5
+# Go version of the docker container used to build binaries, taken from go.mod.
+# The release build overrides it with make GO_VERSION=<manifest GOVERSION>.
+GO_VERSION := $(shell awk '/^go /{print $$2}' go.mod)
 
 # Short cut for setting the platform across all targets.
 PLATFORM := kubernetes
@@ -220,7 +219,11 @@ LISTERS_PACKAGE := $(GENERATED_PACKAGE_BASE)/listers
 INFORMERS_PACKAGE := $(GENERATED_PACKAGE_BASE)/informers
 
 # Common arguments for the Kubernetes code generator tool chain.
-CODEGEN_ARGS := --go-header-file scripts/codegen/boilerplate.go.txt --output-base ../../..
+CODEGEN_ARGS := --go-header-file scripts/codegen/boilerplate.go.txt
+
+# Code generators and controller-gen are pinned in their own module so their
+# deps don't mix with the operator's.
+CODEGEN := go tool -modfile=scripts/codegen/go.mod
 
 # CRD file target, contains all the CRDs.
 CRD_FILE := example/crd.yaml
@@ -236,7 +239,7 @@ GENERATED_FILES := pkg/apis/couchbase/v2/zz_generated.deepcopy.go \
 SOURCE := $(shell find . -name *.go -type f)
 
 # The git revision, infinitely more useful than an arbitrary build number.
-REVISION := $(shell git rev-parse HEAD)
+REVISION := $(shell git rev-parse HEAD 2>/dev/null)
 
 ################################################################################
 # Go Language Variables
@@ -250,8 +253,6 @@ REVISION := $(shell git rev-parse HEAD)
 GOPATH := $(shell go env GOPATH)
 GOBIN := $(if $(GOPATH),$(GOPATH)/bin,$(HOME)/go/bin)
 GOLINT_VERSION := v2.12.2
-CODE_GENERATOR_VERSION := v0.28.3 # Should be kept in sync with other libs in go.mod
-CONTROLLER_TOOLS_VERSION := v0.19.0 # See https://github.com/kubernetes-sigs/controller-tools/releases
 
 # Common environment settings for all Go builds.
 STATIC_GOENV := CGO_ENABLED=0 GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH)
@@ -292,10 +293,6 @@ DOCKERFILE := Dockerfile
 ifeq ($(TARGET_PLATFORM),openshift)
 DOCKERFILE := Dockerfile.rhel
 endif
-
-# The build image is platform specific (depends on the dockerfile), thus
-# enabling concurrency.
-DOCKER_BUILD_IMAGE := couchbase/operator-build:$(TARGET_PLATFORM)
 
 # All binary builds get these arguments, acting as a stable interface between
 # the make system and any binaries emitted.  Thus the correct version is
@@ -455,6 +452,22 @@ clean:
 touch-generated:
 	touch ${GENERATED_FILES}
 
+# Regenerate all generated code in place.
+.PHONY: update-generated
+update-generated:
+	$(MAKE) -B $(GENERATED_FILES)
+
+# Fail if the generated code is out of date.  Regenerates in a scratch copy of
+# this checkout (untracked files included) so it never touches the files here,
+# which CV builds and tests in parallel.
+.PHONY: verify-generated
+verify-generated:
+	@set -e; dir=$$(mktemp -d); trap 'rm -rf "$$dir"' EXIT; \
+	git ls-files -co --exclude-standard | tar -cf - -T - | tar -xf - -C "$$dir"; \
+	$(MAKE) -C "$$dir" update-generated; \
+	diff -rq pkg/apis/couchbase/v2 "$$dir/pkg/apis/couchbase/v2" && diff -rq pkg/generated "$$dir/pkg/generated" || \
+		{ echo "Generated code is stale: run make update-generated"; exit 1; }
+
 # Build target for the CRD files.
 .PHONY: crd
 crd: $(CRD_FILE)
@@ -473,7 +486,8 @@ dockerized-lint: $(GENERATED_FILES)
 # Lint target to test source code compliance.
 .PHONY: lint
 lint: $(GENERATED_FILES)
-	curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b $(GOBIN) $(GOLINT_VERSION)
+	$(GOBIN)/golangci-lint version 2>/dev/null | grep -q ' $(GOLINT_VERSION:v%=%) ' || \
+		curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b $(GOBIN) $(GOLINT_VERSION)
 	$(GOBIN)/golangci-lint run --timeout=15m ./pkg/... ./cmd/... ./test/...
 
 # Lint python scripts for dodgy code.
@@ -620,31 +634,26 @@ endif
 
 # Build the V2 deep copy functions when the API source changes.
 pkg/apis/couchbase/v2/zz_generated.deepcopy.go: $(APISRC_V2)
-	@go install k8s.io/code-generator/cmd/deepcopy-gen@$(CODE_GENERATOR_VERSION)
-	$(GOBIN)/deepcopy-gen --input-dirs $(API_PACKAGE_V2) -O zz_generated.deepcopy --bounding-dirs $(API_PACKAGE_BASE) $(CODEGEN_ARGS)
+	$(CODEGEN) deepcopy-gen --output-file zz_generated.deepcopy.go $(CODEGEN_ARGS) $(API_PACKAGE_V2)
 
 # Build the couchbase kubernetes client when any API source changes.
 pkg/generated/clientset: $(APISRC)
 	@rm -rf $@
-	@go install k8s.io/code-generator/cmd/client-gen@$(CODE_GENERATOR_VERSION)
-	$(GOBIN)/client-gen --clientset-name $(CLIENTSET_NAME) --input-base "" --input $(API_PACKAGE_V2) --output-package $(CLIENTSET_PACKAGE) $(CODEGEN_ARGS)
+	$(CODEGEN) client-gen --clientset-name $(CLIENTSET_NAME) --input-base "" --input $(API_PACKAGE_V2) --output-dir $@ --output-pkg $(CLIENTSET_PACKAGE) $(CODEGEN_ARGS)
 
 # Build the couchbase kubernetes listers when any API source changes.
 pkg/generated/listers: $(APISRC)
 	@rm -rf $@
-	@go install k8s.io/code-generator/cmd/lister-gen@$(CODE_GENERATOR_VERSION)
-	$(GOBIN)/lister-gen --input-dirs $(API_PACKAGE_V2) --output-package $(LISTERS_PACKAGE) $(CODEGEN_ARGS)
+	$(CODEGEN) lister-gen --output-dir $@ --output-pkg $(LISTERS_PACKAGE) $(CODEGEN_ARGS) $(API_PACKAGE_V2)
 
 # Build the couchbase kubernetes informers when the clients or listers update.
 pkg/generated/informers: pkg/generated/clientset pkg/generated/listers
 	@rm -rf $@
-	@go install k8s.io/code-generator/cmd/informer-gen@$(CODE_GENERATOR_VERSION)
-	$(GOBIN)/informer-gen --input-dirs $(API_PACKAGE_V2) --versioned-clientset-package $(CLIENTSET_PACKAGE)/$(CLIENTSET_NAME) --listers-package $(LISTERS_PACKAGE) --output-package $(INFORMERS_PACKAGE) $(CODEGEN_ARGS)
+	$(CODEGEN) informer-gen --versioned-clientset-package $(CLIENTSET_PACKAGE)/$(CLIENTSET_NAME) --listers-package $(LISTERS_PACKAGE) --output-dir $@ --output-pkg $(INFORMERS_PACKAGE) $(CODEGEN_ARGS) $(API_PACKAGE_V2)
 
 # Build the CRDs from the binary when the binary updates.
 $(CRD_FILE): $(APISRC_V2)
-	@go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
-	$(GOBIN)/controller-gen crd:crdVersions=v1 paths=./pkg/apis/couchbase/v2 output:dir=example
+	$(CODEGEN) controller-gen crd:crdVersions=v1 paths=./pkg/apis/couchbase/v2 output:dir=example
 	@cat example/couchbase.com_*.yaml > $@
 	go run -ldflags "$(LDFLAGS)" scripts/crd-transform.go -in $@ -out $@
 	@rm -f example/couchbase.com_*.yaml
@@ -664,12 +673,11 @@ $(DYNAMIC_BINARIES): $(GENERATED_FILES) $(SOURCE)
 	$(DYNAMIC_GOENV) go test $(BUILDFLAGS) -race -c $(PACKAGE_BASE)/test/e2e -o $@ -ldflags "$(LDFLAGS)"
 
 # All binary builds for image builds will match these rules, and all builds will happen in a container
-# so we have full, in-tree, control of the tool chain.
+# so we have full, in-tree, control of the tool chain.  The binary is exported straight to the
+# target directory; touch it because the exporter stamps 1980, which make sees as always stale.
 $(TARGET_BINARIES): .dockerignore docker/couchbase-operator-build/$(DOCKERFILE) $(GENERATED_FILES) $(SOURCE) | $(TARGET_BINDIR)
-	docker buildx build --platform=${DOCKER_PLATFORM} -f docker/couchbase-operator-build/$(DOCKERFILE) -t $(DOCKER_BUILD_IMAGE) --load --build-arg GOAL=binary --build-arg BINARY=$(notdir $@) --build-arg PLATFORM=${PLATFORM}  $(DOCKER_BUILD_ARGS) .
-	docker run --platform ${DOCKER_PLATFORM} --rm --entrypoint /bin/cat $(DOCKER_BUILD_IMAGE) /tmp/src/github.com/couchbase/couchbase-operator/$(BINDIR)/$(notdir $@) > $(TARGET_BINDIR)/$(notdir $@)
-	chmod +x $(TARGET_BINDIR)/$(notdir $@)
-	docker rmi -f $(DOCKER_BUILD_IMAGE)
+	docker buildx build --platform=${DOCKER_PLATFORM} -f docker/couchbase-operator-build/$(DOCKERFILE) --output type=local,dest=$(TARGET_BINDIR) --build-arg GOAL=binary --build-arg BINARY=$(notdir $@) --build-arg PLATFORM=${PLATFORM}  $(DOCKER_BUILD_ARGS) .
+	touch $@
 
 ################################################################################
 # Build System Recipes

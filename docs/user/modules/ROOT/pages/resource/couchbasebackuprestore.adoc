@@ -56,6 +56,11 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbasebackuprestores-spec-env-valuefrom-fieldref,fieldRef>>:
         <<couchbasebackuprestores-spec-env-valuefrom-fieldref-apiversion,apiVersion>>: ""
         <<couchbasebackuprestores-spec-env-valuefrom-fieldref-fieldpath,fieldPath>>: ""
+      <<couchbasebackuprestores-spec-env-valuefrom-filekeyref,fileKeyRef>>:
+        <<couchbasebackuprestores-spec-env-valuefrom-filekeyref-key,key>>: ""
+        <<couchbasebackuprestores-spec-env-valuefrom-filekeyref-optional,optional>>: false
+        <<couchbasebackuprestores-spec-env-valuefrom-filekeyref-path,path>>: ""
+        <<couchbasebackuprestores-spec-env-valuefrom-filekeyref-volumename,volumeName>>: ""
       <<couchbasebackuprestores-spec-env-valuefrom-resourcefieldref,resourceFieldRef>>:
         <<couchbasebackuprestores-spec-env-valuefrom-resourcefieldref-containername,containerName>>: ""
         <<couchbasebackuprestores-spec-env-valuefrom-resourcefieldref-divisor,divisor>>: ""
@@ -569,7 +574,7 @@ These can be used to configure cbbackupmgr behavior via environment variables.
 ==== Description
 
 Name of the environment variable.
-Must be a C_IDENTIFIER.
+May consist of any printable ASCII characters except '='.
 
 === couchbasebackuprestores.spec.env.value
 
@@ -622,7 +627,8 @@ Selects a key of a ConfigMap.
 
 ==== Description
 
-The key to select.
+The key to select from the ConfigMap's Data field.
+Keys in the BinaryData field are not currently propagated to container env vars.
 
 === couchbasebackuprestores.spec.env.valueFrom.configMapKeyRef.name
 
@@ -683,6 +689,75 @@ Version of the schema the FieldPath is written in terms of, defaults to "v1".
 ==== Description
 
 Path of the field to select in the specified API version.
+
+=== couchbasebackuprestores.spec.env.valueFrom.fileKeyRef
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+FileKeyRef selects a key of the env file.
+Requires the EnvFiles feature gate to be enabled.
+
+=== couchbasebackuprestores.spec.env.valueFrom.fileKeyRef.key
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+The key within the env file.
+An invalid key will prevent the pod from starting.
+The keys defined within a source may consist of any printable ASCII characters except '='.
+During Alpha stage of the EnvFiles feature gate, the key size is limited to 128 characters.
+
+=== couchbasebackuprestores.spec.env.valueFrom.fileKeyRef.optional
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `False`
+
+==== Description
+
+Specify whether the file or its key must be defined.
+If the file or key
+does not exist, then the env var is not published.
+If optional is set to true and the specified key does not exist,
+the environment variable will not be set in the Pod's containers.
+If optional is set to false and the specified key does not exist,
+an error will be returned during Pod creation.
+
+=== couchbasebackuprestores.spec.env.valueFrom.fileKeyRef.path
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+The path within the volume from which to select the file.
+Must be relative and may not contain the '..' path or start with '..'.
+
+=== couchbasebackuprestores.spec.env.valueFrom.fileKeyRef.volumeName
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+The name of the volume mount containing the env file.
 
 === couchbasebackuprestores.spec.env.valueFrom.resourceFieldRef
 

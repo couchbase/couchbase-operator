@@ -12,10 +12,10 @@
 package v2
 
 import (
-	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // CouchbaseUserLister helps list CouchbaseUsers.
@@ -23,7 +23,7 @@ import (
 type CouchbaseUserLister interface {
 	// List lists all CouchbaseUsers in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseUser, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseUser, err error)
 	// CouchbaseUsers returns an object that can list and get CouchbaseUsers.
 	CouchbaseUsers(namespace string) CouchbaseUserNamespaceLister
 	CouchbaseUserListerExpansion
@@ -31,25 +31,17 @@ type CouchbaseUserLister interface {
 
 // couchbaseUserLister implements the CouchbaseUserLister interface.
 type couchbaseUserLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*couchbasev2.CouchbaseUser]
 }
 
 // NewCouchbaseUserLister returns a new CouchbaseUserLister.
 func NewCouchbaseUserLister(indexer cache.Indexer) CouchbaseUserLister {
-	return &couchbaseUserLister{indexer: indexer}
-}
-
-// List lists all CouchbaseUsers in the indexer.
-func (s *couchbaseUserLister) List(selector labels.Selector) (ret []*v2.CouchbaseUser, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseUser))
-	})
-	return ret, err
+	return &couchbaseUserLister{listers.New[*couchbasev2.CouchbaseUser](indexer, couchbasev2.Resource("couchbaseuser"))}
 }
 
 // CouchbaseUsers returns an object that can list and get CouchbaseUsers.
 func (s *couchbaseUserLister) CouchbaseUsers(namespace string) CouchbaseUserNamespaceLister {
-	return couchbaseUserNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return couchbaseUserNamespaceLister{listers.NewNamespaced[*couchbasev2.CouchbaseUser](s.ResourceIndexer, namespace)}
 }
 
 // CouchbaseUserNamespaceLister helps list and get CouchbaseUsers.
@@ -57,36 +49,15 @@ func (s *couchbaseUserLister) CouchbaseUsers(namespace string) CouchbaseUserName
 type CouchbaseUserNamespaceLister interface {
 	// List lists all CouchbaseUsers in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseUser, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseUser, err error)
 	// Get retrieves the CouchbaseUser from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v2.CouchbaseUser, error)
+	Get(name string) (*couchbasev2.CouchbaseUser, error)
 	CouchbaseUserNamespaceListerExpansion
 }
 
 // couchbaseUserNamespaceLister implements the CouchbaseUserNamespaceLister
 // interface.
 type couchbaseUserNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all CouchbaseUsers in the indexer for a given namespace.
-func (s couchbaseUserNamespaceLister) List(selector labels.Selector) (ret []*v2.CouchbaseUser, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseUser))
-	})
-	return ret, err
-}
-
-// Get retrieves the CouchbaseUser from the indexer for a given namespace and name.
-func (s couchbaseUserNamespaceLister) Get(name string) (*v2.CouchbaseUser, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v2.Resource("couchbaseuser"), name)
-	}
-	return obj.(*v2.CouchbaseUser), nil
+	listers.ResourceIndexer[*couchbasev2.CouchbaseUser]
 }

@@ -165,6 +165,13 @@ Group to impersonate for the operation, this flag can be repeated to specify mul
 +
 UID to impersonate for the operation.
 
+--as-user-extra::
+*Type*: stringArray
++
+*Default*: []
++
+User extras to impersonate for the operation, this flag can be repeated to specify multiple values for the same key.
+
 --cache-dir::
 *Type*: string
 +
@@ -220,6 +227,11 @@ Path to the kubeconfig file to use for CLI requests.
 *Type*: string
 +
 If present, the namespace scope for this CLI request
+
+--proxy-url::
+*Type*: string
++
+Proxy URL to use for requests to the API server
 
 --request-timeout::
 *Type*: string
@@ -667,6 +679,13 @@ Group to impersonate for the operation, this flag can be repeated to specify mul
 +
 UID to impersonate for the operation.
 
+--as-user-extra::
+*Type*: stringArray
++
+*Default*: []
++
+User extras to impersonate for the operation, this flag can be repeated to specify multiple values for the same key.
+
 --cache-dir::
 *Type*: string
 +
@@ -722,6 +741,11 @@ Path to the kubeconfig file to use for CLI requests.
 *Type*: string
 +
 If present, the namespace scope for this CLI request
+
+--proxy-url::
+*Type*: string
++
+Proxy URL to use for requests to the API server
 
 --request-timeout::
 *Type*: string
@@ -904,6 +928,13 @@ Group to impersonate for the operation, this flag can be repeated to specify mul
 +
 UID to impersonate for the operation.
 
+--as-user-extra::
+*Type*: stringArray
++
+*Default*: []
++
+User extras to impersonate for the operation, this flag can be repeated to specify multiple values for the same key.
+
 --cache-dir::
 *Type*: string
 +
@@ -959,6 +990,11 @@ Path to the kubeconfig file to use for CLI requests.
 *Type*: string
 +
 If present, the namespace scope for this CLI request
+
+--proxy-url::
+*Type*: string
++
+Proxy URL to use for requests to the API server
 
 --request-timeout::
 *Type*: string
@@ -1017,6 +1053,13 @@ Group to impersonate for the operation, this flag can be repeated to specify mul
 +
 UID to impersonate for the operation.
 
+--as-user-extra::
+*Type*: stringArray
++
+*Default*: []
++
+User extras to impersonate for the operation, this flag can be repeated to specify multiple values for the same key.
+
 --cache-dir::
 *Type*: string
 +
@@ -1072,6 +1115,11 @@ Path to the kubeconfig file to use for CLI requests.
 *Type*: string
 +
 If present, the namespace scope for this CLI request
+
+--proxy-url::
+*Type*: string
++
+Proxy URL to use for requests to the API server
 
 --request-timeout::
 *Type*: string
@@ -1270,6 +1318,13 @@ Group to impersonate for the operation, this flag can be repeated to specify mul
 +
 UID to impersonate for the operation.
 
+--as-user-extra::
+*Type*: stringArray
++
+*Default*: []
++
+User extras to impersonate for the operation, this flag can be repeated to specify multiple values for the same key.
+
 --cache-dir::
 *Type*: string
 +
@@ -1325,6 +1380,11 @@ Path to the kubeconfig file to use for CLI requests.
 *Type*: string
 +
 If present, the namespace scope for this CLI request
+
+--proxy-url::
+*Type*: string
++
+Proxy URL to use for requests to the API server
 
 --request-timeout::
 *Type*: string
@@ -1422,6 +1482,13 @@ Group to impersonate for the operation, this flag can be repeated to specify mul
 +
 UID to impersonate for the operation.
 
+--as-user-extra::
+*Type*: stringArray
++
+*Default*: []
++
+User extras to impersonate for the operation, this flag can be repeated to specify multiple values for the same key.
+
 --cache-dir::
 *Type*: string
 +
@@ -1477,6 +1544,11 @@ Path to the kubeconfig file to use for CLI requests.
 *Type*: string
 +
 If present, the namespace scope for this CLI request
+
+--proxy-url::
+*Type*: string
++
+Proxy URL to use for requests to the API server
 
 --request-timeout::
 *Type*: string
@@ -1552,6 +1624,13 @@ Group to impersonate for the operation, this flag can be repeated to specify mul
 +
 UID to impersonate for the operation.
 
+--as-user-extra::
+*Type*: stringArray
++
+*Default*: []
++
+User extras to impersonate for the operation, this flag can be repeated to specify multiple values for the same key.
+
 --cache-dir::
 *Type*: string
 +
@@ -1607,6 +1686,11 @@ Path to the kubeconfig file to use for CLI requests.
 *Type*: string
 +
 If present, the namespace scope for this CLI request
+
+--proxy-url::
+*Type*: string
++
+Proxy URL to use for requests to the API server
 
 --request-timeout::
 *Type*: string
@@ -1658,6 +1742,13 @@ Group to impersonate for the operation, this flag can be repeated to specify mul
 +
 UID to impersonate for the operation.
 
+--as-user-extra::
+*Type*: stringArray
++
+*Default*: []
++
+User extras to impersonate for the operation, this flag can be repeated to specify multiple values for the same key.
+
 --cache-dir::
 *Type*: string
 +
@@ -1713,6 +1804,11 @@ Path to the kubeconfig file to use for CLI requests.
 *Type*: string
 +
 If present, the namespace scope for this CLI request
+
+--proxy-url::
+*Type*: string
++
+Proxy URL to use for requests to the API server
 
 --request-timeout::
 *Type*: string
@@ -1784,6 +1880,13 @@ Group to impersonate for the operation, this flag can be repeated to specify mul
 +
 UID to impersonate for the operation.
 
+--as-user-extra::
+*Type*: stringArray
++
+*Default*: []
++
+User extras to impersonate for the operation, this flag can be repeated to specify multiple values for the same key.
+
 --cache-dir::
 *Type*: string
 +
@@ -1839,6 +1942,11 @@ Path to the kubeconfig file to use for CLI requests.
 *Type*: string
 +
 If present, the namespace scope for this CLI request
+
+--proxy-url::
+*Type*: string
++
+Proxy URL to use for requests to the API server
 
 --request-timeout::
 *Type*: string
@@ -2021,6 +2129,13 @@ Group to impersonate for the operation, this flag can be repeated to specify mul
 +
 UID to impersonate for the operation.
 
+--as-user-extra::
+*Type*: stringArray
++
+*Default*: []
++
+User extras to impersonate for the operation, this flag can be repeated to specify multiple values for the same key.
+
 --cache-dir::
 *Type*: string
 +
@@ -2076,6 +2191,11 @@ Path to the kubeconfig file to use for CLI requests.
 *Type*: string
 +
 If present, the namespace scope for this CLI request
+
+--proxy-url::
+*Type*: string
++
+Proxy URL to use for requests to the API server
 
 --request-timeout::
 *Type*: string
@@ -2134,6 +2254,13 @@ Group to impersonate for the operation, this flag can be repeated to specify mul
 +
 UID to impersonate for the operation.
 
+--as-user-extra::
+*Type*: stringArray
++
+*Default*: []
++
+User extras to impersonate for the operation, this flag can be repeated to specify multiple values for the same key.
+
 --cache-dir::
 *Type*: string
 +
@@ -2189,6 +2316,11 @@ Path to the kubeconfig file to use for CLI requests.
 *Type*: string
 +
 If present, the namespace scope for this CLI request
+
+--proxy-url::
+*Type*: string
++
+Proxy URL to use for requests to the API server
 
 --request-timeout::
 *Type*: string
@@ -2387,6 +2519,13 @@ Group to impersonate for the operation, this flag can be repeated to specify mul
 +
 UID to impersonate for the operation.
 
+--as-user-extra::
+*Type*: stringArray
++
+*Default*: []
++
+User extras to impersonate for the operation, this flag can be repeated to specify multiple values for the same key.
+
 --cache-dir::
 *Type*: string
 +
@@ -2442,6 +2581,11 @@ Path to the kubeconfig file to use for CLI requests.
 *Type*: string
 +
 If present, the namespace scope for this CLI request
+
+--proxy-url::
+*Type*: string
++
+Proxy URL to use for requests to the API server
 
 --request-timeout::
 *Type*: string
@@ -2537,6 +2681,13 @@ Group to impersonate for the operation, this flag can be repeated to specify mul
 +
 UID to impersonate for the operation.
 
+--as-user-extra::
+*Type*: stringArray
++
+*Default*: []
++
+User extras to impersonate for the operation, this flag can be repeated to specify multiple values for the same key.
+
 --cache-dir::
 *Type*: string
 +
@@ -2592,6 +2743,11 @@ Path to the kubeconfig file to use for CLI requests.
 *Type*: string
 +
 If present, the namespace scope for this CLI request
+
+--proxy-url::
+*Type*: string
++
+Proxy URL to use for requests to the API server
 
 --request-timeout::
 *Type*: string
@@ -2660,6 +2816,13 @@ Group to impersonate for the operation, this flag can be repeated to specify mul
 +
 UID to impersonate for the operation.
 
+--as-user-extra::
+*Type*: stringArray
++
+*Default*: []
++
+User extras to impersonate for the operation, this flag can be repeated to specify multiple values for the same key.
+
 --cache-dir::
 *Type*: string
 +
@@ -2710,6 +2873,11 @@ Path to the kubeconfig file to use for CLI requests.
 *Type*: string
 +
 If present, the namespace scope for this CLI request
+
+--proxy-url::
+*Type*: string
++
+Proxy URL to use for requests to the API server
 
 --request-timeout::
 *Type*: string
@@ -2847,6 +3015,13 @@ Group to impersonate for the operation, this flag can be repeated to specify mul
 +
 UID to impersonate for the operation.
 
+--as-user-extra::
+*Type*: stringArray
++
+*Default*: []
++
+User extras to impersonate for the operation, this flag can be repeated to specify multiple values for the same key.
+
 --cache-dir::
 *Type*: string
 +
@@ -2902,6 +3077,11 @@ Path to the kubeconfig file to use for CLI requests.
 *Type*: string
 +
 If present, the namespace scope for this CLI request
+
+--proxy-url::
+*Type*: string
++
+Proxy URL to use for requests to the API server
 
 --request-timeout::
 *Type*: string
@@ -3007,6 +3187,13 @@ Group to impersonate for the operation, this flag can be repeated to specify mul
 +
 UID to impersonate for the operation.
 
+--as-user-extra::
+*Type*: stringArray
++
+*Default*: []
++
+User extras to impersonate for the operation, this flag can be repeated to specify multiple values for the same key.
+
 --cache-dir::
 *Type*: string
 +
@@ -3062,6 +3249,11 @@ Path to the kubeconfig file to use for CLI requests.
 *Type*: string
 +
 If present, the namespace scope for this CLI request
+
+--proxy-url::
+*Type*: string
++
+Proxy URL to use for requests to the API server
 
 --request-timeout::
 *Type*: string
@@ -3126,6 +3318,13 @@ Group to impersonate for the operation, this flag can be repeated to specify mul
 +
 UID to impersonate for the operation.
 
+--as-user-extra::
+*Type*: stringArray
++
+*Default*: []
++
+User extras to impersonate for the operation, this flag can be repeated to specify multiple values for the same key.
+
 --cache-dir::
 *Type*: string
 +
@@ -3181,6 +3380,11 @@ Path to the kubeconfig file to use for CLI requests.
 *Type*: string
 +
 If present, the namespace scope for this CLI request
+
+--proxy-url::
+*Type*: string
++
+Proxy URL to use for requests to the API server
 
 --request-timeout::
 *Type*: string
@@ -3247,6 +3451,13 @@ Group to impersonate for the operation, this flag can be repeated to specify mul
 +
 UID to impersonate for the operation.
 
+--as-user-extra::
+*Type*: stringArray
++
+*Default*: []
++
+User extras to impersonate for the operation, this flag can be repeated to specify multiple values for the same key.
+
 --cache-dir::
 *Type*: string
 +
@@ -3302,6 +3513,11 @@ Path to the kubeconfig file to use for CLI requests.
 *Type*: string
 +
 If present, the namespace scope for this CLI request
+
+--proxy-url::
+*Type*: string
++
+Proxy URL to use for requests to the API server
 
 --request-timeout::
 *Type*: string
@@ -3353,6 +3569,13 @@ Group to impersonate for the operation, this flag can be repeated to specify mul
 +
 UID to impersonate for the operation.
 
+--as-user-extra::
+*Type*: stringArray
++
+*Default*: []
++
+User extras to impersonate for the operation, this flag can be repeated to specify multiple values for the same key.
+
 --cache-dir::
 *Type*: string
 +
@@ -3408,6 +3631,11 @@ Path to the kubeconfig file to use for CLI requests.
 *Type*: string
 +
 If present, the namespace scope for this CLI request
+
+--proxy-url::
+*Type*: string
++
+Proxy URL to use for requests to the API server
 
 --request-timeout::
 *Type*: string

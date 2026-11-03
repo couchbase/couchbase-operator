@@ -12,111 +12,34 @@
 package fake
 
 import (
-	"context"
-
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned/typed/couchbase/v2"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeCouchbaseEncryptionKeys implements CouchbaseEncryptionKeyInterface
-type FakeCouchbaseEncryptionKeys struct {
+// fakeCouchbaseEncryptionKeys implements CouchbaseEncryptionKeyInterface
+type fakeCouchbaseEncryptionKeys struct {
+	*gentype.FakeClientWithList[*v2.CouchbaseEncryptionKey, *v2.CouchbaseEncryptionKeyList]
 	Fake *FakeCouchbaseV2
-	ns   string
 }
 
-var couchbaseencryptionkeysResource = v2.SchemeGroupVersion.WithResource("couchbaseencryptionkeys")
-
-var couchbaseencryptionkeysKind = v2.SchemeGroupVersion.WithKind("CouchbaseEncryptionKey")
-
-// Get takes name of the couchbaseEncryptionKey, and returns the corresponding couchbaseEncryptionKey object, and an error if there is any.
-func (c *FakeCouchbaseEncryptionKeys) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2.CouchbaseEncryptionKey, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(couchbaseencryptionkeysResource, c.ns, name), &v2.CouchbaseEncryptionKey{})
-
-	if obj == nil {
-		return nil, err
+func newFakeCouchbaseEncryptionKeys(fake *FakeCouchbaseV2, namespace string) couchbasev2.CouchbaseEncryptionKeyInterface {
+	return &fakeCouchbaseEncryptionKeys{
+		gentype.NewFakeClientWithList[*v2.CouchbaseEncryptionKey, *v2.CouchbaseEncryptionKeyList](
+			fake.Fake,
+			namespace,
+			v2.SchemeGroupVersion.WithResource("couchbaseencryptionkeys"),
+			v2.SchemeGroupVersion.WithKind("CouchbaseEncryptionKey"),
+			func() *v2.CouchbaseEncryptionKey { return &v2.CouchbaseEncryptionKey{} },
+			func() *v2.CouchbaseEncryptionKeyList { return &v2.CouchbaseEncryptionKeyList{} },
+			func(dst, src *v2.CouchbaseEncryptionKeyList) { dst.ListMeta = src.ListMeta },
+			func(list *v2.CouchbaseEncryptionKeyList) []*v2.CouchbaseEncryptionKey {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v2.CouchbaseEncryptionKeyList, items []*v2.CouchbaseEncryptionKey) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v2.CouchbaseEncryptionKey), err
-}
-
-// List takes label and field selectors, and returns the list of CouchbaseEncryptionKeys that match those selectors.
-func (c *FakeCouchbaseEncryptionKeys) List(ctx context.Context, opts v1.ListOptions) (result *v2.CouchbaseEncryptionKeyList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(couchbaseencryptionkeysResource, couchbaseencryptionkeysKind, c.ns, opts), &v2.CouchbaseEncryptionKeyList{})
-
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v2.CouchbaseEncryptionKeyList{ListMeta: obj.(*v2.CouchbaseEncryptionKeyList).ListMeta}
-	for _, item := range obj.(*v2.CouchbaseEncryptionKeyList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested couchbaseEncryptionKeys.
-func (c *FakeCouchbaseEncryptionKeys) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(couchbaseencryptionkeysResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a couchbaseEncryptionKey and creates it.  Returns the server's representation of the couchbaseEncryptionKey, and an error, if there is any.
-func (c *FakeCouchbaseEncryptionKeys) Create(ctx context.Context, couchbaseEncryptionKey *v2.CouchbaseEncryptionKey, opts v1.CreateOptions) (result *v2.CouchbaseEncryptionKey, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(couchbaseencryptionkeysResource, c.ns, couchbaseEncryptionKey), &v2.CouchbaseEncryptionKey{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2.CouchbaseEncryptionKey), err
-}
-
-// Update takes the representation of a couchbaseEncryptionKey and updates it. Returns the server's representation of the couchbaseEncryptionKey, and an error, if there is any.
-func (c *FakeCouchbaseEncryptionKeys) Update(ctx context.Context, couchbaseEncryptionKey *v2.CouchbaseEncryptionKey, opts v1.UpdateOptions) (result *v2.CouchbaseEncryptionKey, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(couchbaseencryptionkeysResource, c.ns, couchbaseEncryptionKey), &v2.CouchbaseEncryptionKey{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2.CouchbaseEncryptionKey), err
-}
-
-// Delete takes name of the couchbaseEncryptionKey and deletes it. Returns an error if one occurs.
-func (c *FakeCouchbaseEncryptionKeys) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(couchbaseencryptionkeysResource, c.ns, name, opts), &v2.CouchbaseEncryptionKey{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeCouchbaseEncryptionKeys) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(couchbaseencryptionkeysResource, c.ns, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v2.CouchbaseEncryptionKeyList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched couchbaseEncryptionKey.
-func (c *FakeCouchbaseEncryptionKeys) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseEncryptionKey, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(couchbaseencryptionkeysResource, c.ns, name, pt, data, subresources...), &v2.CouchbaseEncryptionKey{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2.CouchbaseEncryptionKey), err
 }

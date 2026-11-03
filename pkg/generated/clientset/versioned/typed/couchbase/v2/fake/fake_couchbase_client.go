@@ -22,79 +22,79 @@ type FakeCouchbaseV2 struct {
 }
 
 func (c *FakeCouchbaseV2) CouchbaseAutoscalers(namespace string) v2.CouchbaseAutoscalerInterface {
-	return &FakeCouchbaseAutoscalers{c, namespace}
+	return newFakeCouchbaseAutoscalers(c, namespace)
 }
 
 func (c *FakeCouchbaseV2) CouchbaseBackups(namespace string) v2.CouchbaseBackupInterface {
-	return &FakeCouchbaseBackups{c, namespace}
+	return newFakeCouchbaseBackups(c, namespace)
 }
 
 func (c *FakeCouchbaseV2) CouchbaseBackupRestores(namespace string) v2.CouchbaseBackupRestoreInterface {
-	return &FakeCouchbaseBackupRestores{c, namespace}
+	return newFakeCouchbaseBackupRestores(c, namespace)
 }
 
 func (c *FakeCouchbaseV2) CouchbaseBuckets(namespace string) v2.CouchbaseBucketInterface {
-	return &FakeCouchbaseBuckets{c, namespace}
+	return newFakeCouchbaseBuckets(c, namespace)
 }
 
 func (c *FakeCouchbaseV2) CouchbaseClusters(namespace string) v2.CouchbaseClusterInterface {
-	return &FakeCouchbaseClusters{c, namespace}
+	return newFakeCouchbaseClusters(c, namespace)
 }
 
 func (c *FakeCouchbaseV2) CouchbaseCollections(namespace string) v2.CouchbaseCollectionInterface {
-	return &FakeCouchbaseCollections{c, namespace}
+	return newFakeCouchbaseCollections(c, namespace)
 }
 
 func (c *FakeCouchbaseV2) CouchbaseCollectionGroups(namespace string) v2.CouchbaseCollectionGroupInterface {
-	return &FakeCouchbaseCollectionGroups{c, namespace}
+	return newFakeCouchbaseCollectionGroups(c, namespace)
 }
 
 func (c *FakeCouchbaseV2) CouchbaseEncryptionKeys(namespace string) v2.CouchbaseEncryptionKeyInterface {
-	return &FakeCouchbaseEncryptionKeys{c, namespace}
+	return newFakeCouchbaseEncryptionKeys(c, namespace)
 }
 
 func (c *FakeCouchbaseV2) CouchbaseEphemeralBuckets(namespace string) v2.CouchbaseEphemeralBucketInterface {
-	return &FakeCouchbaseEphemeralBuckets{c, namespace}
+	return newFakeCouchbaseEphemeralBuckets(c, namespace)
 }
 
 func (c *FakeCouchbaseV2) CouchbaseGroups(namespace string) v2.CouchbaseGroupInterface {
-	return &FakeCouchbaseGroups{c, namespace}
+	return newFakeCouchbaseGroups(c, namespace)
 }
 
 func (c *FakeCouchbaseV2) CouchbaseMemcachedBuckets(namespace string) v2.CouchbaseMemcachedBucketInterface {
-	return &FakeCouchbaseMemcachedBuckets{c, namespace}
+	return newFakeCouchbaseMemcachedBuckets(c, namespace)
 }
 
 func (c *FakeCouchbaseV2) CouchbaseMigrationReplications(namespace string) v2.CouchbaseMigrationReplicationInterface {
-	return &FakeCouchbaseMigrationReplications{c, namespace}
+	return newFakeCouchbaseMigrationReplications(c, namespace)
 }
 
 func (c *FakeCouchbaseV2) CouchbaseReplications(namespace string) v2.CouchbaseReplicationInterface {
-	return &FakeCouchbaseReplications{c, namespace}
+	return newFakeCouchbaseReplications(c, namespace)
 }
 
 func (c *FakeCouchbaseV2) CouchbaseRoleBindings(namespace string) v2.CouchbaseRoleBindingInterface {
-	return &FakeCouchbaseRoleBindings{c, namespace}
+	return newFakeCouchbaseRoleBindings(c, namespace)
 }
 
 func (c *FakeCouchbaseV2) CouchbaseScopes(namespace string) v2.CouchbaseScopeInterface {
-	return &FakeCouchbaseScopes{c, namespace}
+	return newFakeCouchbaseScopes(c, namespace)
 }
 
 func (c *FakeCouchbaseV2) CouchbaseScopeGroups(namespace string) v2.CouchbaseScopeGroupInterface {
-	return &FakeCouchbaseScopeGroups{c, namespace}
+	return newFakeCouchbaseScopeGroups(c, namespace)
 }
 
 func (c *FakeCouchbaseV2) CouchbaseSnapshotBackupRestores(namespace string) v2.CouchbaseSnapshotBackupRestoreInterface {
-	return &FakeCouchbaseSnapshotBackupRestores{c, namespace}
+	return newFakeCouchbaseSnapshotBackupRestores(c, namespace)
 }
 
 func (c *FakeCouchbaseV2) CouchbaseSnapshotBackupRuns(namespace string) v2.CouchbaseSnapshotBackupRunInterface {
-	return &FakeCouchbaseSnapshotBackupRuns{c, namespace}
+	return newFakeCouchbaseSnapshotBackupRuns(c, namespace)
 }
 
 func (c *FakeCouchbaseV2) CouchbaseUsers(namespace string) v2.CouchbaseUserInterface {
-	return &FakeCouchbaseUsers{c, namespace}
+	return newFakeCouchbaseUsers(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

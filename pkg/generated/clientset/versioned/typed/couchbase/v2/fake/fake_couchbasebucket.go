@@ -12,123 +12,32 @@
 package fake
 
 import (
-	"context"
-
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned/typed/couchbase/v2"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeCouchbaseBuckets implements CouchbaseBucketInterface
-type FakeCouchbaseBuckets struct {
+// fakeCouchbaseBuckets implements CouchbaseBucketInterface
+type fakeCouchbaseBuckets struct {
+	*gentype.FakeClientWithList[*v2.CouchbaseBucket, *v2.CouchbaseBucketList]
 	Fake *FakeCouchbaseV2
-	ns   string
 }
 
-var couchbasebucketsResource = v2.SchemeGroupVersion.WithResource("couchbasebuckets")
-
-var couchbasebucketsKind = v2.SchemeGroupVersion.WithKind("CouchbaseBucket")
-
-// Get takes name of the couchbaseBucket, and returns the corresponding couchbaseBucket object, and an error if there is any.
-func (c *FakeCouchbaseBuckets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2.CouchbaseBucket, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(couchbasebucketsResource, c.ns, name), &v2.CouchbaseBucket{})
-
-	if obj == nil {
-		return nil, err
+func newFakeCouchbaseBuckets(fake *FakeCouchbaseV2, namespace string) couchbasev2.CouchbaseBucketInterface {
+	return &fakeCouchbaseBuckets{
+		gentype.NewFakeClientWithList[*v2.CouchbaseBucket, *v2.CouchbaseBucketList](
+			fake.Fake,
+			namespace,
+			v2.SchemeGroupVersion.WithResource("couchbasebuckets"),
+			v2.SchemeGroupVersion.WithKind("CouchbaseBucket"),
+			func() *v2.CouchbaseBucket { return &v2.CouchbaseBucket{} },
+			func() *v2.CouchbaseBucketList { return &v2.CouchbaseBucketList{} },
+			func(dst, src *v2.CouchbaseBucketList) { dst.ListMeta = src.ListMeta },
+			func(list *v2.CouchbaseBucketList) []*v2.CouchbaseBucket { return gentype.ToPointerSlice(list.Items) },
+			func(list *v2.CouchbaseBucketList, items []*v2.CouchbaseBucket) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v2.CouchbaseBucket), err
-}
-
-// List takes label and field selectors, and returns the list of CouchbaseBuckets that match those selectors.
-func (c *FakeCouchbaseBuckets) List(ctx context.Context, opts v1.ListOptions) (result *v2.CouchbaseBucketList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(couchbasebucketsResource, couchbasebucketsKind, c.ns, opts), &v2.CouchbaseBucketList{})
-
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v2.CouchbaseBucketList{ListMeta: obj.(*v2.CouchbaseBucketList).ListMeta}
-	for _, item := range obj.(*v2.CouchbaseBucketList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested couchbaseBuckets.
-func (c *FakeCouchbaseBuckets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(couchbasebucketsResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a couchbaseBucket and creates it.  Returns the server's representation of the couchbaseBucket, and an error, if there is any.
-func (c *FakeCouchbaseBuckets) Create(ctx context.Context, couchbaseBucket *v2.CouchbaseBucket, opts v1.CreateOptions) (result *v2.CouchbaseBucket, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(couchbasebucketsResource, c.ns, couchbaseBucket), &v2.CouchbaseBucket{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2.CouchbaseBucket), err
-}
-
-// Update takes the representation of a couchbaseBucket and updates it. Returns the server's representation of the couchbaseBucket, and an error, if there is any.
-func (c *FakeCouchbaseBuckets) Update(ctx context.Context, couchbaseBucket *v2.CouchbaseBucket, opts v1.UpdateOptions) (result *v2.CouchbaseBucket, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(couchbasebucketsResource, c.ns, couchbaseBucket), &v2.CouchbaseBucket{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2.CouchbaseBucket), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeCouchbaseBuckets) UpdateStatus(ctx context.Context, couchbaseBucket *v2.CouchbaseBucket, opts v1.UpdateOptions) (*v2.CouchbaseBucket, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(couchbasebucketsResource, "status", c.ns, couchbaseBucket), &v2.CouchbaseBucket{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2.CouchbaseBucket), err
-}
-
-// Delete takes name of the couchbaseBucket and deletes it. Returns an error if one occurs.
-func (c *FakeCouchbaseBuckets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(couchbasebucketsResource, c.ns, name, opts), &v2.CouchbaseBucket{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeCouchbaseBuckets) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(couchbasebucketsResource, c.ns, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v2.CouchbaseBucketList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched couchbaseBucket.
-func (c *FakeCouchbaseBuckets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseBucket, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(couchbasebucketsResource, c.ns, name, pt, data, subresources...), &v2.CouchbaseBucket{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2.CouchbaseBucket), err
 }

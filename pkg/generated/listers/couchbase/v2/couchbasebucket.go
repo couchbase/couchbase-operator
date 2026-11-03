@@ -12,10 +12,10 @@
 package v2
 
 import (
-	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // CouchbaseBucketLister helps list CouchbaseBuckets.
@@ -23,7 +23,7 @@ import (
 type CouchbaseBucketLister interface {
 	// List lists all CouchbaseBuckets in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseBucket, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseBucket, err error)
 	// CouchbaseBuckets returns an object that can list and get CouchbaseBuckets.
 	CouchbaseBuckets(namespace string) CouchbaseBucketNamespaceLister
 	CouchbaseBucketListerExpansion
@@ -31,25 +31,17 @@ type CouchbaseBucketLister interface {
 
 // couchbaseBucketLister implements the CouchbaseBucketLister interface.
 type couchbaseBucketLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*couchbasev2.CouchbaseBucket]
 }
 
 // NewCouchbaseBucketLister returns a new CouchbaseBucketLister.
 func NewCouchbaseBucketLister(indexer cache.Indexer) CouchbaseBucketLister {
-	return &couchbaseBucketLister{indexer: indexer}
-}
-
-// List lists all CouchbaseBuckets in the indexer.
-func (s *couchbaseBucketLister) List(selector labels.Selector) (ret []*v2.CouchbaseBucket, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseBucket))
-	})
-	return ret, err
+	return &couchbaseBucketLister{listers.New[*couchbasev2.CouchbaseBucket](indexer, couchbasev2.Resource("couchbasebucket"))}
 }
 
 // CouchbaseBuckets returns an object that can list and get CouchbaseBuckets.
 func (s *couchbaseBucketLister) CouchbaseBuckets(namespace string) CouchbaseBucketNamespaceLister {
-	return couchbaseBucketNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return couchbaseBucketNamespaceLister{listers.NewNamespaced[*couchbasev2.CouchbaseBucket](s.ResourceIndexer, namespace)}
 }
 
 // CouchbaseBucketNamespaceLister helps list and get CouchbaseBuckets.
@@ -57,36 +49,15 @@ func (s *couchbaseBucketLister) CouchbaseBuckets(namespace string) CouchbaseBuck
 type CouchbaseBucketNamespaceLister interface {
 	// List lists all CouchbaseBuckets in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseBucket, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseBucket, err error)
 	// Get retrieves the CouchbaseBucket from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v2.CouchbaseBucket, error)
+	Get(name string) (*couchbasev2.CouchbaseBucket, error)
 	CouchbaseBucketNamespaceListerExpansion
 }
 
 // couchbaseBucketNamespaceLister implements the CouchbaseBucketNamespaceLister
 // interface.
 type couchbaseBucketNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all CouchbaseBuckets in the indexer for a given namespace.
-func (s couchbaseBucketNamespaceLister) List(selector labels.Selector) (ret []*v2.CouchbaseBucket, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseBucket))
-	})
-	return ret, err
-}
-
-// Get retrieves the CouchbaseBucket from the indexer for a given namespace and name.
-func (s couchbaseBucketNamespaceLister) Get(name string) (*v2.CouchbaseBucket, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v2.Resource("couchbasebucket"), name)
-	}
-	return obj.(*v2.CouchbaseBucket), nil
+	listers.ResourceIndexer[*couchbasev2.CouchbaseBucket]
 }

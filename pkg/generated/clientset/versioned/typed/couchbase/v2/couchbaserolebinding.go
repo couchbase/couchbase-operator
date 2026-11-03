@@ -12,15 +12,14 @@
 package v2
 
 import (
-	"context"
-	"time"
+	context "context"
 
-	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	scheme "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	rest "k8s.io/client-go/rest"
+	gentype "k8s.io/client-go/gentype"
 )
 
 // CouchbaseRoleBindingsGetter has a method to return a CouchbaseRoleBindingInterface.
@@ -31,141 +30,32 @@ type CouchbaseRoleBindingsGetter interface {
 
 // CouchbaseRoleBindingInterface has methods to work with CouchbaseRoleBinding resources.
 type CouchbaseRoleBindingInterface interface {
-	Create(ctx context.Context, couchbaseRoleBinding *v2.CouchbaseRoleBinding, opts v1.CreateOptions) (*v2.CouchbaseRoleBinding, error)
-	Update(ctx context.Context, couchbaseRoleBinding *v2.CouchbaseRoleBinding, opts v1.UpdateOptions) (*v2.CouchbaseRoleBinding, error)
+	Create(ctx context.Context, couchbaseRoleBinding *couchbasev2.CouchbaseRoleBinding, opts v1.CreateOptions) (*couchbasev2.CouchbaseRoleBinding, error)
+	Update(ctx context.Context, couchbaseRoleBinding *couchbasev2.CouchbaseRoleBinding, opts v1.UpdateOptions) (*couchbasev2.CouchbaseRoleBinding, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v2.CouchbaseRoleBinding, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v2.CouchbaseRoleBindingList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*couchbasev2.CouchbaseRoleBinding, error)
+	List(ctx context.Context, opts v1.ListOptions) (*couchbasev2.CouchbaseRoleBindingList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseRoleBinding, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *couchbasev2.CouchbaseRoleBinding, err error)
 	CouchbaseRoleBindingExpansion
 }
 
 // couchbaseRoleBindings implements CouchbaseRoleBindingInterface
 type couchbaseRoleBindings struct {
-	client rest.Interface
-	ns     string
+	*gentype.ClientWithList[*couchbasev2.CouchbaseRoleBinding, *couchbasev2.CouchbaseRoleBindingList]
 }
 
 // newCouchbaseRoleBindings returns a CouchbaseRoleBindings
 func newCouchbaseRoleBindings(c *CouchbaseV2Client, namespace string) *couchbaseRoleBindings {
 	return &couchbaseRoleBindings{
-		client: c.RESTClient(),
-		ns:     namespace,
+		gentype.NewClientWithList[*couchbasev2.CouchbaseRoleBinding, *couchbasev2.CouchbaseRoleBindingList](
+			"couchbaserolebindings",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			namespace,
+			func() *couchbasev2.CouchbaseRoleBinding { return &couchbasev2.CouchbaseRoleBinding{} },
+			func() *couchbasev2.CouchbaseRoleBindingList { return &couchbasev2.CouchbaseRoleBindingList{} },
+		),
 	}
-}
-
-// Get takes name of the couchbaseRoleBinding, and returns the corresponding couchbaseRoleBinding object, and an error if there is any.
-func (c *couchbaseRoleBindings) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2.CouchbaseRoleBinding, err error) {
-	result = &v2.CouchbaseRoleBinding{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("couchbaserolebindings").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of CouchbaseRoleBindings that match those selectors.
-func (c *couchbaseRoleBindings) List(ctx context.Context, opts v1.ListOptions) (result *v2.CouchbaseRoleBindingList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v2.CouchbaseRoleBindingList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("couchbaserolebindings").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested couchbaseRoleBindings.
-func (c *couchbaseRoleBindings) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("couchbaserolebindings").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
-}
-
-// Create takes the representation of a couchbaseRoleBinding and creates it.  Returns the server's representation of the couchbaseRoleBinding, and an error, if there is any.
-func (c *couchbaseRoleBindings) Create(ctx context.Context, couchbaseRoleBinding *v2.CouchbaseRoleBinding, opts v1.CreateOptions) (result *v2.CouchbaseRoleBinding, err error) {
-	result = &v2.CouchbaseRoleBinding{}
-	err = c.client.Post().
-		Namespace(c.ns).
-		Resource("couchbaserolebindings").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(couchbaseRoleBinding).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a couchbaseRoleBinding and updates it. Returns the server's representation of the couchbaseRoleBinding, and an error, if there is any.
-func (c *couchbaseRoleBindings) Update(ctx context.Context, couchbaseRoleBinding *v2.CouchbaseRoleBinding, opts v1.UpdateOptions) (result *v2.CouchbaseRoleBinding, err error) {
-	result = &v2.CouchbaseRoleBinding{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("couchbaserolebindings").
-		Name(couchbaseRoleBinding.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(couchbaseRoleBinding).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the couchbaseRoleBinding and deletes it. Returns an error if one occurs.
-func (c *couchbaseRoleBindings) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("couchbaserolebindings").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *couchbaseRoleBindings) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	var timeout time.Duration
-	if listOpts.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
-	}
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("couchbaserolebindings").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// Patch applies the patch and returns the patched couchbaseRoleBinding.
-func (c *couchbaseRoleBindings) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseRoleBinding, err error) {
-	result = &v2.CouchbaseRoleBinding{}
-	err = c.client.Patch(pt).
-		Namespace(c.ns).
-		Resource("couchbaserolebindings").
-		Name(name).
-		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
 }

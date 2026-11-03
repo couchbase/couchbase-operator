@@ -12,10 +12,10 @@
 package v2
 
 import (
-	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // CouchbaseSnapshotBackupRunLister helps list CouchbaseSnapshotBackupRuns.
@@ -23,7 +23,7 @@ import (
 type CouchbaseSnapshotBackupRunLister interface {
 	// List lists all CouchbaseSnapshotBackupRuns in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseSnapshotBackupRun, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseSnapshotBackupRun, err error)
 	// CouchbaseSnapshotBackupRuns returns an object that can list and get CouchbaseSnapshotBackupRuns.
 	CouchbaseSnapshotBackupRuns(namespace string) CouchbaseSnapshotBackupRunNamespaceLister
 	CouchbaseSnapshotBackupRunListerExpansion
@@ -31,25 +31,17 @@ type CouchbaseSnapshotBackupRunLister interface {
 
 // couchbaseSnapshotBackupRunLister implements the CouchbaseSnapshotBackupRunLister interface.
 type couchbaseSnapshotBackupRunLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*couchbasev2.CouchbaseSnapshotBackupRun]
 }
 
 // NewCouchbaseSnapshotBackupRunLister returns a new CouchbaseSnapshotBackupRunLister.
 func NewCouchbaseSnapshotBackupRunLister(indexer cache.Indexer) CouchbaseSnapshotBackupRunLister {
-	return &couchbaseSnapshotBackupRunLister{indexer: indexer}
-}
-
-// List lists all CouchbaseSnapshotBackupRuns in the indexer.
-func (s *couchbaseSnapshotBackupRunLister) List(selector labels.Selector) (ret []*v2.CouchbaseSnapshotBackupRun, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseSnapshotBackupRun))
-	})
-	return ret, err
+	return &couchbaseSnapshotBackupRunLister{listers.New[*couchbasev2.CouchbaseSnapshotBackupRun](indexer, couchbasev2.Resource("couchbasesnapshotbackuprun"))}
 }
 
 // CouchbaseSnapshotBackupRuns returns an object that can list and get CouchbaseSnapshotBackupRuns.
 func (s *couchbaseSnapshotBackupRunLister) CouchbaseSnapshotBackupRuns(namespace string) CouchbaseSnapshotBackupRunNamespaceLister {
-	return couchbaseSnapshotBackupRunNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return couchbaseSnapshotBackupRunNamespaceLister{listers.NewNamespaced[*couchbasev2.CouchbaseSnapshotBackupRun](s.ResourceIndexer, namespace)}
 }
 
 // CouchbaseSnapshotBackupRunNamespaceLister helps list and get CouchbaseSnapshotBackupRuns.
@@ -57,36 +49,15 @@ func (s *couchbaseSnapshotBackupRunLister) CouchbaseSnapshotBackupRuns(namespace
 type CouchbaseSnapshotBackupRunNamespaceLister interface {
 	// List lists all CouchbaseSnapshotBackupRuns in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseSnapshotBackupRun, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseSnapshotBackupRun, err error)
 	// Get retrieves the CouchbaseSnapshotBackupRun from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v2.CouchbaseSnapshotBackupRun, error)
+	Get(name string) (*couchbasev2.CouchbaseSnapshotBackupRun, error)
 	CouchbaseSnapshotBackupRunNamespaceListerExpansion
 }
 
 // couchbaseSnapshotBackupRunNamespaceLister implements the CouchbaseSnapshotBackupRunNamespaceLister
 // interface.
 type couchbaseSnapshotBackupRunNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all CouchbaseSnapshotBackupRuns in the indexer for a given namespace.
-func (s couchbaseSnapshotBackupRunNamespaceLister) List(selector labels.Selector) (ret []*v2.CouchbaseSnapshotBackupRun, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseSnapshotBackupRun))
-	})
-	return ret, err
-}
-
-// Get retrieves the CouchbaseSnapshotBackupRun from the indexer for a given namespace and name.
-func (s couchbaseSnapshotBackupRunNamespaceLister) Get(name string) (*v2.CouchbaseSnapshotBackupRun, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v2.Resource("couchbasesnapshotbackuprun"), name)
-	}
-	return obj.(*v2.CouchbaseSnapshotBackupRun), nil
+	listers.ResourceIndexer[*couchbasev2.CouchbaseSnapshotBackupRun]
 }

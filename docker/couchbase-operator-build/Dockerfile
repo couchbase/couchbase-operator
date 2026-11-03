@@ -34,3 +34,9 @@ ARG BINARY
 # Copy in the rest of the source and compile, caching any build objects.
 COPY . .
 RUN --mount=type=cache,target=/root/.cache/go-build make touch-generated binary -e VERSION=${VERSION} BLD_NUM=${BLD_NUM} TARGET=${TARGET} BINARY=${BINARY}
+
+# Export only the binary: the build writes it straight to the host with
+# --output, with no image to load, copy out of and delete.
+FROM scratch
+ARG BINARY
+COPY --from=build /tmp/src/github.com/couchbase/couchbase-operator/build/bin/${BINARY} /

@@ -12,10 +12,10 @@
 package v2
 
 import (
-	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // CouchbaseAutoscalerLister helps list CouchbaseAutoscalers.
@@ -23,7 +23,7 @@ import (
 type CouchbaseAutoscalerLister interface {
 	// List lists all CouchbaseAutoscalers in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseAutoscaler, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseAutoscaler, err error)
 	// CouchbaseAutoscalers returns an object that can list and get CouchbaseAutoscalers.
 	CouchbaseAutoscalers(namespace string) CouchbaseAutoscalerNamespaceLister
 	CouchbaseAutoscalerListerExpansion
@@ -31,25 +31,17 @@ type CouchbaseAutoscalerLister interface {
 
 // couchbaseAutoscalerLister implements the CouchbaseAutoscalerLister interface.
 type couchbaseAutoscalerLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*couchbasev2.CouchbaseAutoscaler]
 }
 
 // NewCouchbaseAutoscalerLister returns a new CouchbaseAutoscalerLister.
 func NewCouchbaseAutoscalerLister(indexer cache.Indexer) CouchbaseAutoscalerLister {
-	return &couchbaseAutoscalerLister{indexer: indexer}
-}
-
-// List lists all CouchbaseAutoscalers in the indexer.
-func (s *couchbaseAutoscalerLister) List(selector labels.Selector) (ret []*v2.CouchbaseAutoscaler, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseAutoscaler))
-	})
-	return ret, err
+	return &couchbaseAutoscalerLister{listers.New[*couchbasev2.CouchbaseAutoscaler](indexer, couchbasev2.Resource("couchbaseautoscaler"))}
 }
 
 // CouchbaseAutoscalers returns an object that can list and get CouchbaseAutoscalers.
 func (s *couchbaseAutoscalerLister) CouchbaseAutoscalers(namespace string) CouchbaseAutoscalerNamespaceLister {
-	return couchbaseAutoscalerNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return couchbaseAutoscalerNamespaceLister{listers.NewNamespaced[*couchbasev2.CouchbaseAutoscaler](s.ResourceIndexer, namespace)}
 }
 
 // CouchbaseAutoscalerNamespaceLister helps list and get CouchbaseAutoscalers.
@@ -57,36 +49,15 @@ func (s *couchbaseAutoscalerLister) CouchbaseAutoscalers(namespace string) Couch
 type CouchbaseAutoscalerNamespaceLister interface {
 	// List lists all CouchbaseAutoscalers in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseAutoscaler, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseAutoscaler, err error)
 	// Get retrieves the CouchbaseAutoscaler from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v2.CouchbaseAutoscaler, error)
+	Get(name string) (*couchbasev2.CouchbaseAutoscaler, error)
 	CouchbaseAutoscalerNamespaceListerExpansion
 }
 
 // couchbaseAutoscalerNamespaceLister implements the CouchbaseAutoscalerNamespaceLister
 // interface.
 type couchbaseAutoscalerNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all CouchbaseAutoscalers in the indexer for a given namespace.
-func (s couchbaseAutoscalerNamespaceLister) List(selector labels.Selector) (ret []*v2.CouchbaseAutoscaler, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseAutoscaler))
-	})
-	return ret, err
-}
-
-// Get retrieves the CouchbaseAutoscaler from the indexer for a given namespace and name.
-func (s couchbaseAutoscalerNamespaceLister) Get(name string) (*v2.CouchbaseAutoscaler, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v2.Resource("couchbaseautoscaler"), name)
-	}
-	return obj.(*v2.CouchbaseAutoscaler), nil
+	listers.ResourceIndexer[*couchbasev2.CouchbaseAutoscaler]
 }

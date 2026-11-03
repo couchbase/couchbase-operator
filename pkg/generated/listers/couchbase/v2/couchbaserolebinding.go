@@ -12,10 +12,10 @@
 package v2
 
 import (
-	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // CouchbaseRoleBindingLister helps list CouchbaseRoleBindings.
@@ -23,7 +23,7 @@ import (
 type CouchbaseRoleBindingLister interface {
 	// List lists all CouchbaseRoleBindings in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseRoleBinding, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseRoleBinding, err error)
 	// CouchbaseRoleBindings returns an object that can list and get CouchbaseRoleBindings.
 	CouchbaseRoleBindings(namespace string) CouchbaseRoleBindingNamespaceLister
 	CouchbaseRoleBindingListerExpansion
@@ -31,25 +31,17 @@ type CouchbaseRoleBindingLister interface {
 
 // couchbaseRoleBindingLister implements the CouchbaseRoleBindingLister interface.
 type couchbaseRoleBindingLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*couchbasev2.CouchbaseRoleBinding]
 }
 
 // NewCouchbaseRoleBindingLister returns a new CouchbaseRoleBindingLister.
 func NewCouchbaseRoleBindingLister(indexer cache.Indexer) CouchbaseRoleBindingLister {
-	return &couchbaseRoleBindingLister{indexer: indexer}
-}
-
-// List lists all CouchbaseRoleBindings in the indexer.
-func (s *couchbaseRoleBindingLister) List(selector labels.Selector) (ret []*v2.CouchbaseRoleBinding, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseRoleBinding))
-	})
-	return ret, err
+	return &couchbaseRoleBindingLister{listers.New[*couchbasev2.CouchbaseRoleBinding](indexer, couchbasev2.Resource("couchbaserolebinding"))}
 }
 
 // CouchbaseRoleBindings returns an object that can list and get CouchbaseRoleBindings.
 func (s *couchbaseRoleBindingLister) CouchbaseRoleBindings(namespace string) CouchbaseRoleBindingNamespaceLister {
-	return couchbaseRoleBindingNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return couchbaseRoleBindingNamespaceLister{listers.NewNamespaced[*couchbasev2.CouchbaseRoleBinding](s.ResourceIndexer, namespace)}
 }
 
 // CouchbaseRoleBindingNamespaceLister helps list and get CouchbaseRoleBindings.
@@ -57,36 +49,15 @@ func (s *couchbaseRoleBindingLister) CouchbaseRoleBindings(namespace string) Cou
 type CouchbaseRoleBindingNamespaceLister interface {
 	// List lists all CouchbaseRoleBindings in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseRoleBinding, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseRoleBinding, err error)
 	// Get retrieves the CouchbaseRoleBinding from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v2.CouchbaseRoleBinding, error)
+	Get(name string) (*couchbasev2.CouchbaseRoleBinding, error)
 	CouchbaseRoleBindingNamespaceListerExpansion
 }
 
 // couchbaseRoleBindingNamespaceLister implements the CouchbaseRoleBindingNamespaceLister
 // interface.
 type couchbaseRoleBindingNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all CouchbaseRoleBindings in the indexer for a given namespace.
-func (s couchbaseRoleBindingNamespaceLister) List(selector labels.Selector) (ret []*v2.CouchbaseRoleBinding, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseRoleBinding))
-	})
-	return ret, err
-}
-
-// Get retrieves the CouchbaseRoleBinding from the indexer for a given namespace and name.
-func (s couchbaseRoleBindingNamespaceLister) Get(name string) (*v2.CouchbaseRoleBinding, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v2.Resource("couchbaserolebinding"), name)
-	}
-	return obj.(*v2.CouchbaseRoleBinding), nil
+	listers.ResourceIndexer[*couchbasev2.CouchbaseRoleBinding]
 }

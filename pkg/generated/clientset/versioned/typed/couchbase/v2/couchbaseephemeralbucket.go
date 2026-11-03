@@ -12,15 +12,14 @@
 package v2
 
 import (
-	"context"
-	"time"
+	context "context"
 
-	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	scheme "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	rest "k8s.io/client-go/rest"
+	gentype "k8s.io/client-go/gentype"
 )
 
 // CouchbaseEphemeralBucketsGetter has a method to return a CouchbaseEphemeralBucketInterface.
@@ -31,158 +30,34 @@ type CouchbaseEphemeralBucketsGetter interface {
 
 // CouchbaseEphemeralBucketInterface has methods to work with CouchbaseEphemeralBucket resources.
 type CouchbaseEphemeralBucketInterface interface {
-	Create(ctx context.Context, couchbaseEphemeralBucket *v2.CouchbaseEphemeralBucket, opts v1.CreateOptions) (*v2.CouchbaseEphemeralBucket, error)
-	Update(ctx context.Context, couchbaseEphemeralBucket *v2.CouchbaseEphemeralBucket, opts v1.UpdateOptions) (*v2.CouchbaseEphemeralBucket, error)
-	UpdateStatus(ctx context.Context, couchbaseEphemeralBucket *v2.CouchbaseEphemeralBucket, opts v1.UpdateOptions) (*v2.CouchbaseEphemeralBucket, error)
+	Create(ctx context.Context, couchbaseEphemeralBucket *couchbasev2.CouchbaseEphemeralBucket, opts v1.CreateOptions) (*couchbasev2.CouchbaseEphemeralBucket, error)
+	Update(ctx context.Context, couchbaseEphemeralBucket *couchbasev2.CouchbaseEphemeralBucket, opts v1.UpdateOptions) (*couchbasev2.CouchbaseEphemeralBucket, error)
+	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+	UpdateStatus(ctx context.Context, couchbaseEphemeralBucket *couchbasev2.CouchbaseEphemeralBucket, opts v1.UpdateOptions) (*couchbasev2.CouchbaseEphemeralBucket, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v2.CouchbaseEphemeralBucket, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v2.CouchbaseEphemeralBucketList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*couchbasev2.CouchbaseEphemeralBucket, error)
+	List(ctx context.Context, opts v1.ListOptions) (*couchbasev2.CouchbaseEphemeralBucketList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseEphemeralBucket, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *couchbasev2.CouchbaseEphemeralBucket, err error)
 	CouchbaseEphemeralBucketExpansion
 }
 
 // couchbaseEphemeralBuckets implements CouchbaseEphemeralBucketInterface
 type couchbaseEphemeralBuckets struct {
-	client rest.Interface
-	ns     string
+	*gentype.ClientWithList[*couchbasev2.CouchbaseEphemeralBucket, *couchbasev2.CouchbaseEphemeralBucketList]
 }
 
 // newCouchbaseEphemeralBuckets returns a CouchbaseEphemeralBuckets
 func newCouchbaseEphemeralBuckets(c *CouchbaseV2Client, namespace string) *couchbaseEphemeralBuckets {
 	return &couchbaseEphemeralBuckets{
-		client: c.RESTClient(),
-		ns:     namespace,
+		gentype.NewClientWithList[*couchbasev2.CouchbaseEphemeralBucket, *couchbasev2.CouchbaseEphemeralBucketList](
+			"couchbaseephemeralbuckets",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			namespace,
+			func() *couchbasev2.CouchbaseEphemeralBucket { return &couchbasev2.CouchbaseEphemeralBucket{} },
+			func() *couchbasev2.CouchbaseEphemeralBucketList { return &couchbasev2.CouchbaseEphemeralBucketList{} },
+		),
 	}
-}
-
-// Get takes name of the couchbaseEphemeralBucket, and returns the corresponding couchbaseEphemeralBucket object, and an error if there is any.
-func (c *couchbaseEphemeralBuckets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2.CouchbaseEphemeralBucket, err error) {
-	result = &v2.CouchbaseEphemeralBucket{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("couchbaseephemeralbuckets").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of CouchbaseEphemeralBuckets that match those selectors.
-func (c *couchbaseEphemeralBuckets) List(ctx context.Context, opts v1.ListOptions) (result *v2.CouchbaseEphemeralBucketList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v2.CouchbaseEphemeralBucketList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("couchbaseephemeralbuckets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested couchbaseEphemeralBuckets.
-func (c *couchbaseEphemeralBuckets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("couchbaseephemeralbuckets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
-}
-
-// Create takes the representation of a couchbaseEphemeralBucket and creates it.  Returns the server's representation of the couchbaseEphemeralBucket, and an error, if there is any.
-func (c *couchbaseEphemeralBuckets) Create(ctx context.Context, couchbaseEphemeralBucket *v2.CouchbaseEphemeralBucket, opts v1.CreateOptions) (result *v2.CouchbaseEphemeralBucket, err error) {
-	result = &v2.CouchbaseEphemeralBucket{}
-	err = c.client.Post().
-		Namespace(c.ns).
-		Resource("couchbaseephemeralbuckets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(couchbaseEphemeralBucket).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a couchbaseEphemeralBucket and updates it. Returns the server's representation of the couchbaseEphemeralBucket, and an error, if there is any.
-func (c *couchbaseEphemeralBuckets) Update(ctx context.Context, couchbaseEphemeralBucket *v2.CouchbaseEphemeralBucket, opts v1.UpdateOptions) (result *v2.CouchbaseEphemeralBucket, err error) {
-	result = &v2.CouchbaseEphemeralBucket{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("couchbaseephemeralbuckets").
-		Name(couchbaseEphemeralBucket.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(couchbaseEphemeralBucket).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *couchbaseEphemeralBuckets) UpdateStatus(ctx context.Context, couchbaseEphemeralBucket *v2.CouchbaseEphemeralBucket, opts v1.UpdateOptions) (result *v2.CouchbaseEphemeralBucket, err error) {
-	result = &v2.CouchbaseEphemeralBucket{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("couchbaseephemeralbuckets").
-		Name(couchbaseEphemeralBucket.Name).
-		SubResource("status").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(couchbaseEphemeralBucket).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the couchbaseEphemeralBucket and deletes it. Returns an error if one occurs.
-func (c *couchbaseEphemeralBuckets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("couchbaseephemeralbuckets").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *couchbaseEphemeralBuckets) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	var timeout time.Duration
-	if listOpts.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
-	}
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("couchbaseephemeralbuckets").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// Patch applies the patch and returns the patched couchbaseEphemeralBucket.
-func (c *couchbaseEphemeralBuckets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseEphemeralBucket, err error) {
-	result = &v2.CouchbaseEphemeralBucket{}
-	err = c.client.Patch(pt).
-		Namespace(c.ns).
-		Resource("couchbaseephemeralbuckets").
-		Name(name).
-		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
 }

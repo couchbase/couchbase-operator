@@ -12,15 +12,14 @@
 package v2
 
 import (
-	"context"
-	"time"
+	context "context"
 
-	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	scheme "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	rest "k8s.io/client-go/rest"
+	gentype "k8s.io/client-go/gentype"
 )
 
 // CouchbaseBackupsGetter has a method to return a CouchbaseBackupInterface.
@@ -31,158 +30,34 @@ type CouchbaseBackupsGetter interface {
 
 // CouchbaseBackupInterface has methods to work with CouchbaseBackup resources.
 type CouchbaseBackupInterface interface {
-	Create(ctx context.Context, couchbaseBackup *v2.CouchbaseBackup, opts v1.CreateOptions) (*v2.CouchbaseBackup, error)
-	Update(ctx context.Context, couchbaseBackup *v2.CouchbaseBackup, opts v1.UpdateOptions) (*v2.CouchbaseBackup, error)
-	UpdateStatus(ctx context.Context, couchbaseBackup *v2.CouchbaseBackup, opts v1.UpdateOptions) (*v2.CouchbaseBackup, error)
+	Create(ctx context.Context, couchbaseBackup *couchbasev2.CouchbaseBackup, opts v1.CreateOptions) (*couchbasev2.CouchbaseBackup, error)
+	Update(ctx context.Context, couchbaseBackup *couchbasev2.CouchbaseBackup, opts v1.UpdateOptions) (*couchbasev2.CouchbaseBackup, error)
+	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+	UpdateStatus(ctx context.Context, couchbaseBackup *couchbasev2.CouchbaseBackup, opts v1.UpdateOptions) (*couchbasev2.CouchbaseBackup, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v2.CouchbaseBackup, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v2.CouchbaseBackupList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*couchbasev2.CouchbaseBackup, error)
+	List(ctx context.Context, opts v1.ListOptions) (*couchbasev2.CouchbaseBackupList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseBackup, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *couchbasev2.CouchbaseBackup, err error)
 	CouchbaseBackupExpansion
 }
 
 // couchbaseBackups implements CouchbaseBackupInterface
 type couchbaseBackups struct {
-	client rest.Interface
-	ns     string
+	*gentype.ClientWithList[*couchbasev2.CouchbaseBackup, *couchbasev2.CouchbaseBackupList]
 }
 
 // newCouchbaseBackups returns a CouchbaseBackups
 func newCouchbaseBackups(c *CouchbaseV2Client, namespace string) *couchbaseBackups {
 	return &couchbaseBackups{
-		client: c.RESTClient(),
-		ns:     namespace,
+		gentype.NewClientWithList[*couchbasev2.CouchbaseBackup, *couchbasev2.CouchbaseBackupList](
+			"couchbasebackups",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			namespace,
+			func() *couchbasev2.CouchbaseBackup { return &couchbasev2.CouchbaseBackup{} },
+			func() *couchbasev2.CouchbaseBackupList { return &couchbasev2.CouchbaseBackupList{} },
+		),
 	}
-}
-
-// Get takes name of the couchbaseBackup, and returns the corresponding couchbaseBackup object, and an error if there is any.
-func (c *couchbaseBackups) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2.CouchbaseBackup, err error) {
-	result = &v2.CouchbaseBackup{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("couchbasebackups").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of CouchbaseBackups that match those selectors.
-func (c *couchbaseBackups) List(ctx context.Context, opts v1.ListOptions) (result *v2.CouchbaseBackupList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v2.CouchbaseBackupList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("couchbasebackups").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested couchbaseBackups.
-func (c *couchbaseBackups) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("couchbasebackups").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
-}
-
-// Create takes the representation of a couchbaseBackup and creates it.  Returns the server's representation of the couchbaseBackup, and an error, if there is any.
-func (c *couchbaseBackups) Create(ctx context.Context, couchbaseBackup *v2.CouchbaseBackup, opts v1.CreateOptions) (result *v2.CouchbaseBackup, err error) {
-	result = &v2.CouchbaseBackup{}
-	err = c.client.Post().
-		Namespace(c.ns).
-		Resource("couchbasebackups").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(couchbaseBackup).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a couchbaseBackup and updates it. Returns the server's representation of the couchbaseBackup, and an error, if there is any.
-func (c *couchbaseBackups) Update(ctx context.Context, couchbaseBackup *v2.CouchbaseBackup, opts v1.UpdateOptions) (result *v2.CouchbaseBackup, err error) {
-	result = &v2.CouchbaseBackup{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("couchbasebackups").
-		Name(couchbaseBackup.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(couchbaseBackup).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *couchbaseBackups) UpdateStatus(ctx context.Context, couchbaseBackup *v2.CouchbaseBackup, opts v1.UpdateOptions) (result *v2.CouchbaseBackup, err error) {
-	result = &v2.CouchbaseBackup{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("couchbasebackups").
-		Name(couchbaseBackup.Name).
-		SubResource("status").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(couchbaseBackup).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the couchbaseBackup and deletes it. Returns an error if one occurs.
-func (c *couchbaseBackups) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("couchbasebackups").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *couchbaseBackups) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	var timeout time.Duration
-	if listOpts.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
-	}
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("couchbasebackups").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// Patch applies the patch and returns the patched couchbaseBackup.
-func (c *couchbaseBackups) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseBackup, err error) {
-	result = &v2.CouchbaseBackup{}
-	err = c.client.Patch(pt).
-		Namespace(c.ns).
-		Resource("couchbasebackups").
-		Name(name).
-		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
 }

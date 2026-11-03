@@ -18,43 +18,43 @@ import (
 // Interface provides access to all the informers in this group version.
 type Interface interface {
 	// CouchbaseAutoscalers returns a CouchbaseAutoscalerInformer.
-	CouchbaseAutoscalers() CouchbaseAutoscalerInformer
+	CouchbaseAutoscalers() TypedCouchbaseAutoscalerInformer
 	// CouchbaseBackups returns a CouchbaseBackupInformer.
-	CouchbaseBackups() CouchbaseBackupInformer
+	CouchbaseBackups() TypedCouchbaseBackupInformer
 	// CouchbaseBackupRestores returns a CouchbaseBackupRestoreInformer.
-	CouchbaseBackupRestores() CouchbaseBackupRestoreInformer
+	CouchbaseBackupRestores() TypedCouchbaseBackupRestoreInformer
 	// CouchbaseBuckets returns a CouchbaseBucketInformer.
-	CouchbaseBuckets() CouchbaseBucketInformer
+	CouchbaseBuckets() TypedCouchbaseBucketInformer
 	// CouchbaseClusters returns a CouchbaseClusterInformer.
-	CouchbaseClusters() CouchbaseClusterInformer
+	CouchbaseClusters() TypedCouchbaseClusterInformer
 	// CouchbaseCollections returns a CouchbaseCollectionInformer.
-	CouchbaseCollections() CouchbaseCollectionInformer
+	CouchbaseCollections() TypedCouchbaseCollectionInformer
 	// CouchbaseCollectionGroups returns a CouchbaseCollectionGroupInformer.
-	CouchbaseCollectionGroups() CouchbaseCollectionGroupInformer
+	CouchbaseCollectionGroups() TypedCouchbaseCollectionGroupInformer
 	// CouchbaseEncryptionKeys returns a CouchbaseEncryptionKeyInformer.
-	CouchbaseEncryptionKeys() CouchbaseEncryptionKeyInformer
+	CouchbaseEncryptionKeys() TypedCouchbaseEncryptionKeyInformer
 	// CouchbaseEphemeralBuckets returns a CouchbaseEphemeralBucketInformer.
-	CouchbaseEphemeralBuckets() CouchbaseEphemeralBucketInformer
+	CouchbaseEphemeralBuckets() TypedCouchbaseEphemeralBucketInformer
 	// CouchbaseGroups returns a CouchbaseGroupInformer.
-	CouchbaseGroups() CouchbaseGroupInformer
+	CouchbaseGroups() TypedCouchbaseGroupInformer
 	// CouchbaseMemcachedBuckets returns a CouchbaseMemcachedBucketInformer.
-	CouchbaseMemcachedBuckets() CouchbaseMemcachedBucketInformer
+	CouchbaseMemcachedBuckets() TypedCouchbaseMemcachedBucketInformer
 	// CouchbaseMigrationReplications returns a CouchbaseMigrationReplicationInformer.
-	CouchbaseMigrationReplications() CouchbaseMigrationReplicationInformer
+	CouchbaseMigrationReplications() TypedCouchbaseMigrationReplicationInformer
 	// CouchbaseReplications returns a CouchbaseReplicationInformer.
-	CouchbaseReplications() CouchbaseReplicationInformer
+	CouchbaseReplications() TypedCouchbaseReplicationInformer
 	// CouchbaseRoleBindings returns a CouchbaseRoleBindingInformer.
-	CouchbaseRoleBindings() CouchbaseRoleBindingInformer
+	CouchbaseRoleBindings() TypedCouchbaseRoleBindingInformer
 	// CouchbaseScopes returns a CouchbaseScopeInformer.
-	CouchbaseScopes() CouchbaseScopeInformer
+	CouchbaseScopes() TypedCouchbaseScopeInformer
 	// CouchbaseScopeGroups returns a CouchbaseScopeGroupInformer.
-	CouchbaseScopeGroups() CouchbaseScopeGroupInformer
+	CouchbaseScopeGroups() TypedCouchbaseScopeGroupInformer
 	// CouchbaseSnapshotBackupRestores returns a CouchbaseSnapshotBackupRestoreInformer.
-	CouchbaseSnapshotBackupRestores() CouchbaseSnapshotBackupRestoreInformer
+	CouchbaseSnapshotBackupRestores() TypedCouchbaseSnapshotBackupRestoreInformer
 	// CouchbaseSnapshotBackupRuns returns a CouchbaseSnapshotBackupRunInformer.
-	CouchbaseSnapshotBackupRuns() CouchbaseSnapshotBackupRunInformer
+	CouchbaseSnapshotBackupRuns() TypedCouchbaseSnapshotBackupRunInformer
 	// CouchbaseUsers returns a CouchbaseUserInformer.
-	CouchbaseUsers() CouchbaseUserInformer
+	CouchbaseUsers() TypedCouchbaseUserInformer
 }
 
 type version struct {
@@ -68,97 +68,97 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// CouchbaseAutoscalers returns a CouchbaseAutoscalerInformer.
-func (v *version) CouchbaseAutoscalers() CouchbaseAutoscalerInformer {
+// CouchbaseAutoscalers returns a TypedCouchbaseAutoscalerInformer.
+func (v *version) CouchbaseAutoscalers() TypedCouchbaseAutoscalerInformer {
 	return &couchbaseAutoscalerInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// CouchbaseBackups returns a CouchbaseBackupInformer.
-func (v *version) CouchbaseBackups() CouchbaseBackupInformer {
+// CouchbaseBackups returns a TypedCouchbaseBackupInformer.
+func (v *version) CouchbaseBackups() TypedCouchbaseBackupInformer {
 	return &couchbaseBackupInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// CouchbaseBackupRestores returns a CouchbaseBackupRestoreInformer.
-func (v *version) CouchbaseBackupRestores() CouchbaseBackupRestoreInformer {
+// CouchbaseBackupRestores returns a TypedCouchbaseBackupRestoreInformer.
+func (v *version) CouchbaseBackupRestores() TypedCouchbaseBackupRestoreInformer {
 	return &couchbaseBackupRestoreInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// CouchbaseBuckets returns a CouchbaseBucketInformer.
-func (v *version) CouchbaseBuckets() CouchbaseBucketInformer {
+// CouchbaseBuckets returns a TypedCouchbaseBucketInformer.
+func (v *version) CouchbaseBuckets() TypedCouchbaseBucketInformer {
 	return &couchbaseBucketInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// CouchbaseClusters returns a CouchbaseClusterInformer.
-func (v *version) CouchbaseClusters() CouchbaseClusterInformer {
+// CouchbaseClusters returns a TypedCouchbaseClusterInformer.
+func (v *version) CouchbaseClusters() TypedCouchbaseClusterInformer {
 	return &couchbaseClusterInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// CouchbaseCollections returns a CouchbaseCollectionInformer.
-func (v *version) CouchbaseCollections() CouchbaseCollectionInformer {
+// CouchbaseCollections returns a TypedCouchbaseCollectionInformer.
+func (v *version) CouchbaseCollections() TypedCouchbaseCollectionInformer {
 	return &couchbaseCollectionInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// CouchbaseCollectionGroups returns a CouchbaseCollectionGroupInformer.
-func (v *version) CouchbaseCollectionGroups() CouchbaseCollectionGroupInformer {
+// CouchbaseCollectionGroups returns a TypedCouchbaseCollectionGroupInformer.
+func (v *version) CouchbaseCollectionGroups() TypedCouchbaseCollectionGroupInformer {
 	return &couchbaseCollectionGroupInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// CouchbaseEncryptionKeys returns a CouchbaseEncryptionKeyInformer.
-func (v *version) CouchbaseEncryptionKeys() CouchbaseEncryptionKeyInformer {
+// CouchbaseEncryptionKeys returns a TypedCouchbaseEncryptionKeyInformer.
+func (v *version) CouchbaseEncryptionKeys() TypedCouchbaseEncryptionKeyInformer {
 	return &couchbaseEncryptionKeyInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// CouchbaseEphemeralBuckets returns a CouchbaseEphemeralBucketInformer.
-func (v *version) CouchbaseEphemeralBuckets() CouchbaseEphemeralBucketInformer {
+// CouchbaseEphemeralBuckets returns a TypedCouchbaseEphemeralBucketInformer.
+func (v *version) CouchbaseEphemeralBuckets() TypedCouchbaseEphemeralBucketInformer {
 	return &couchbaseEphemeralBucketInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// CouchbaseGroups returns a CouchbaseGroupInformer.
-func (v *version) CouchbaseGroups() CouchbaseGroupInformer {
+// CouchbaseGroups returns a TypedCouchbaseGroupInformer.
+func (v *version) CouchbaseGroups() TypedCouchbaseGroupInformer {
 	return &couchbaseGroupInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// CouchbaseMemcachedBuckets returns a CouchbaseMemcachedBucketInformer.
-func (v *version) CouchbaseMemcachedBuckets() CouchbaseMemcachedBucketInformer {
+// CouchbaseMemcachedBuckets returns a TypedCouchbaseMemcachedBucketInformer.
+func (v *version) CouchbaseMemcachedBuckets() TypedCouchbaseMemcachedBucketInformer {
 	return &couchbaseMemcachedBucketInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// CouchbaseMigrationReplications returns a CouchbaseMigrationReplicationInformer.
-func (v *version) CouchbaseMigrationReplications() CouchbaseMigrationReplicationInformer {
+// CouchbaseMigrationReplications returns a TypedCouchbaseMigrationReplicationInformer.
+func (v *version) CouchbaseMigrationReplications() TypedCouchbaseMigrationReplicationInformer {
 	return &couchbaseMigrationReplicationInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// CouchbaseReplications returns a CouchbaseReplicationInformer.
-func (v *version) CouchbaseReplications() CouchbaseReplicationInformer {
+// CouchbaseReplications returns a TypedCouchbaseReplicationInformer.
+func (v *version) CouchbaseReplications() TypedCouchbaseReplicationInformer {
 	return &couchbaseReplicationInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// CouchbaseRoleBindings returns a CouchbaseRoleBindingInformer.
-func (v *version) CouchbaseRoleBindings() CouchbaseRoleBindingInformer {
+// CouchbaseRoleBindings returns a TypedCouchbaseRoleBindingInformer.
+func (v *version) CouchbaseRoleBindings() TypedCouchbaseRoleBindingInformer {
 	return &couchbaseRoleBindingInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// CouchbaseScopes returns a CouchbaseScopeInformer.
-func (v *version) CouchbaseScopes() CouchbaseScopeInformer {
+// CouchbaseScopes returns a TypedCouchbaseScopeInformer.
+func (v *version) CouchbaseScopes() TypedCouchbaseScopeInformer {
 	return &couchbaseScopeInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// CouchbaseScopeGroups returns a CouchbaseScopeGroupInformer.
-func (v *version) CouchbaseScopeGroups() CouchbaseScopeGroupInformer {
+// CouchbaseScopeGroups returns a TypedCouchbaseScopeGroupInformer.
+func (v *version) CouchbaseScopeGroups() TypedCouchbaseScopeGroupInformer {
 	return &couchbaseScopeGroupInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// CouchbaseSnapshotBackupRestores returns a CouchbaseSnapshotBackupRestoreInformer.
-func (v *version) CouchbaseSnapshotBackupRestores() CouchbaseSnapshotBackupRestoreInformer {
+// CouchbaseSnapshotBackupRestores returns a TypedCouchbaseSnapshotBackupRestoreInformer.
+func (v *version) CouchbaseSnapshotBackupRestores() TypedCouchbaseSnapshotBackupRestoreInformer {
 	return &couchbaseSnapshotBackupRestoreInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// CouchbaseSnapshotBackupRuns returns a CouchbaseSnapshotBackupRunInformer.
-func (v *version) CouchbaseSnapshotBackupRuns() CouchbaseSnapshotBackupRunInformer {
+// CouchbaseSnapshotBackupRuns returns a TypedCouchbaseSnapshotBackupRunInformer.
+func (v *version) CouchbaseSnapshotBackupRuns() TypedCouchbaseSnapshotBackupRunInformer {
 	return &couchbaseSnapshotBackupRunInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// CouchbaseUsers returns a CouchbaseUserInformer.
-func (v *version) CouchbaseUsers() CouchbaseUserInformer {
+// CouchbaseUsers returns a TypedCouchbaseUserInformer.
+func (v *version) CouchbaseUsers() TypedCouchbaseUserInformer {
 	return &couchbaseUserInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

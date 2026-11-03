@@ -22,6 +22,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
+	streamhttp "k8s.io/streaming/pkg/httpstream"
 )
 
 var (
@@ -30,7 +31,7 @@ var (
 	// instances is a counter of how many instances are alive.
 	instances = 0
 	// handlers backs up port forward error handlers when in silent mode.
-	handlers []func(error)
+	handlers []runtime.ErrorHandler
 )
 
 // PortForwarder forwards a pod port to localhost in the background.
@@ -105,8 +106,10 @@ func (pf *PortForwarder) createPortForwardDialer(req *rest.Request) (httpstream.
 	// Ideally we should never fallback since we're not supposed to support <1.30 clusters anyway
 	// but keeping in case customer has explicitly turned it off.
 	// Also it helps to be good people and try to be backwards compatible as much as possible.
+	// The websocket dialer now returns k8s.io/streaming errors, so check both packages.
 	dialer := portforward.NewFallbackDialer(wsDialer, spdyDialer, func(err error) bool {
-		return httpstream.IsUpgradeFailure(err) || httpstream.IsHTTPSProxyError(err)
+		return streamhttp.IsUpgradeFailure(err) || streamhttp.IsHTTPSProxyError(err) ||
+			httpstream.IsUpgradeFailure(err) || httpstream.IsHTTPSProxyError(err)
 	})
 
 	return dialer, nil
@@ -126,7 +129,7 @@ func Silent() func() {
 
 	if instances == 0 {
 		handlers = runtime.ErrorHandlers
-		runtime.ErrorHandlers = []func(error){} //nolint:reassign
+		runtime.ErrorHandlers = []runtime.ErrorHandler{} //nolint:reassign
 	}
 
 	instances++

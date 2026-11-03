@@ -12,15 +12,14 @@
 package v2
 
 import (
-	"context"
-	"time"
+	context "context"
 
-	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	scheme "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	rest "k8s.io/client-go/rest"
+	gentype "k8s.io/client-go/gentype"
 )
 
 // CouchbaseMemcachedBucketsGetter has a method to return a CouchbaseMemcachedBucketInterface.
@@ -31,158 +30,34 @@ type CouchbaseMemcachedBucketsGetter interface {
 
 // CouchbaseMemcachedBucketInterface has methods to work with CouchbaseMemcachedBucket resources.
 type CouchbaseMemcachedBucketInterface interface {
-	Create(ctx context.Context, couchbaseMemcachedBucket *v2.CouchbaseMemcachedBucket, opts v1.CreateOptions) (*v2.CouchbaseMemcachedBucket, error)
-	Update(ctx context.Context, couchbaseMemcachedBucket *v2.CouchbaseMemcachedBucket, opts v1.UpdateOptions) (*v2.CouchbaseMemcachedBucket, error)
-	UpdateStatus(ctx context.Context, couchbaseMemcachedBucket *v2.CouchbaseMemcachedBucket, opts v1.UpdateOptions) (*v2.CouchbaseMemcachedBucket, error)
+	Create(ctx context.Context, couchbaseMemcachedBucket *couchbasev2.CouchbaseMemcachedBucket, opts v1.CreateOptions) (*couchbasev2.CouchbaseMemcachedBucket, error)
+	Update(ctx context.Context, couchbaseMemcachedBucket *couchbasev2.CouchbaseMemcachedBucket, opts v1.UpdateOptions) (*couchbasev2.CouchbaseMemcachedBucket, error)
+	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+	UpdateStatus(ctx context.Context, couchbaseMemcachedBucket *couchbasev2.CouchbaseMemcachedBucket, opts v1.UpdateOptions) (*couchbasev2.CouchbaseMemcachedBucket, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v2.CouchbaseMemcachedBucket, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v2.CouchbaseMemcachedBucketList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*couchbasev2.CouchbaseMemcachedBucket, error)
+	List(ctx context.Context, opts v1.ListOptions) (*couchbasev2.CouchbaseMemcachedBucketList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseMemcachedBucket, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *couchbasev2.CouchbaseMemcachedBucket, err error)
 	CouchbaseMemcachedBucketExpansion
 }
 
 // couchbaseMemcachedBuckets implements CouchbaseMemcachedBucketInterface
 type couchbaseMemcachedBuckets struct {
-	client rest.Interface
-	ns     string
+	*gentype.ClientWithList[*couchbasev2.CouchbaseMemcachedBucket, *couchbasev2.CouchbaseMemcachedBucketList]
 }
 
 // newCouchbaseMemcachedBuckets returns a CouchbaseMemcachedBuckets
 func newCouchbaseMemcachedBuckets(c *CouchbaseV2Client, namespace string) *couchbaseMemcachedBuckets {
 	return &couchbaseMemcachedBuckets{
-		client: c.RESTClient(),
-		ns:     namespace,
+		gentype.NewClientWithList[*couchbasev2.CouchbaseMemcachedBucket, *couchbasev2.CouchbaseMemcachedBucketList](
+			"couchbasememcachedbuckets",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			namespace,
+			func() *couchbasev2.CouchbaseMemcachedBucket { return &couchbasev2.CouchbaseMemcachedBucket{} },
+			func() *couchbasev2.CouchbaseMemcachedBucketList { return &couchbasev2.CouchbaseMemcachedBucketList{} },
+		),
 	}
-}
-
-// Get takes name of the couchbaseMemcachedBucket, and returns the corresponding couchbaseMemcachedBucket object, and an error if there is any.
-func (c *couchbaseMemcachedBuckets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2.CouchbaseMemcachedBucket, err error) {
-	result = &v2.CouchbaseMemcachedBucket{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("couchbasememcachedbuckets").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of CouchbaseMemcachedBuckets that match those selectors.
-func (c *couchbaseMemcachedBuckets) List(ctx context.Context, opts v1.ListOptions) (result *v2.CouchbaseMemcachedBucketList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v2.CouchbaseMemcachedBucketList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("couchbasememcachedbuckets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested couchbaseMemcachedBuckets.
-func (c *couchbaseMemcachedBuckets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("couchbasememcachedbuckets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
-}
-
-// Create takes the representation of a couchbaseMemcachedBucket and creates it.  Returns the server's representation of the couchbaseMemcachedBucket, and an error, if there is any.
-func (c *couchbaseMemcachedBuckets) Create(ctx context.Context, couchbaseMemcachedBucket *v2.CouchbaseMemcachedBucket, opts v1.CreateOptions) (result *v2.CouchbaseMemcachedBucket, err error) {
-	result = &v2.CouchbaseMemcachedBucket{}
-	err = c.client.Post().
-		Namespace(c.ns).
-		Resource("couchbasememcachedbuckets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(couchbaseMemcachedBucket).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a couchbaseMemcachedBucket and updates it. Returns the server's representation of the couchbaseMemcachedBucket, and an error, if there is any.
-func (c *couchbaseMemcachedBuckets) Update(ctx context.Context, couchbaseMemcachedBucket *v2.CouchbaseMemcachedBucket, opts v1.UpdateOptions) (result *v2.CouchbaseMemcachedBucket, err error) {
-	result = &v2.CouchbaseMemcachedBucket{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("couchbasememcachedbuckets").
-		Name(couchbaseMemcachedBucket.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(couchbaseMemcachedBucket).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *couchbaseMemcachedBuckets) UpdateStatus(ctx context.Context, couchbaseMemcachedBucket *v2.CouchbaseMemcachedBucket, opts v1.UpdateOptions) (result *v2.CouchbaseMemcachedBucket, err error) {
-	result = &v2.CouchbaseMemcachedBucket{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("couchbasememcachedbuckets").
-		Name(couchbaseMemcachedBucket.Name).
-		SubResource("status").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(couchbaseMemcachedBucket).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the couchbaseMemcachedBucket and deletes it. Returns an error if one occurs.
-func (c *couchbaseMemcachedBuckets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("couchbasememcachedbuckets").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *couchbaseMemcachedBuckets) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	var timeout time.Duration
-	if listOpts.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
-	}
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("couchbasememcachedbuckets").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// Patch applies the patch and returns the patched couchbaseMemcachedBucket.
-func (c *couchbaseMemcachedBuckets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseMemcachedBucket, err error) {
-	result = &v2.CouchbaseMemcachedBucket{}
-	err = c.client.Patch(pt).
-		Namespace(c.ns).
-		Resource("couchbasememcachedbuckets").
-		Name(name).
-		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
 }

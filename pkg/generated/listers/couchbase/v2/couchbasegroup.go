@@ -12,10 +12,10 @@
 package v2
 
 import (
-	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // CouchbaseGroupLister helps list CouchbaseGroups.
@@ -23,7 +23,7 @@ import (
 type CouchbaseGroupLister interface {
 	// List lists all CouchbaseGroups in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseGroup, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseGroup, err error)
 	// CouchbaseGroups returns an object that can list and get CouchbaseGroups.
 	CouchbaseGroups(namespace string) CouchbaseGroupNamespaceLister
 	CouchbaseGroupListerExpansion
@@ -31,25 +31,17 @@ type CouchbaseGroupLister interface {
 
 // couchbaseGroupLister implements the CouchbaseGroupLister interface.
 type couchbaseGroupLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*couchbasev2.CouchbaseGroup]
 }
 
 // NewCouchbaseGroupLister returns a new CouchbaseGroupLister.
 func NewCouchbaseGroupLister(indexer cache.Indexer) CouchbaseGroupLister {
-	return &couchbaseGroupLister{indexer: indexer}
-}
-
-// List lists all CouchbaseGroups in the indexer.
-func (s *couchbaseGroupLister) List(selector labels.Selector) (ret []*v2.CouchbaseGroup, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseGroup))
-	})
-	return ret, err
+	return &couchbaseGroupLister{listers.New[*couchbasev2.CouchbaseGroup](indexer, couchbasev2.Resource("couchbasegroup"))}
 }
 
 // CouchbaseGroups returns an object that can list and get CouchbaseGroups.
 func (s *couchbaseGroupLister) CouchbaseGroups(namespace string) CouchbaseGroupNamespaceLister {
-	return couchbaseGroupNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return couchbaseGroupNamespaceLister{listers.NewNamespaced[*couchbasev2.CouchbaseGroup](s.ResourceIndexer, namespace)}
 }
 
 // CouchbaseGroupNamespaceLister helps list and get CouchbaseGroups.
@@ -57,36 +49,15 @@ func (s *couchbaseGroupLister) CouchbaseGroups(namespace string) CouchbaseGroupN
 type CouchbaseGroupNamespaceLister interface {
 	// List lists all CouchbaseGroups in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseGroup, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseGroup, err error)
 	// Get retrieves the CouchbaseGroup from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v2.CouchbaseGroup, error)
+	Get(name string) (*couchbasev2.CouchbaseGroup, error)
 	CouchbaseGroupNamespaceListerExpansion
 }
 
 // couchbaseGroupNamespaceLister implements the CouchbaseGroupNamespaceLister
 // interface.
 type couchbaseGroupNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all CouchbaseGroups in the indexer for a given namespace.
-func (s couchbaseGroupNamespaceLister) List(selector labels.Selector) (ret []*v2.CouchbaseGroup, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseGroup))
-	})
-	return ret, err
-}
-
-// Get retrieves the CouchbaseGroup from the indexer for a given namespace and name.
-func (s couchbaseGroupNamespaceLister) Get(name string) (*v2.CouchbaseGroup, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v2.Resource("couchbasegroup"), name)
-	}
-	return obj.(*v2.CouchbaseGroup), nil
+	listers.ResourceIndexer[*couchbasev2.CouchbaseGroup]
 }

@@ -12,10 +12,10 @@
 package v2
 
 import (
-	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // CouchbaseMigrationReplicationLister helps list CouchbaseMigrationReplications.
@@ -23,7 +23,7 @@ import (
 type CouchbaseMigrationReplicationLister interface {
 	// List lists all CouchbaseMigrationReplications in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseMigrationReplication, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseMigrationReplication, err error)
 	// CouchbaseMigrationReplications returns an object that can list and get CouchbaseMigrationReplications.
 	CouchbaseMigrationReplications(namespace string) CouchbaseMigrationReplicationNamespaceLister
 	CouchbaseMigrationReplicationListerExpansion
@@ -31,25 +31,17 @@ type CouchbaseMigrationReplicationLister interface {
 
 // couchbaseMigrationReplicationLister implements the CouchbaseMigrationReplicationLister interface.
 type couchbaseMigrationReplicationLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*couchbasev2.CouchbaseMigrationReplication]
 }
 
 // NewCouchbaseMigrationReplicationLister returns a new CouchbaseMigrationReplicationLister.
 func NewCouchbaseMigrationReplicationLister(indexer cache.Indexer) CouchbaseMigrationReplicationLister {
-	return &couchbaseMigrationReplicationLister{indexer: indexer}
-}
-
-// List lists all CouchbaseMigrationReplications in the indexer.
-func (s *couchbaseMigrationReplicationLister) List(selector labels.Selector) (ret []*v2.CouchbaseMigrationReplication, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseMigrationReplication))
-	})
-	return ret, err
+	return &couchbaseMigrationReplicationLister{listers.New[*couchbasev2.CouchbaseMigrationReplication](indexer, couchbasev2.Resource("couchbasemigrationreplication"))}
 }
 
 // CouchbaseMigrationReplications returns an object that can list and get CouchbaseMigrationReplications.
 func (s *couchbaseMigrationReplicationLister) CouchbaseMigrationReplications(namespace string) CouchbaseMigrationReplicationNamespaceLister {
-	return couchbaseMigrationReplicationNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return couchbaseMigrationReplicationNamespaceLister{listers.NewNamespaced[*couchbasev2.CouchbaseMigrationReplication](s.ResourceIndexer, namespace)}
 }
 
 // CouchbaseMigrationReplicationNamespaceLister helps list and get CouchbaseMigrationReplications.
@@ -57,36 +49,15 @@ func (s *couchbaseMigrationReplicationLister) CouchbaseMigrationReplications(nam
 type CouchbaseMigrationReplicationNamespaceLister interface {
 	// List lists all CouchbaseMigrationReplications in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseMigrationReplication, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseMigrationReplication, err error)
 	// Get retrieves the CouchbaseMigrationReplication from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v2.CouchbaseMigrationReplication, error)
+	Get(name string) (*couchbasev2.CouchbaseMigrationReplication, error)
 	CouchbaseMigrationReplicationNamespaceListerExpansion
 }
 
 // couchbaseMigrationReplicationNamespaceLister implements the CouchbaseMigrationReplicationNamespaceLister
 // interface.
 type couchbaseMigrationReplicationNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all CouchbaseMigrationReplications in the indexer for a given namespace.
-func (s couchbaseMigrationReplicationNamespaceLister) List(selector labels.Selector) (ret []*v2.CouchbaseMigrationReplication, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseMigrationReplication))
-	})
-	return ret, err
-}
-
-// Get retrieves the CouchbaseMigrationReplication from the indexer for a given namespace and name.
-func (s couchbaseMigrationReplicationNamespaceLister) Get(name string) (*v2.CouchbaseMigrationReplication, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v2.Resource("couchbasemigrationreplication"), name)
-	}
-	return obj.(*v2.CouchbaseMigrationReplication), nil
+	listers.ResourceIndexer[*couchbasev2.CouchbaseMigrationReplication]
 }

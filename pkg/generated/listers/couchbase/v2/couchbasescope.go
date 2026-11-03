@@ -12,10 +12,10 @@
 package v2
 
 import (
-	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // CouchbaseScopeLister helps list CouchbaseScopes.
@@ -23,7 +23,7 @@ import (
 type CouchbaseScopeLister interface {
 	// List lists all CouchbaseScopes in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseScope, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseScope, err error)
 	// CouchbaseScopes returns an object that can list and get CouchbaseScopes.
 	CouchbaseScopes(namespace string) CouchbaseScopeNamespaceLister
 	CouchbaseScopeListerExpansion
@@ -31,25 +31,17 @@ type CouchbaseScopeLister interface {
 
 // couchbaseScopeLister implements the CouchbaseScopeLister interface.
 type couchbaseScopeLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*couchbasev2.CouchbaseScope]
 }
 
 // NewCouchbaseScopeLister returns a new CouchbaseScopeLister.
 func NewCouchbaseScopeLister(indexer cache.Indexer) CouchbaseScopeLister {
-	return &couchbaseScopeLister{indexer: indexer}
-}
-
-// List lists all CouchbaseScopes in the indexer.
-func (s *couchbaseScopeLister) List(selector labels.Selector) (ret []*v2.CouchbaseScope, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseScope))
-	})
-	return ret, err
+	return &couchbaseScopeLister{listers.New[*couchbasev2.CouchbaseScope](indexer, couchbasev2.Resource("couchbasescope"))}
 }
 
 // CouchbaseScopes returns an object that can list and get CouchbaseScopes.
 func (s *couchbaseScopeLister) CouchbaseScopes(namespace string) CouchbaseScopeNamespaceLister {
-	return couchbaseScopeNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return couchbaseScopeNamespaceLister{listers.NewNamespaced[*couchbasev2.CouchbaseScope](s.ResourceIndexer, namespace)}
 }
 
 // CouchbaseScopeNamespaceLister helps list and get CouchbaseScopes.
@@ -57,36 +49,15 @@ func (s *couchbaseScopeLister) CouchbaseScopes(namespace string) CouchbaseScopeN
 type CouchbaseScopeNamespaceLister interface {
 	// List lists all CouchbaseScopes in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseScope, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseScope, err error)
 	// Get retrieves the CouchbaseScope from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v2.CouchbaseScope, error)
+	Get(name string) (*couchbasev2.CouchbaseScope, error)
 	CouchbaseScopeNamespaceListerExpansion
 }
 
 // couchbaseScopeNamespaceLister implements the CouchbaseScopeNamespaceLister
 // interface.
 type couchbaseScopeNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all CouchbaseScopes in the indexer for a given namespace.
-func (s couchbaseScopeNamespaceLister) List(selector labels.Selector) (ret []*v2.CouchbaseScope, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseScope))
-	})
-	return ret, err
-}
-
-// Get retrieves the CouchbaseScope from the indexer for a given namespace and name.
-func (s couchbaseScopeNamespaceLister) Get(name string) (*v2.CouchbaseScope, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v2.Resource("couchbasescope"), name)
-	}
-	return obj.(*v2.CouchbaseScope), nil
+	listers.ResourceIndexer[*couchbasev2.CouchbaseScope]
 }

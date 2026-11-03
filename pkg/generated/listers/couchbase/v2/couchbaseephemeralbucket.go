@@ -12,10 +12,10 @@
 package v2
 
 import (
-	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // CouchbaseEphemeralBucketLister helps list CouchbaseEphemeralBuckets.
@@ -23,7 +23,7 @@ import (
 type CouchbaseEphemeralBucketLister interface {
 	// List lists all CouchbaseEphemeralBuckets in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseEphemeralBucket, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseEphemeralBucket, err error)
 	// CouchbaseEphemeralBuckets returns an object that can list and get CouchbaseEphemeralBuckets.
 	CouchbaseEphemeralBuckets(namespace string) CouchbaseEphemeralBucketNamespaceLister
 	CouchbaseEphemeralBucketListerExpansion
@@ -31,25 +31,17 @@ type CouchbaseEphemeralBucketLister interface {
 
 // couchbaseEphemeralBucketLister implements the CouchbaseEphemeralBucketLister interface.
 type couchbaseEphemeralBucketLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*couchbasev2.CouchbaseEphemeralBucket]
 }
 
 // NewCouchbaseEphemeralBucketLister returns a new CouchbaseEphemeralBucketLister.
 func NewCouchbaseEphemeralBucketLister(indexer cache.Indexer) CouchbaseEphemeralBucketLister {
-	return &couchbaseEphemeralBucketLister{indexer: indexer}
-}
-
-// List lists all CouchbaseEphemeralBuckets in the indexer.
-func (s *couchbaseEphemeralBucketLister) List(selector labels.Selector) (ret []*v2.CouchbaseEphemeralBucket, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseEphemeralBucket))
-	})
-	return ret, err
+	return &couchbaseEphemeralBucketLister{listers.New[*couchbasev2.CouchbaseEphemeralBucket](indexer, couchbasev2.Resource("couchbaseephemeralbucket"))}
 }
 
 // CouchbaseEphemeralBuckets returns an object that can list and get CouchbaseEphemeralBuckets.
 func (s *couchbaseEphemeralBucketLister) CouchbaseEphemeralBuckets(namespace string) CouchbaseEphemeralBucketNamespaceLister {
-	return couchbaseEphemeralBucketNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return couchbaseEphemeralBucketNamespaceLister{listers.NewNamespaced[*couchbasev2.CouchbaseEphemeralBucket](s.ResourceIndexer, namespace)}
 }
 
 // CouchbaseEphemeralBucketNamespaceLister helps list and get CouchbaseEphemeralBuckets.
@@ -57,36 +49,15 @@ func (s *couchbaseEphemeralBucketLister) CouchbaseEphemeralBuckets(namespace str
 type CouchbaseEphemeralBucketNamespaceLister interface {
 	// List lists all CouchbaseEphemeralBuckets in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseEphemeralBucket, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseEphemeralBucket, err error)
 	// Get retrieves the CouchbaseEphemeralBucket from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v2.CouchbaseEphemeralBucket, error)
+	Get(name string) (*couchbasev2.CouchbaseEphemeralBucket, error)
 	CouchbaseEphemeralBucketNamespaceListerExpansion
 }
 
 // couchbaseEphemeralBucketNamespaceLister implements the CouchbaseEphemeralBucketNamespaceLister
 // interface.
 type couchbaseEphemeralBucketNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all CouchbaseEphemeralBuckets in the indexer for a given namespace.
-func (s couchbaseEphemeralBucketNamespaceLister) List(selector labels.Selector) (ret []*v2.CouchbaseEphemeralBucket, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseEphemeralBucket))
-	})
-	return ret, err
-}
-
-// Get retrieves the CouchbaseEphemeralBucket from the indexer for a given namespace and name.
-func (s couchbaseEphemeralBucketNamespaceLister) Get(name string) (*v2.CouchbaseEphemeralBucket, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v2.Resource("couchbaseephemeralbucket"), name)
-	}
-	return obj.(*v2.CouchbaseEphemeralBucket), nil
+	listers.ResourceIndexer[*couchbasev2.CouchbaseEphemeralBucket]
 }

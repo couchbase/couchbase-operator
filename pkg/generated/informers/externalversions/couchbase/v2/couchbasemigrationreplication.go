@@ -12,25 +12,54 @@
 package v2
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	apiscouchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	versioned "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	internalinterfaces "github.com/couchbase/couchbase-operator/pkg/generated/informers/externalversions/internalinterfaces"
-	v2 "github.com/couchbase/couchbase-operator/pkg/generated/listers/couchbase/v2"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/generated/listers/couchbase/v2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
 )
 
 // CouchbaseMigrationReplicationInformer provides access to a shared informer and lister for
-// CouchbaseMigrationReplications.
+// CouchbaseMigrationReplications. Prefer using the type-safe variant (see [TypedCouchbaseMigrationReplicationInformer]).
 type CouchbaseMigrationReplicationInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v2.CouchbaseMigrationReplicationLister
+	Lister() couchbasev2.CouchbaseMigrationReplicationLister
 }
+
+// TypedCouchbaseMigrationReplicationInformer provides access to a shared informer and lister for
+// CouchbaseMigrationReplications, including the type-safe TypedInformer variant.
+// It is a superset of CouchbaseMigrationReplicationInformer.
+type TypedCouchbaseMigrationReplicationInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() CouchbaseMigrationReplicationIndexInformer
+	Lister() couchbasev2.CouchbaseMigrationReplicationLister
+}
+
+// CouchbaseMigrationReplicationIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type CouchbaseMigrationReplicationIndexInformer cache.TypedSharedIndexInformer[*apiscouchbasev2.CouchbaseMigrationReplication]
+
+// CouchbaseMigrationReplicationHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for CouchbaseMigrationReplication.
+type CouchbaseMigrationReplicationHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apiscouchbasev2.CouchbaseMigrationReplication]
+
+// CouchbaseMigrationReplicationDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for CouchbaseMigrationReplication.
+type CouchbaseMigrationReplicationDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apiscouchbasev2.CouchbaseMigrationReplication]
+
+// CouchbaseMigrationReplicationFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for CouchbaseMigrationReplication.
+type CouchbaseMigrationReplicationFilteringHandler = cache.TypedFilteringResourceEventHandler[*apiscouchbasev2.CouchbaseMigrationReplication]
+
+// CouchbaseMigrationReplicationIndexers is a specialization of [cache.TypedIndexers] for CouchbaseMigrationReplication.
+type CouchbaseMigrationReplicationIndexers = cache.TypedIndexers[*apiscouchbasev2.CouchbaseMigrationReplication]
+
+// DeletedCouchbaseMigrationReplication is a specialization of [cache.DeletedObject] for CouchbaseMigrationReplication.
+type DeletedCouchbaseMigrationReplication = cache.DeletedObject[*apiscouchbasev2.CouchbaseMigrationReplication]
 
 type couchbaseMigrationReplicationInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -41,43 +70,132 @@ type couchbaseMigrationReplicationInformer struct {
 // NewCouchbaseMigrationReplicationInformer constructs a new informer for CouchbaseMigrationReplication type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedCouchbaseMigrationReplicationInformer]).
 func NewCouchbaseMigrationReplicationInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredCouchbaseMigrationReplicationInformer(client, namespace, resyncPeriod, indexers, nil)
+	return NewCouchbaseMigrationReplicationInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedCouchbaseMigrationReplicationInformer constructs a new informer for CouchbaseMigrationReplication type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedCouchbaseMigrationReplicationInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers CouchbaseMigrationReplicationIndexers) CouchbaseMigrationReplicationIndexInformer {
+	return NewTypedCouchbaseMigrationReplicationInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredCouchbaseMigrationReplicationInformer constructs a new informer for CouchbaseMigrationReplication type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredCouchbaseMigrationReplicationInformer]).
 func NewFilteredCouchbaseMigrationReplicationInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+	return NewTypedCouchbaseMigrationReplicationInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredCouchbaseMigrationReplicationInformer constructs a new informer for CouchbaseMigrationReplication type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredCouchbaseMigrationReplicationInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers CouchbaseMigrationReplicationIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) CouchbaseMigrationReplicationIndexInformer {
+	return NewTypedCouchbaseMigrationReplicationInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
+}
+
+// NewCouchbaseMigrationReplicationInformerWithOptions constructs a new informer for CouchbaseMigrationReplication type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedCouchbaseMigrationReplicationInformerWithOptions]).
+func NewCouchbaseMigrationReplicationInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedCouchbaseMigrationReplicationInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedCouchbaseMigrationReplicationInformerWithOptions constructs a new informer for CouchbaseMigrationReplication type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedCouchbaseMigrationReplicationInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) CouchbaseMigrationReplicationIndexInformer {
+	gvr := schema.GroupVersionResource{Group: "couchbase.com", Version: "v2", Resource: "couchbasemigrationreplications"}
+	identifier := options.InformerName.WithResource(gvr)
+	tweakListOptions := options.TweakListOptions
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseMigrationReplication](cache.NewSharedIndexInformerWithOptions(
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
+			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.CouchbaseV2().CouchbaseMigrationReplications(namespace).List(context.TODO(), options)
+				return client.CouchbaseV2().CouchbaseMigrationReplications(namespace).List(context.Background(), opts)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(opts v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.CouchbaseV2().CouchbaseMigrationReplications(namespace).Watch(context.TODO(), options)
+				return client.CouchbaseV2().CouchbaseMigrationReplications(namespace).Watch(context.Background(), opts)
 			},
+			ListWithContextFunc: func(ctx context.Context, opts v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&opts)
+				}
+				return client.CouchbaseV2().CouchbaseMigrationReplications(namespace).List(ctx, opts)
+			},
+			WatchFuncWithContext: func(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&opts)
+				}
+				return client.CouchbaseV2().CouchbaseMigrationReplications(namespace).Watch(ctx, opts)
+			},
+		}, client),
+		&apiscouchbasev2.CouchbaseMigrationReplication{},
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod: options.ResyncPeriod,
+			Indexers:     options.Indexers,
+			Identifier:   identifier,
 		},
-		&couchbasev2.CouchbaseMigrationReplication{},
-		resyncPeriod,
-		indexers,
-	)
+	))
 }
 
 func (f *couchbaseMigrationReplicationInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredCouchbaseMigrationReplicationInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewTypedCouchbaseMigrationReplicationInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *couchbaseMigrationReplicationInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&couchbasev2.CouchbaseMigrationReplication{}, f.defaultInformer)
+	return f.TypedInformer()
 }
 
-func (f *couchbaseMigrationReplicationInformer) Lister() v2.CouchbaseMigrationReplicationLister {
-	return v2.NewCouchbaseMigrationReplicationLister(f.Informer().GetIndexer())
+func (f *couchbaseMigrationReplicationInformer) TypedInformer() CouchbaseMigrationReplicationIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseMigrationReplication](f.factory.InformerFor(&apiscouchbasev2.CouchbaseMigrationReplication{}, f.defaultInformer))
+}
+
+func (f *couchbaseMigrationReplicationInformer) Lister() couchbasev2.CouchbaseMigrationReplicationLister {
+	return couchbasev2.NewCouchbaseMigrationReplicationLister(f.Informer().GetIndexer())
+}
+
+// ToTypedCouchbaseMigrationReplicationInformer converts an untyped informer into a TypedCouchbaseMigrationReplicationInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *CouchbaseMigrationReplication. If that is not the case, calling type-safe methods of the returned
+// TypedCouchbaseMigrationReplicationInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedCouchbaseMigrationReplicationInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedCouchbaseMigrationReplicationInformer(informer CouchbaseMigrationReplicationInformer) TypedCouchbaseMigrationReplicationInformer {
+	if informer, ok := informer.(TypedCouchbaseMigrationReplicationInformer); ok {
+		return informer
+	}
+	return &couchbaseMigrationReplicationTypedInformerAdapter{informer}
+}
+
+type couchbaseMigrationReplicationTypedInformerAdapter struct {
+	CouchbaseMigrationReplicationInformer
+}
+
+func (a *couchbaseMigrationReplicationTypedInformerAdapter) TypedInformer() CouchbaseMigrationReplicationIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseMigrationReplication](a.Informer())
+}
+
+// ToCouchbaseMigrationReplicationIndexInformer converts an untyped informer into a CouchbaseMigrationReplicationIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *CouchbaseMigrationReplication. If that is not the case, calling type-safe methods of the returned
+// CouchbaseMigrationReplicationIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a CouchbaseMigrationReplicationIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToCouchbaseMigrationReplicationIndexInformer(informer cache.SharedIndexInformer) CouchbaseMigrationReplicationIndexInformer {
+	if informer, ok := informer.(CouchbaseMigrationReplicationIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseMigrationReplication](informer)
 }

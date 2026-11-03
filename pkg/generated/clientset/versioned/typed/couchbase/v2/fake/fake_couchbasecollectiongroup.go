@@ -12,123 +12,34 @@
 package fake
 
 import (
-	"context"
-
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned/typed/couchbase/v2"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeCouchbaseCollectionGroups implements CouchbaseCollectionGroupInterface
-type FakeCouchbaseCollectionGroups struct {
+// fakeCouchbaseCollectionGroups implements CouchbaseCollectionGroupInterface
+type fakeCouchbaseCollectionGroups struct {
+	*gentype.FakeClientWithList[*v2.CouchbaseCollectionGroup, *v2.CouchbaseCollectionGroupList]
 	Fake *FakeCouchbaseV2
-	ns   string
 }
 
-var couchbasecollectiongroupsResource = v2.SchemeGroupVersion.WithResource("couchbasecollectiongroups")
-
-var couchbasecollectiongroupsKind = v2.SchemeGroupVersion.WithKind("CouchbaseCollectionGroup")
-
-// Get takes name of the couchbaseCollectionGroup, and returns the corresponding couchbaseCollectionGroup object, and an error if there is any.
-func (c *FakeCouchbaseCollectionGroups) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2.CouchbaseCollectionGroup, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(couchbasecollectiongroupsResource, c.ns, name), &v2.CouchbaseCollectionGroup{})
-
-	if obj == nil {
-		return nil, err
+func newFakeCouchbaseCollectionGroups(fake *FakeCouchbaseV2, namespace string) couchbasev2.CouchbaseCollectionGroupInterface {
+	return &fakeCouchbaseCollectionGroups{
+		gentype.NewFakeClientWithList[*v2.CouchbaseCollectionGroup, *v2.CouchbaseCollectionGroupList](
+			fake.Fake,
+			namespace,
+			v2.SchemeGroupVersion.WithResource("couchbasecollectiongroups"),
+			v2.SchemeGroupVersion.WithKind("CouchbaseCollectionGroup"),
+			func() *v2.CouchbaseCollectionGroup { return &v2.CouchbaseCollectionGroup{} },
+			func() *v2.CouchbaseCollectionGroupList { return &v2.CouchbaseCollectionGroupList{} },
+			func(dst, src *v2.CouchbaseCollectionGroupList) { dst.ListMeta = src.ListMeta },
+			func(list *v2.CouchbaseCollectionGroupList) []*v2.CouchbaseCollectionGroup {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v2.CouchbaseCollectionGroupList, items []*v2.CouchbaseCollectionGroup) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v2.CouchbaseCollectionGroup), err
-}
-
-// List takes label and field selectors, and returns the list of CouchbaseCollectionGroups that match those selectors.
-func (c *FakeCouchbaseCollectionGroups) List(ctx context.Context, opts v1.ListOptions) (result *v2.CouchbaseCollectionGroupList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(couchbasecollectiongroupsResource, couchbasecollectiongroupsKind, c.ns, opts), &v2.CouchbaseCollectionGroupList{})
-
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v2.CouchbaseCollectionGroupList{ListMeta: obj.(*v2.CouchbaseCollectionGroupList).ListMeta}
-	for _, item := range obj.(*v2.CouchbaseCollectionGroupList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested couchbaseCollectionGroups.
-func (c *FakeCouchbaseCollectionGroups) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(couchbasecollectiongroupsResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a couchbaseCollectionGroup and creates it.  Returns the server's representation of the couchbaseCollectionGroup, and an error, if there is any.
-func (c *FakeCouchbaseCollectionGroups) Create(ctx context.Context, couchbaseCollectionGroup *v2.CouchbaseCollectionGroup, opts v1.CreateOptions) (result *v2.CouchbaseCollectionGroup, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(couchbasecollectiongroupsResource, c.ns, couchbaseCollectionGroup), &v2.CouchbaseCollectionGroup{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2.CouchbaseCollectionGroup), err
-}
-
-// Update takes the representation of a couchbaseCollectionGroup and updates it. Returns the server's representation of the couchbaseCollectionGroup, and an error, if there is any.
-func (c *FakeCouchbaseCollectionGroups) Update(ctx context.Context, couchbaseCollectionGroup *v2.CouchbaseCollectionGroup, opts v1.UpdateOptions) (result *v2.CouchbaseCollectionGroup, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(couchbasecollectiongroupsResource, c.ns, couchbaseCollectionGroup), &v2.CouchbaseCollectionGroup{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2.CouchbaseCollectionGroup), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeCouchbaseCollectionGroups) UpdateStatus(ctx context.Context, couchbaseCollectionGroup *v2.CouchbaseCollectionGroup, opts v1.UpdateOptions) (*v2.CouchbaseCollectionGroup, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(couchbasecollectiongroupsResource, "status", c.ns, couchbaseCollectionGroup), &v2.CouchbaseCollectionGroup{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2.CouchbaseCollectionGroup), err
-}
-
-// Delete takes name of the couchbaseCollectionGroup and deletes it. Returns an error if one occurs.
-func (c *FakeCouchbaseCollectionGroups) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(couchbasecollectiongroupsResource, c.ns, name, opts), &v2.CouchbaseCollectionGroup{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeCouchbaseCollectionGroups) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(couchbasecollectiongroupsResource, c.ns, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v2.CouchbaseCollectionGroupList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched couchbaseCollectionGroup.
-func (c *FakeCouchbaseCollectionGroups) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseCollectionGroup, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(couchbasecollectiongroupsResource, c.ns, name, pt, data, subresources...), &v2.CouchbaseCollectionGroup{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2.CouchbaseCollectionGroup), err
 }

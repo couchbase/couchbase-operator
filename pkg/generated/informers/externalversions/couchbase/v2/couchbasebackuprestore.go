@@ -12,25 +12,54 @@
 package v2
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	apiscouchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	versioned "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	internalinterfaces "github.com/couchbase/couchbase-operator/pkg/generated/informers/externalversions/internalinterfaces"
-	v2 "github.com/couchbase/couchbase-operator/pkg/generated/listers/couchbase/v2"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/generated/listers/couchbase/v2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
 )
 
 // CouchbaseBackupRestoreInformer provides access to a shared informer and lister for
-// CouchbaseBackupRestores.
+// CouchbaseBackupRestores. Prefer using the type-safe variant (see [TypedCouchbaseBackupRestoreInformer]).
 type CouchbaseBackupRestoreInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v2.CouchbaseBackupRestoreLister
+	Lister() couchbasev2.CouchbaseBackupRestoreLister
 }
+
+// TypedCouchbaseBackupRestoreInformer provides access to a shared informer and lister for
+// CouchbaseBackupRestores, including the type-safe TypedInformer variant.
+// It is a superset of CouchbaseBackupRestoreInformer.
+type TypedCouchbaseBackupRestoreInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() CouchbaseBackupRestoreIndexInformer
+	Lister() couchbasev2.CouchbaseBackupRestoreLister
+}
+
+// CouchbaseBackupRestoreIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type CouchbaseBackupRestoreIndexInformer cache.TypedSharedIndexInformer[*apiscouchbasev2.CouchbaseBackupRestore]
+
+// CouchbaseBackupRestoreHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for CouchbaseBackupRestore.
+type CouchbaseBackupRestoreHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apiscouchbasev2.CouchbaseBackupRestore]
+
+// CouchbaseBackupRestoreDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for CouchbaseBackupRestore.
+type CouchbaseBackupRestoreDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apiscouchbasev2.CouchbaseBackupRestore]
+
+// CouchbaseBackupRestoreFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for CouchbaseBackupRestore.
+type CouchbaseBackupRestoreFilteringHandler = cache.TypedFilteringResourceEventHandler[*apiscouchbasev2.CouchbaseBackupRestore]
+
+// CouchbaseBackupRestoreIndexers is a specialization of [cache.TypedIndexers] for CouchbaseBackupRestore.
+type CouchbaseBackupRestoreIndexers = cache.TypedIndexers[*apiscouchbasev2.CouchbaseBackupRestore]
+
+// DeletedCouchbaseBackupRestore is a specialization of [cache.DeletedObject] for CouchbaseBackupRestore.
+type DeletedCouchbaseBackupRestore = cache.DeletedObject[*apiscouchbasev2.CouchbaseBackupRestore]
 
 type couchbaseBackupRestoreInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -41,43 +70,132 @@ type couchbaseBackupRestoreInformer struct {
 // NewCouchbaseBackupRestoreInformer constructs a new informer for CouchbaseBackupRestore type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedCouchbaseBackupRestoreInformer]).
 func NewCouchbaseBackupRestoreInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredCouchbaseBackupRestoreInformer(client, namespace, resyncPeriod, indexers, nil)
+	return NewCouchbaseBackupRestoreInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedCouchbaseBackupRestoreInformer constructs a new informer for CouchbaseBackupRestore type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedCouchbaseBackupRestoreInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers CouchbaseBackupRestoreIndexers) CouchbaseBackupRestoreIndexInformer {
+	return NewTypedCouchbaseBackupRestoreInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredCouchbaseBackupRestoreInformer constructs a new informer for CouchbaseBackupRestore type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredCouchbaseBackupRestoreInformer]).
 func NewFilteredCouchbaseBackupRestoreInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+	return NewTypedCouchbaseBackupRestoreInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredCouchbaseBackupRestoreInformer constructs a new informer for CouchbaseBackupRestore type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredCouchbaseBackupRestoreInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers CouchbaseBackupRestoreIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) CouchbaseBackupRestoreIndexInformer {
+	return NewTypedCouchbaseBackupRestoreInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
+}
+
+// NewCouchbaseBackupRestoreInformerWithOptions constructs a new informer for CouchbaseBackupRestore type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedCouchbaseBackupRestoreInformerWithOptions]).
+func NewCouchbaseBackupRestoreInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedCouchbaseBackupRestoreInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedCouchbaseBackupRestoreInformerWithOptions constructs a new informer for CouchbaseBackupRestore type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedCouchbaseBackupRestoreInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) CouchbaseBackupRestoreIndexInformer {
+	gvr := schema.GroupVersionResource{Group: "couchbase.com", Version: "v2", Resource: "couchbasebackuprestores"}
+	identifier := options.InformerName.WithResource(gvr)
+	tweakListOptions := options.TweakListOptions
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseBackupRestore](cache.NewSharedIndexInformerWithOptions(
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
+			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.CouchbaseV2().CouchbaseBackupRestores(namespace).List(context.TODO(), options)
+				return client.CouchbaseV2().CouchbaseBackupRestores(namespace).List(context.Background(), opts)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(opts v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.CouchbaseV2().CouchbaseBackupRestores(namespace).Watch(context.TODO(), options)
+				return client.CouchbaseV2().CouchbaseBackupRestores(namespace).Watch(context.Background(), opts)
 			},
+			ListWithContextFunc: func(ctx context.Context, opts v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&opts)
+				}
+				return client.CouchbaseV2().CouchbaseBackupRestores(namespace).List(ctx, opts)
+			},
+			WatchFuncWithContext: func(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&opts)
+				}
+				return client.CouchbaseV2().CouchbaseBackupRestores(namespace).Watch(ctx, opts)
+			},
+		}, client),
+		&apiscouchbasev2.CouchbaseBackupRestore{},
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod: options.ResyncPeriod,
+			Indexers:     options.Indexers,
+			Identifier:   identifier,
 		},
-		&couchbasev2.CouchbaseBackupRestore{},
-		resyncPeriod,
-		indexers,
-	)
+	))
 }
 
 func (f *couchbaseBackupRestoreInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredCouchbaseBackupRestoreInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewTypedCouchbaseBackupRestoreInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *couchbaseBackupRestoreInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&couchbasev2.CouchbaseBackupRestore{}, f.defaultInformer)
+	return f.TypedInformer()
 }
 
-func (f *couchbaseBackupRestoreInformer) Lister() v2.CouchbaseBackupRestoreLister {
-	return v2.NewCouchbaseBackupRestoreLister(f.Informer().GetIndexer())
+func (f *couchbaseBackupRestoreInformer) TypedInformer() CouchbaseBackupRestoreIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseBackupRestore](f.factory.InformerFor(&apiscouchbasev2.CouchbaseBackupRestore{}, f.defaultInformer))
+}
+
+func (f *couchbaseBackupRestoreInformer) Lister() couchbasev2.CouchbaseBackupRestoreLister {
+	return couchbasev2.NewCouchbaseBackupRestoreLister(f.Informer().GetIndexer())
+}
+
+// ToTypedCouchbaseBackupRestoreInformer converts an untyped informer into a TypedCouchbaseBackupRestoreInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *CouchbaseBackupRestore. If that is not the case, calling type-safe methods of the returned
+// TypedCouchbaseBackupRestoreInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedCouchbaseBackupRestoreInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedCouchbaseBackupRestoreInformer(informer CouchbaseBackupRestoreInformer) TypedCouchbaseBackupRestoreInformer {
+	if informer, ok := informer.(TypedCouchbaseBackupRestoreInformer); ok {
+		return informer
+	}
+	return &couchbaseBackupRestoreTypedInformerAdapter{informer}
+}
+
+type couchbaseBackupRestoreTypedInformerAdapter struct {
+	CouchbaseBackupRestoreInformer
+}
+
+func (a *couchbaseBackupRestoreTypedInformerAdapter) TypedInformer() CouchbaseBackupRestoreIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseBackupRestore](a.Informer())
+}
+
+// ToCouchbaseBackupRestoreIndexInformer converts an untyped informer into a CouchbaseBackupRestoreIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *CouchbaseBackupRestore. If that is not the case, calling type-safe methods of the returned
+// CouchbaseBackupRestoreIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a CouchbaseBackupRestoreIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToCouchbaseBackupRestoreIndexInformer(informer cache.SharedIndexInformer) CouchbaseBackupRestoreIndexInformer {
+	if informer, ok := informer.(CouchbaseBackupRestoreIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseBackupRestore](informer)
 }

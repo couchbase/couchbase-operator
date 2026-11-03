@@ -12,10 +12,10 @@
 package v2
 
 import (
-	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // CouchbaseClusterLister helps list CouchbaseClusters.
@@ -23,7 +23,7 @@ import (
 type CouchbaseClusterLister interface {
 	// List lists all CouchbaseClusters in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseCluster, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseCluster, err error)
 	// CouchbaseClusters returns an object that can list and get CouchbaseClusters.
 	CouchbaseClusters(namespace string) CouchbaseClusterNamespaceLister
 	CouchbaseClusterListerExpansion
@@ -31,25 +31,17 @@ type CouchbaseClusterLister interface {
 
 // couchbaseClusterLister implements the CouchbaseClusterLister interface.
 type couchbaseClusterLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*couchbasev2.CouchbaseCluster]
 }
 
 // NewCouchbaseClusterLister returns a new CouchbaseClusterLister.
 func NewCouchbaseClusterLister(indexer cache.Indexer) CouchbaseClusterLister {
-	return &couchbaseClusterLister{indexer: indexer}
-}
-
-// List lists all CouchbaseClusters in the indexer.
-func (s *couchbaseClusterLister) List(selector labels.Selector) (ret []*v2.CouchbaseCluster, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseCluster))
-	})
-	return ret, err
+	return &couchbaseClusterLister{listers.New[*couchbasev2.CouchbaseCluster](indexer, couchbasev2.Resource("couchbasecluster"))}
 }
 
 // CouchbaseClusters returns an object that can list and get CouchbaseClusters.
 func (s *couchbaseClusterLister) CouchbaseClusters(namespace string) CouchbaseClusterNamespaceLister {
-	return couchbaseClusterNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return couchbaseClusterNamespaceLister{listers.NewNamespaced[*couchbasev2.CouchbaseCluster](s.ResourceIndexer, namespace)}
 }
 
 // CouchbaseClusterNamespaceLister helps list and get CouchbaseClusters.
@@ -57,36 +49,15 @@ func (s *couchbaseClusterLister) CouchbaseClusters(namespace string) CouchbaseCl
 type CouchbaseClusterNamespaceLister interface {
 	// List lists all CouchbaseClusters in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseCluster, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseCluster, err error)
 	// Get retrieves the CouchbaseCluster from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v2.CouchbaseCluster, error)
+	Get(name string) (*couchbasev2.CouchbaseCluster, error)
 	CouchbaseClusterNamespaceListerExpansion
 }
 
 // couchbaseClusterNamespaceLister implements the CouchbaseClusterNamespaceLister
 // interface.
 type couchbaseClusterNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all CouchbaseClusters in the indexer for a given namespace.
-func (s couchbaseClusterNamespaceLister) List(selector labels.Selector) (ret []*v2.CouchbaseCluster, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseCluster))
-	})
-	return ret, err
-}
-
-// Get retrieves the CouchbaseCluster from the indexer for a given namespace and name.
-func (s couchbaseClusterNamespaceLister) Get(name string) (*v2.CouchbaseCluster, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v2.Resource("couchbasecluster"), name)
-	}
-	return obj.(*v2.CouchbaseCluster), nil
+	listers.ResourceIndexer[*couchbasev2.CouchbaseCluster]
 }

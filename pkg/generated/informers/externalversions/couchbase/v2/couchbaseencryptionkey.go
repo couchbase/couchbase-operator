@@ -12,25 +12,54 @@
 package v2
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	apiscouchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	versioned "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	internalinterfaces "github.com/couchbase/couchbase-operator/pkg/generated/informers/externalversions/internalinterfaces"
-	v2 "github.com/couchbase/couchbase-operator/pkg/generated/listers/couchbase/v2"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/generated/listers/couchbase/v2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
 )
 
 // CouchbaseEncryptionKeyInformer provides access to a shared informer and lister for
-// CouchbaseEncryptionKeys.
+// CouchbaseEncryptionKeys. Prefer using the type-safe variant (see [TypedCouchbaseEncryptionKeyInformer]).
 type CouchbaseEncryptionKeyInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v2.CouchbaseEncryptionKeyLister
+	Lister() couchbasev2.CouchbaseEncryptionKeyLister
 }
+
+// TypedCouchbaseEncryptionKeyInformer provides access to a shared informer and lister for
+// CouchbaseEncryptionKeys, including the type-safe TypedInformer variant.
+// It is a superset of CouchbaseEncryptionKeyInformer.
+type TypedCouchbaseEncryptionKeyInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() CouchbaseEncryptionKeyIndexInformer
+	Lister() couchbasev2.CouchbaseEncryptionKeyLister
+}
+
+// CouchbaseEncryptionKeyIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type CouchbaseEncryptionKeyIndexInformer cache.TypedSharedIndexInformer[*apiscouchbasev2.CouchbaseEncryptionKey]
+
+// CouchbaseEncryptionKeyHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for CouchbaseEncryptionKey.
+type CouchbaseEncryptionKeyHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apiscouchbasev2.CouchbaseEncryptionKey]
+
+// CouchbaseEncryptionKeyDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for CouchbaseEncryptionKey.
+type CouchbaseEncryptionKeyDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apiscouchbasev2.CouchbaseEncryptionKey]
+
+// CouchbaseEncryptionKeyFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for CouchbaseEncryptionKey.
+type CouchbaseEncryptionKeyFilteringHandler = cache.TypedFilteringResourceEventHandler[*apiscouchbasev2.CouchbaseEncryptionKey]
+
+// CouchbaseEncryptionKeyIndexers is a specialization of [cache.TypedIndexers] for CouchbaseEncryptionKey.
+type CouchbaseEncryptionKeyIndexers = cache.TypedIndexers[*apiscouchbasev2.CouchbaseEncryptionKey]
+
+// DeletedCouchbaseEncryptionKey is a specialization of [cache.DeletedObject] for CouchbaseEncryptionKey.
+type DeletedCouchbaseEncryptionKey = cache.DeletedObject[*apiscouchbasev2.CouchbaseEncryptionKey]
 
 type couchbaseEncryptionKeyInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -41,43 +70,132 @@ type couchbaseEncryptionKeyInformer struct {
 // NewCouchbaseEncryptionKeyInformer constructs a new informer for CouchbaseEncryptionKey type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedCouchbaseEncryptionKeyInformer]).
 func NewCouchbaseEncryptionKeyInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredCouchbaseEncryptionKeyInformer(client, namespace, resyncPeriod, indexers, nil)
+	return NewCouchbaseEncryptionKeyInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedCouchbaseEncryptionKeyInformer constructs a new informer for CouchbaseEncryptionKey type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedCouchbaseEncryptionKeyInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers CouchbaseEncryptionKeyIndexers) CouchbaseEncryptionKeyIndexInformer {
+	return NewTypedCouchbaseEncryptionKeyInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredCouchbaseEncryptionKeyInformer constructs a new informer for CouchbaseEncryptionKey type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredCouchbaseEncryptionKeyInformer]).
 func NewFilteredCouchbaseEncryptionKeyInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+	return NewTypedCouchbaseEncryptionKeyInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredCouchbaseEncryptionKeyInformer constructs a new informer for CouchbaseEncryptionKey type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredCouchbaseEncryptionKeyInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers CouchbaseEncryptionKeyIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) CouchbaseEncryptionKeyIndexInformer {
+	return NewTypedCouchbaseEncryptionKeyInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
+}
+
+// NewCouchbaseEncryptionKeyInformerWithOptions constructs a new informer for CouchbaseEncryptionKey type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedCouchbaseEncryptionKeyInformerWithOptions]).
+func NewCouchbaseEncryptionKeyInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedCouchbaseEncryptionKeyInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedCouchbaseEncryptionKeyInformerWithOptions constructs a new informer for CouchbaseEncryptionKey type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedCouchbaseEncryptionKeyInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) CouchbaseEncryptionKeyIndexInformer {
+	gvr := schema.GroupVersionResource{Group: "couchbase.com", Version: "v2", Resource: "couchbaseencryptionkeys"}
+	identifier := options.InformerName.WithResource(gvr)
+	tweakListOptions := options.TweakListOptions
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseEncryptionKey](cache.NewSharedIndexInformerWithOptions(
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
+			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.CouchbaseV2().CouchbaseEncryptionKeys(namespace).List(context.TODO(), options)
+				return client.CouchbaseV2().CouchbaseEncryptionKeys(namespace).List(context.Background(), opts)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(opts v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.CouchbaseV2().CouchbaseEncryptionKeys(namespace).Watch(context.TODO(), options)
+				return client.CouchbaseV2().CouchbaseEncryptionKeys(namespace).Watch(context.Background(), opts)
 			},
+			ListWithContextFunc: func(ctx context.Context, opts v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&opts)
+				}
+				return client.CouchbaseV2().CouchbaseEncryptionKeys(namespace).List(ctx, opts)
+			},
+			WatchFuncWithContext: func(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&opts)
+				}
+				return client.CouchbaseV2().CouchbaseEncryptionKeys(namespace).Watch(ctx, opts)
+			},
+		}, client),
+		&apiscouchbasev2.CouchbaseEncryptionKey{},
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod: options.ResyncPeriod,
+			Indexers:     options.Indexers,
+			Identifier:   identifier,
 		},
-		&couchbasev2.CouchbaseEncryptionKey{},
-		resyncPeriod,
-		indexers,
-	)
+	))
 }
 
 func (f *couchbaseEncryptionKeyInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredCouchbaseEncryptionKeyInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewTypedCouchbaseEncryptionKeyInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *couchbaseEncryptionKeyInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&couchbasev2.CouchbaseEncryptionKey{}, f.defaultInformer)
+	return f.TypedInformer()
 }
 
-func (f *couchbaseEncryptionKeyInformer) Lister() v2.CouchbaseEncryptionKeyLister {
-	return v2.NewCouchbaseEncryptionKeyLister(f.Informer().GetIndexer())
+func (f *couchbaseEncryptionKeyInformer) TypedInformer() CouchbaseEncryptionKeyIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseEncryptionKey](f.factory.InformerFor(&apiscouchbasev2.CouchbaseEncryptionKey{}, f.defaultInformer))
+}
+
+func (f *couchbaseEncryptionKeyInformer) Lister() couchbasev2.CouchbaseEncryptionKeyLister {
+	return couchbasev2.NewCouchbaseEncryptionKeyLister(f.Informer().GetIndexer())
+}
+
+// ToTypedCouchbaseEncryptionKeyInformer converts an untyped informer into a TypedCouchbaseEncryptionKeyInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *CouchbaseEncryptionKey. If that is not the case, calling type-safe methods of the returned
+// TypedCouchbaseEncryptionKeyInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedCouchbaseEncryptionKeyInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedCouchbaseEncryptionKeyInformer(informer CouchbaseEncryptionKeyInformer) TypedCouchbaseEncryptionKeyInformer {
+	if informer, ok := informer.(TypedCouchbaseEncryptionKeyInformer); ok {
+		return informer
+	}
+	return &couchbaseEncryptionKeyTypedInformerAdapter{informer}
+}
+
+type couchbaseEncryptionKeyTypedInformerAdapter struct {
+	CouchbaseEncryptionKeyInformer
+}
+
+func (a *couchbaseEncryptionKeyTypedInformerAdapter) TypedInformer() CouchbaseEncryptionKeyIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseEncryptionKey](a.Informer())
+}
+
+// ToCouchbaseEncryptionKeyIndexInformer converts an untyped informer into a CouchbaseEncryptionKeyIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *CouchbaseEncryptionKey. If that is not the case, calling type-safe methods of the returned
+// CouchbaseEncryptionKeyIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a CouchbaseEncryptionKeyIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToCouchbaseEncryptionKeyIndexInformer(informer cache.SharedIndexInformer) CouchbaseEncryptionKeyIndexInformer {
+	if informer, ok := informer.(CouchbaseEncryptionKeyIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseEncryptionKey](informer)
 }

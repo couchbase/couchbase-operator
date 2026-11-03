@@ -12,123 +12,32 @@
 package fake
 
 import (
-	"context"
-
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned/typed/couchbase/v2"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeCouchbaseUsers implements CouchbaseUserInterface
-type FakeCouchbaseUsers struct {
+// fakeCouchbaseUsers implements CouchbaseUserInterface
+type fakeCouchbaseUsers struct {
+	*gentype.FakeClientWithList[*v2.CouchbaseUser, *v2.CouchbaseUserList]
 	Fake *FakeCouchbaseV2
-	ns   string
 }
 
-var couchbaseusersResource = v2.SchemeGroupVersion.WithResource("couchbaseusers")
-
-var couchbaseusersKind = v2.SchemeGroupVersion.WithKind("CouchbaseUser")
-
-// Get takes name of the couchbaseUser, and returns the corresponding couchbaseUser object, and an error if there is any.
-func (c *FakeCouchbaseUsers) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2.CouchbaseUser, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(couchbaseusersResource, c.ns, name), &v2.CouchbaseUser{})
-
-	if obj == nil {
-		return nil, err
+func newFakeCouchbaseUsers(fake *FakeCouchbaseV2, namespace string) couchbasev2.CouchbaseUserInterface {
+	return &fakeCouchbaseUsers{
+		gentype.NewFakeClientWithList[*v2.CouchbaseUser, *v2.CouchbaseUserList](
+			fake.Fake,
+			namespace,
+			v2.SchemeGroupVersion.WithResource("couchbaseusers"),
+			v2.SchemeGroupVersion.WithKind("CouchbaseUser"),
+			func() *v2.CouchbaseUser { return &v2.CouchbaseUser{} },
+			func() *v2.CouchbaseUserList { return &v2.CouchbaseUserList{} },
+			func(dst, src *v2.CouchbaseUserList) { dst.ListMeta = src.ListMeta },
+			func(list *v2.CouchbaseUserList) []*v2.CouchbaseUser { return gentype.ToPointerSlice(list.Items) },
+			func(list *v2.CouchbaseUserList, items []*v2.CouchbaseUser) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v2.CouchbaseUser), err
-}
-
-// List takes label and field selectors, and returns the list of CouchbaseUsers that match those selectors.
-func (c *FakeCouchbaseUsers) List(ctx context.Context, opts v1.ListOptions) (result *v2.CouchbaseUserList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(couchbaseusersResource, couchbaseusersKind, c.ns, opts), &v2.CouchbaseUserList{})
-
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v2.CouchbaseUserList{ListMeta: obj.(*v2.CouchbaseUserList).ListMeta}
-	for _, item := range obj.(*v2.CouchbaseUserList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested couchbaseUsers.
-func (c *FakeCouchbaseUsers) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(couchbaseusersResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a couchbaseUser and creates it.  Returns the server's representation of the couchbaseUser, and an error, if there is any.
-func (c *FakeCouchbaseUsers) Create(ctx context.Context, couchbaseUser *v2.CouchbaseUser, opts v1.CreateOptions) (result *v2.CouchbaseUser, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(couchbaseusersResource, c.ns, couchbaseUser), &v2.CouchbaseUser{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2.CouchbaseUser), err
-}
-
-// Update takes the representation of a couchbaseUser and updates it. Returns the server's representation of the couchbaseUser, and an error, if there is any.
-func (c *FakeCouchbaseUsers) Update(ctx context.Context, couchbaseUser *v2.CouchbaseUser, opts v1.UpdateOptions) (result *v2.CouchbaseUser, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(couchbaseusersResource, c.ns, couchbaseUser), &v2.CouchbaseUser{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2.CouchbaseUser), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeCouchbaseUsers) UpdateStatus(ctx context.Context, couchbaseUser *v2.CouchbaseUser, opts v1.UpdateOptions) (*v2.CouchbaseUser, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(couchbaseusersResource, "status", c.ns, couchbaseUser), &v2.CouchbaseUser{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2.CouchbaseUser), err
-}
-
-// Delete takes name of the couchbaseUser and deletes it. Returns an error if one occurs.
-func (c *FakeCouchbaseUsers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(couchbaseusersResource, c.ns, name, opts), &v2.CouchbaseUser{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeCouchbaseUsers) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(couchbaseusersResource, c.ns, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v2.CouchbaseUserList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched couchbaseUser.
-func (c *FakeCouchbaseUsers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseUser, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(couchbaseusersResource, c.ns, name, pt, data, subresources...), &v2.CouchbaseUser{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2.CouchbaseUser), err
 }

@@ -12,10 +12,10 @@
 package v2
 
 import (
-	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // CouchbaseCollectionLister helps list CouchbaseCollections.
@@ -23,7 +23,7 @@ import (
 type CouchbaseCollectionLister interface {
 	// List lists all CouchbaseCollections in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseCollection, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseCollection, err error)
 	// CouchbaseCollections returns an object that can list and get CouchbaseCollections.
 	CouchbaseCollections(namespace string) CouchbaseCollectionNamespaceLister
 	CouchbaseCollectionListerExpansion
@@ -31,25 +31,17 @@ type CouchbaseCollectionLister interface {
 
 // couchbaseCollectionLister implements the CouchbaseCollectionLister interface.
 type couchbaseCollectionLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*couchbasev2.CouchbaseCollection]
 }
 
 // NewCouchbaseCollectionLister returns a new CouchbaseCollectionLister.
 func NewCouchbaseCollectionLister(indexer cache.Indexer) CouchbaseCollectionLister {
-	return &couchbaseCollectionLister{indexer: indexer}
-}
-
-// List lists all CouchbaseCollections in the indexer.
-func (s *couchbaseCollectionLister) List(selector labels.Selector) (ret []*v2.CouchbaseCollection, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseCollection))
-	})
-	return ret, err
+	return &couchbaseCollectionLister{listers.New[*couchbasev2.CouchbaseCollection](indexer, couchbasev2.Resource("couchbasecollection"))}
 }
 
 // CouchbaseCollections returns an object that can list and get CouchbaseCollections.
 func (s *couchbaseCollectionLister) CouchbaseCollections(namespace string) CouchbaseCollectionNamespaceLister {
-	return couchbaseCollectionNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return couchbaseCollectionNamespaceLister{listers.NewNamespaced[*couchbasev2.CouchbaseCollection](s.ResourceIndexer, namespace)}
 }
 
 // CouchbaseCollectionNamespaceLister helps list and get CouchbaseCollections.
@@ -57,36 +49,15 @@ func (s *couchbaseCollectionLister) CouchbaseCollections(namespace string) Couch
 type CouchbaseCollectionNamespaceLister interface {
 	// List lists all CouchbaseCollections in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseCollection, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseCollection, err error)
 	// Get retrieves the CouchbaseCollection from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v2.CouchbaseCollection, error)
+	Get(name string) (*couchbasev2.CouchbaseCollection, error)
 	CouchbaseCollectionNamespaceListerExpansion
 }
 
 // couchbaseCollectionNamespaceLister implements the CouchbaseCollectionNamespaceLister
 // interface.
 type couchbaseCollectionNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all CouchbaseCollections in the indexer for a given namespace.
-func (s couchbaseCollectionNamespaceLister) List(selector labels.Selector) (ret []*v2.CouchbaseCollection, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseCollection))
-	})
-	return ret, err
-}
-
-// Get retrieves the CouchbaseCollection from the indexer for a given namespace and name.
-func (s couchbaseCollectionNamespaceLister) Get(name string) (*v2.CouchbaseCollection, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v2.Resource("couchbasecollection"), name)
-	}
-	return obj.(*v2.CouchbaseCollection), nil
+	listers.ResourceIndexer[*couchbasev2.CouchbaseCollection]
 }

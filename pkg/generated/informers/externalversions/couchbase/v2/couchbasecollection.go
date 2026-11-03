@@ -12,25 +12,54 @@
 package v2
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	apiscouchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	versioned "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	internalinterfaces "github.com/couchbase/couchbase-operator/pkg/generated/informers/externalversions/internalinterfaces"
-	v2 "github.com/couchbase/couchbase-operator/pkg/generated/listers/couchbase/v2"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/generated/listers/couchbase/v2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
 )
 
 // CouchbaseCollectionInformer provides access to a shared informer and lister for
-// CouchbaseCollections.
+// CouchbaseCollections. Prefer using the type-safe variant (see [TypedCouchbaseCollectionInformer]).
 type CouchbaseCollectionInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v2.CouchbaseCollectionLister
+	Lister() couchbasev2.CouchbaseCollectionLister
 }
+
+// TypedCouchbaseCollectionInformer provides access to a shared informer and lister for
+// CouchbaseCollections, including the type-safe TypedInformer variant.
+// It is a superset of CouchbaseCollectionInformer.
+type TypedCouchbaseCollectionInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() CouchbaseCollectionIndexInformer
+	Lister() couchbasev2.CouchbaseCollectionLister
+}
+
+// CouchbaseCollectionIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type CouchbaseCollectionIndexInformer cache.TypedSharedIndexInformer[*apiscouchbasev2.CouchbaseCollection]
+
+// CouchbaseCollectionHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for CouchbaseCollection.
+type CouchbaseCollectionHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apiscouchbasev2.CouchbaseCollection]
+
+// CouchbaseCollectionDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for CouchbaseCollection.
+type CouchbaseCollectionDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apiscouchbasev2.CouchbaseCollection]
+
+// CouchbaseCollectionFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for CouchbaseCollection.
+type CouchbaseCollectionFilteringHandler = cache.TypedFilteringResourceEventHandler[*apiscouchbasev2.CouchbaseCollection]
+
+// CouchbaseCollectionIndexers is a specialization of [cache.TypedIndexers] for CouchbaseCollection.
+type CouchbaseCollectionIndexers = cache.TypedIndexers[*apiscouchbasev2.CouchbaseCollection]
+
+// DeletedCouchbaseCollection is a specialization of [cache.DeletedObject] for CouchbaseCollection.
+type DeletedCouchbaseCollection = cache.DeletedObject[*apiscouchbasev2.CouchbaseCollection]
 
 type couchbaseCollectionInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -41,43 +70,132 @@ type couchbaseCollectionInformer struct {
 // NewCouchbaseCollectionInformer constructs a new informer for CouchbaseCollection type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedCouchbaseCollectionInformer]).
 func NewCouchbaseCollectionInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredCouchbaseCollectionInformer(client, namespace, resyncPeriod, indexers, nil)
+	return NewCouchbaseCollectionInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedCouchbaseCollectionInformer constructs a new informer for CouchbaseCollection type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedCouchbaseCollectionInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers CouchbaseCollectionIndexers) CouchbaseCollectionIndexInformer {
+	return NewTypedCouchbaseCollectionInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredCouchbaseCollectionInformer constructs a new informer for CouchbaseCollection type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredCouchbaseCollectionInformer]).
 func NewFilteredCouchbaseCollectionInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+	return NewTypedCouchbaseCollectionInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredCouchbaseCollectionInformer constructs a new informer for CouchbaseCollection type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredCouchbaseCollectionInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers CouchbaseCollectionIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) CouchbaseCollectionIndexInformer {
+	return NewTypedCouchbaseCollectionInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
+}
+
+// NewCouchbaseCollectionInformerWithOptions constructs a new informer for CouchbaseCollection type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedCouchbaseCollectionInformerWithOptions]).
+func NewCouchbaseCollectionInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedCouchbaseCollectionInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedCouchbaseCollectionInformerWithOptions constructs a new informer for CouchbaseCollection type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedCouchbaseCollectionInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) CouchbaseCollectionIndexInformer {
+	gvr := schema.GroupVersionResource{Group: "couchbase.com", Version: "v2", Resource: "couchbasecollections"}
+	identifier := options.InformerName.WithResource(gvr)
+	tweakListOptions := options.TweakListOptions
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseCollection](cache.NewSharedIndexInformerWithOptions(
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
+			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.CouchbaseV2().CouchbaseCollections(namespace).List(context.TODO(), options)
+				return client.CouchbaseV2().CouchbaseCollections(namespace).List(context.Background(), opts)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(opts v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.CouchbaseV2().CouchbaseCollections(namespace).Watch(context.TODO(), options)
+				return client.CouchbaseV2().CouchbaseCollections(namespace).Watch(context.Background(), opts)
 			},
+			ListWithContextFunc: func(ctx context.Context, opts v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&opts)
+				}
+				return client.CouchbaseV2().CouchbaseCollections(namespace).List(ctx, opts)
+			},
+			WatchFuncWithContext: func(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&opts)
+				}
+				return client.CouchbaseV2().CouchbaseCollections(namespace).Watch(ctx, opts)
+			},
+		}, client),
+		&apiscouchbasev2.CouchbaseCollection{},
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod: options.ResyncPeriod,
+			Indexers:     options.Indexers,
+			Identifier:   identifier,
 		},
-		&couchbasev2.CouchbaseCollection{},
-		resyncPeriod,
-		indexers,
-	)
+	))
 }
 
 func (f *couchbaseCollectionInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredCouchbaseCollectionInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewTypedCouchbaseCollectionInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *couchbaseCollectionInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&couchbasev2.CouchbaseCollection{}, f.defaultInformer)
+	return f.TypedInformer()
 }
 
-func (f *couchbaseCollectionInformer) Lister() v2.CouchbaseCollectionLister {
-	return v2.NewCouchbaseCollectionLister(f.Informer().GetIndexer())
+func (f *couchbaseCollectionInformer) TypedInformer() CouchbaseCollectionIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseCollection](f.factory.InformerFor(&apiscouchbasev2.CouchbaseCollection{}, f.defaultInformer))
+}
+
+func (f *couchbaseCollectionInformer) Lister() couchbasev2.CouchbaseCollectionLister {
+	return couchbasev2.NewCouchbaseCollectionLister(f.Informer().GetIndexer())
+}
+
+// ToTypedCouchbaseCollectionInformer converts an untyped informer into a TypedCouchbaseCollectionInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *CouchbaseCollection. If that is not the case, calling type-safe methods of the returned
+// TypedCouchbaseCollectionInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedCouchbaseCollectionInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedCouchbaseCollectionInformer(informer CouchbaseCollectionInformer) TypedCouchbaseCollectionInformer {
+	if informer, ok := informer.(TypedCouchbaseCollectionInformer); ok {
+		return informer
+	}
+	return &couchbaseCollectionTypedInformerAdapter{informer}
+}
+
+type couchbaseCollectionTypedInformerAdapter struct {
+	CouchbaseCollectionInformer
+}
+
+func (a *couchbaseCollectionTypedInformerAdapter) TypedInformer() CouchbaseCollectionIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseCollection](a.Informer())
+}
+
+// ToCouchbaseCollectionIndexInformer converts an untyped informer into a CouchbaseCollectionIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *CouchbaseCollection. If that is not the case, calling type-safe methods of the returned
+// CouchbaseCollectionIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a CouchbaseCollectionIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToCouchbaseCollectionIndexInformer(informer cache.SharedIndexInformer) CouchbaseCollectionIndexInformer {
+	if informer, ok := informer.(CouchbaseCollectionIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseCollection](informer)
 }

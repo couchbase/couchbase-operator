@@ -12,25 +12,54 @@
 package v2
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	apiscouchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	versioned "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	internalinterfaces "github.com/couchbase/couchbase-operator/pkg/generated/informers/externalversions/internalinterfaces"
-	v2 "github.com/couchbase/couchbase-operator/pkg/generated/listers/couchbase/v2"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/generated/listers/couchbase/v2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
 )
 
 // CouchbaseScopeInformer provides access to a shared informer and lister for
-// CouchbaseScopes.
+// CouchbaseScopes. Prefer using the type-safe variant (see [TypedCouchbaseScopeInformer]).
 type CouchbaseScopeInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v2.CouchbaseScopeLister
+	Lister() couchbasev2.CouchbaseScopeLister
 }
+
+// TypedCouchbaseScopeInformer provides access to a shared informer and lister for
+// CouchbaseScopes, including the type-safe TypedInformer variant.
+// It is a superset of CouchbaseScopeInformer.
+type TypedCouchbaseScopeInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() CouchbaseScopeIndexInformer
+	Lister() couchbasev2.CouchbaseScopeLister
+}
+
+// CouchbaseScopeIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type CouchbaseScopeIndexInformer cache.TypedSharedIndexInformer[*apiscouchbasev2.CouchbaseScope]
+
+// CouchbaseScopeHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for CouchbaseScope.
+type CouchbaseScopeHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apiscouchbasev2.CouchbaseScope]
+
+// CouchbaseScopeDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for CouchbaseScope.
+type CouchbaseScopeDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apiscouchbasev2.CouchbaseScope]
+
+// CouchbaseScopeFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for CouchbaseScope.
+type CouchbaseScopeFilteringHandler = cache.TypedFilteringResourceEventHandler[*apiscouchbasev2.CouchbaseScope]
+
+// CouchbaseScopeIndexers is a specialization of [cache.TypedIndexers] for CouchbaseScope.
+type CouchbaseScopeIndexers = cache.TypedIndexers[*apiscouchbasev2.CouchbaseScope]
+
+// DeletedCouchbaseScope is a specialization of [cache.DeletedObject] for CouchbaseScope.
+type DeletedCouchbaseScope = cache.DeletedObject[*apiscouchbasev2.CouchbaseScope]
 
 type couchbaseScopeInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -41,43 +70,132 @@ type couchbaseScopeInformer struct {
 // NewCouchbaseScopeInformer constructs a new informer for CouchbaseScope type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedCouchbaseScopeInformer]).
 func NewCouchbaseScopeInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredCouchbaseScopeInformer(client, namespace, resyncPeriod, indexers, nil)
+	return NewCouchbaseScopeInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedCouchbaseScopeInformer constructs a new informer for CouchbaseScope type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedCouchbaseScopeInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers CouchbaseScopeIndexers) CouchbaseScopeIndexInformer {
+	return NewTypedCouchbaseScopeInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredCouchbaseScopeInformer constructs a new informer for CouchbaseScope type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredCouchbaseScopeInformer]).
 func NewFilteredCouchbaseScopeInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+	return NewTypedCouchbaseScopeInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredCouchbaseScopeInformer constructs a new informer for CouchbaseScope type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredCouchbaseScopeInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers CouchbaseScopeIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) CouchbaseScopeIndexInformer {
+	return NewTypedCouchbaseScopeInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
+}
+
+// NewCouchbaseScopeInformerWithOptions constructs a new informer for CouchbaseScope type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedCouchbaseScopeInformerWithOptions]).
+func NewCouchbaseScopeInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedCouchbaseScopeInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedCouchbaseScopeInformerWithOptions constructs a new informer for CouchbaseScope type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedCouchbaseScopeInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) CouchbaseScopeIndexInformer {
+	gvr := schema.GroupVersionResource{Group: "couchbase.com", Version: "v2", Resource: "couchbasescopes"}
+	identifier := options.InformerName.WithResource(gvr)
+	tweakListOptions := options.TweakListOptions
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseScope](cache.NewSharedIndexInformerWithOptions(
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
+			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.CouchbaseV2().CouchbaseScopes(namespace).List(context.TODO(), options)
+				return client.CouchbaseV2().CouchbaseScopes(namespace).List(context.Background(), opts)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(opts v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.CouchbaseV2().CouchbaseScopes(namespace).Watch(context.TODO(), options)
+				return client.CouchbaseV2().CouchbaseScopes(namespace).Watch(context.Background(), opts)
 			},
+			ListWithContextFunc: func(ctx context.Context, opts v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&opts)
+				}
+				return client.CouchbaseV2().CouchbaseScopes(namespace).List(ctx, opts)
+			},
+			WatchFuncWithContext: func(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&opts)
+				}
+				return client.CouchbaseV2().CouchbaseScopes(namespace).Watch(ctx, opts)
+			},
+		}, client),
+		&apiscouchbasev2.CouchbaseScope{},
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod: options.ResyncPeriod,
+			Indexers:     options.Indexers,
+			Identifier:   identifier,
 		},
-		&couchbasev2.CouchbaseScope{},
-		resyncPeriod,
-		indexers,
-	)
+	))
 }
 
 func (f *couchbaseScopeInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredCouchbaseScopeInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewTypedCouchbaseScopeInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *couchbaseScopeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&couchbasev2.CouchbaseScope{}, f.defaultInformer)
+	return f.TypedInformer()
 }
 
-func (f *couchbaseScopeInformer) Lister() v2.CouchbaseScopeLister {
-	return v2.NewCouchbaseScopeLister(f.Informer().GetIndexer())
+func (f *couchbaseScopeInformer) TypedInformer() CouchbaseScopeIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseScope](f.factory.InformerFor(&apiscouchbasev2.CouchbaseScope{}, f.defaultInformer))
+}
+
+func (f *couchbaseScopeInformer) Lister() couchbasev2.CouchbaseScopeLister {
+	return couchbasev2.NewCouchbaseScopeLister(f.Informer().GetIndexer())
+}
+
+// ToTypedCouchbaseScopeInformer converts an untyped informer into a TypedCouchbaseScopeInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *CouchbaseScope. If that is not the case, calling type-safe methods of the returned
+// TypedCouchbaseScopeInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedCouchbaseScopeInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedCouchbaseScopeInformer(informer CouchbaseScopeInformer) TypedCouchbaseScopeInformer {
+	if informer, ok := informer.(TypedCouchbaseScopeInformer); ok {
+		return informer
+	}
+	return &couchbaseScopeTypedInformerAdapter{informer}
+}
+
+type couchbaseScopeTypedInformerAdapter struct {
+	CouchbaseScopeInformer
+}
+
+func (a *couchbaseScopeTypedInformerAdapter) TypedInformer() CouchbaseScopeIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseScope](a.Informer())
+}
+
+// ToCouchbaseScopeIndexInformer converts an untyped informer into a CouchbaseScopeIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *CouchbaseScope. If that is not the case, calling type-safe methods of the returned
+// CouchbaseScopeIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a CouchbaseScopeIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToCouchbaseScopeIndexInformer(informer cache.SharedIndexInformer) CouchbaseScopeIndexInformer {
+	if informer, ok := informer.(CouchbaseScopeIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseScope](informer)
 }

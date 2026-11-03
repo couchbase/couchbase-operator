@@ -12,7 +12,7 @@
 package externalversions
 
 import (
-	"fmt"
+	fmt "fmt"
 
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"

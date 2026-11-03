@@ -12,123 +12,34 @@
 package fake
 
 import (
-	"context"
-
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned/typed/couchbase/v2"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeCouchbaseMigrationReplications implements CouchbaseMigrationReplicationInterface
-type FakeCouchbaseMigrationReplications struct {
+// fakeCouchbaseMigrationReplications implements CouchbaseMigrationReplicationInterface
+type fakeCouchbaseMigrationReplications struct {
+	*gentype.FakeClientWithList[*v2.CouchbaseMigrationReplication, *v2.CouchbaseMigrationReplicationList]
 	Fake *FakeCouchbaseV2
-	ns   string
 }
 
-var couchbasemigrationreplicationsResource = v2.SchemeGroupVersion.WithResource("couchbasemigrationreplications")
-
-var couchbasemigrationreplicationsKind = v2.SchemeGroupVersion.WithKind("CouchbaseMigrationReplication")
-
-// Get takes name of the couchbaseMigrationReplication, and returns the corresponding couchbaseMigrationReplication object, and an error if there is any.
-func (c *FakeCouchbaseMigrationReplications) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2.CouchbaseMigrationReplication, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(couchbasemigrationreplicationsResource, c.ns, name), &v2.CouchbaseMigrationReplication{})
-
-	if obj == nil {
-		return nil, err
+func newFakeCouchbaseMigrationReplications(fake *FakeCouchbaseV2, namespace string) couchbasev2.CouchbaseMigrationReplicationInterface {
+	return &fakeCouchbaseMigrationReplications{
+		gentype.NewFakeClientWithList[*v2.CouchbaseMigrationReplication, *v2.CouchbaseMigrationReplicationList](
+			fake.Fake,
+			namespace,
+			v2.SchemeGroupVersion.WithResource("couchbasemigrationreplications"),
+			v2.SchemeGroupVersion.WithKind("CouchbaseMigrationReplication"),
+			func() *v2.CouchbaseMigrationReplication { return &v2.CouchbaseMigrationReplication{} },
+			func() *v2.CouchbaseMigrationReplicationList { return &v2.CouchbaseMigrationReplicationList{} },
+			func(dst, src *v2.CouchbaseMigrationReplicationList) { dst.ListMeta = src.ListMeta },
+			func(list *v2.CouchbaseMigrationReplicationList) []*v2.CouchbaseMigrationReplication {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v2.CouchbaseMigrationReplicationList, items []*v2.CouchbaseMigrationReplication) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v2.CouchbaseMigrationReplication), err
-}
-
-// List takes label and field selectors, and returns the list of CouchbaseMigrationReplications that match those selectors.
-func (c *FakeCouchbaseMigrationReplications) List(ctx context.Context, opts v1.ListOptions) (result *v2.CouchbaseMigrationReplicationList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(couchbasemigrationreplicationsResource, couchbasemigrationreplicationsKind, c.ns, opts), &v2.CouchbaseMigrationReplicationList{})
-
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v2.CouchbaseMigrationReplicationList{ListMeta: obj.(*v2.CouchbaseMigrationReplicationList).ListMeta}
-	for _, item := range obj.(*v2.CouchbaseMigrationReplicationList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested couchbaseMigrationReplications.
-func (c *FakeCouchbaseMigrationReplications) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(couchbasemigrationreplicationsResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a couchbaseMigrationReplication and creates it.  Returns the server's representation of the couchbaseMigrationReplication, and an error, if there is any.
-func (c *FakeCouchbaseMigrationReplications) Create(ctx context.Context, couchbaseMigrationReplication *v2.CouchbaseMigrationReplication, opts v1.CreateOptions) (result *v2.CouchbaseMigrationReplication, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(couchbasemigrationreplicationsResource, c.ns, couchbaseMigrationReplication), &v2.CouchbaseMigrationReplication{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2.CouchbaseMigrationReplication), err
-}
-
-// Update takes the representation of a couchbaseMigrationReplication and updates it. Returns the server's representation of the couchbaseMigrationReplication, and an error, if there is any.
-func (c *FakeCouchbaseMigrationReplications) Update(ctx context.Context, couchbaseMigrationReplication *v2.CouchbaseMigrationReplication, opts v1.UpdateOptions) (result *v2.CouchbaseMigrationReplication, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(couchbasemigrationreplicationsResource, c.ns, couchbaseMigrationReplication), &v2.CouchbaseMigrationReplication{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2.CouchbaseMigrationReplication), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeCouchbaseMigrationReplications) UpdateStatus(ctx context.Context, couchbaseMigrationReplication *v2.CouchbaseMigrationReplication, opts v1.UpdateOptions) (*v2.CouchbaseMigrationReplication, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(couchbasemigrationreplicationsResource, "status", c.ns, couchbaseMigrationReplication), &v2.CouchbaseMigrationReplication{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2.CouchbaseMigrationReplication), err
-}
-
-// Delete takes name of the couchbaseMigrationReplication and deletes it. Returns an error if one occurs.
-func (c *FakeCouchbaseMigrationReplications) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(couchbasemigrationreplicationsResource, c.ns, name, opts), &v2.CouchbaseMigrationReplication{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeCouchbaseMigrationReplications) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(couchbasemigrationreplicationsResource, c.ns, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v2.CouchbaseMigrationReplicationList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched couchbaseMigrationReplication.
-func (c *FakeCouchbaseMigrationReplications) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseMigrationReplication, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(couchbasemigrationreplicationsResource, c.ns, name, pt, data, subresources...), &v2.CouchbaseMigrationReplication{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2.CouchbaseMigrationReplication), err
 }

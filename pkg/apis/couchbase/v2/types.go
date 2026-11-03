@@ -4592,7 +4592,7 @@ type CouchbaseClusterNetworkingSpec struct {
 	// slower, there are some situations where it is required for connectivity.  This field
 	// must be either "Cluster" or "Local", defaulting to "Local",
 	// +kubebuilder:validation:Enum=Cluster;Local
-	ExposedFeatureTrafficPolicy *v1.ServiceExternalTrafficPolicyType `json:"exposedFeatureTrafficPolicy,omitempty"`
+	ExposedFeatureTrafficPolicy *v1.ServiceExternalTrafficPolicy `json:"exposedFeatureTrafficPolicy,omitempty"`
 
 	// TLS defines the TLS configuration for the cluster including
 	// server and client certificate configuration, and TLS security policies.

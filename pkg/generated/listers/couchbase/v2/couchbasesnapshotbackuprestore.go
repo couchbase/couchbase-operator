@@ -12,10 +12,10 @@
 package v2
 
 import (
-	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // CouchbaseSnapshotBackupRestoreLister helps list CouchbaseSnapshotBackupRestores.
@@ -23,7 +23,7 @@ import (
 type CouchbaseSnapshotBackupRestoreLister interface {
 	// List lists all CouchbaseSnapshotBackupRestores in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseSnapshotBackupRestore, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseSnapshotBackupRestore, err error)
 	// CouchbaseSnapshotBackupRestores returns an object that can list and get CouchbaseSnapshotBackupRestores.
 	CouchbaseSnapshotBackupRestores(namespace string) CouchbaseSnapshotBackupRestoreNamespaceLister
 	CouchbaseSnapshotBackupRestoreListerExpansion
@@ -31,25 +31,17 @@ type CouchbaseSnapshotBackupRestoreLister interface {
 
 // couchbaseSnapshotBackupRestoreLister implements the CouchbaseSnapshotBackupRestoreLister interface.
 type couchbaseSnapshotBackupRestoreLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*couchbasev2.CouchbaseSnapshotBackupRestore]
 }
 
 // NewCouchbaseSnapshotBackupRestoreLister returns a new CouchbaseSnapshotBackupRestoreLister.
 func NewCouchbaseSnapshotBackupRestoreLister(indexer cache.Indexer) CouchbaseSnapshotBackupRestoreLister {
-	return &couchbaseSnapshotBackupRestoreLister{indexer: indexer}
-}
-
-// List lists all CouchbaseSnapshotBackupRestores in the indexer.
-func (s *couchbaseSnapshotBackupRestoreLister) List(selector labels.Selector) (ret []*v2.CouchbaseSnapshotBackupRestore, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseSnapshotBackupRestore))
-	})
-	return ret, err
+	return &couchbaseSnapshotBackupRestoreLister{listers.New[*couchbasev2.CouchbaseSnapshotBackupRestore](indexer, couchbasev2.Resource("couchbasesnapshotbackuprestore"))}
 }
 
 // CouchbaseSnapshotBackupRestores returns an object that can list and get CouchbaseSnapshotBackupRestores.
 func (s *couchbaseSnapshotBackupRestoreLister) CouchbaseSnapshotBackupRestores(namespace string) CouchbaseSnapshotBackupRestoreNamespaceLister {
-	return couchbaseSnapshotBackupRestoreNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return couchbaseSnapshotBackupRestoreNamespaceLister{listers.NewNamespaced[*couchbasev2.CouchbaseSnapshotBackupRestore](s.ResourceIndexer, namespace)}
 }
 
 // CouchbaseSnapshotBackupRestoreNamespaceLister helps list and get CouchbaseSnapshotBackupRestores.
@@ -57,36 +49,15 @@ func (s *couchbaseSnapshotBackupRestoreLister) CouchbaseSnapshotBackupRestores(n
 type CouchbaseSnapshotBackupRestoreNamespaceLister interface {
 	// List lists all CouchbaseSnapshotBackupRestores in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseSnapshotBackupRestore, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseSnapshotBackupRestore, err error)
 	// Get retrieves the CouchbaseSnapshotBackupRestore from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v2.CouchbaseSnapshotBackupRestore, error)
+	Get(name string) (*couchbasev2.CouchbaseSnapshotBackupRestore, error)
 	CouchbaseSnapshotBackupRestoreNamespaceListerExpansion
 }
 
 // couchbaseSnapshotBackupRestoreNamespaceLister implements the CouchbaseSnapshotBackupRestoreNamespaceLister
 // interface.
 type couchbaseSnapshotBackupRestoreNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all CouchbaseSnapshotBackupRestores in the indexer for a given namespace.
-func (s couchbaseSnapshotBackupRestoreNamespaceLister) List(selector labels.Selector) (ret []*v2.CouchbaseSnapshotBackupRestore, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseSnapshotBackupRestore))
-	})
-	return ret, err
-}
-
-// Get retrieves the CouchbaseSnapshotBackupRestore from the indexer for a given namespace and name.
-func (s couchbaseSnapshotBackupRestoreNamespaceLister) Get(name string) (*v2.CouchbaseSnapshotBackupRestore, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v2.Resource("couchbasesnapshotbackuprestore"), name)
-	}
-	return obj.(*v2.CouchbaseSnapshotBackupRestore), nil
+	listers.ResourceIndexer[*couchbasev2.CouchbaseSnapshotBackupRestore]
 }

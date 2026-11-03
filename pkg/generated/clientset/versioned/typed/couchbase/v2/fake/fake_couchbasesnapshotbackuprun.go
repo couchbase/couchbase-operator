@@ -12,123 +12,34 @@
 package fake
 
 import (
-	"context"
-
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned/typed/couchbase/v2"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeCouchbaseSnapshotBackupRuns implements CouchbaseSnapshotBackupRunInterface
-type FakeCouchbaseSnapshotBackupRuns struct {
+// fakeCouchbaseSnapshotBackupRuns implements CouchbaseSnapshotBackupRunInterface
+type fakeCouchbaseSnapshotBackupRuns struct {
+	*gentype.FakeClientWithList[*v2.CouchbaseSnapshotBackupRun, *v2.CouchbaseSnapshotBackupRunList]
 	Fake *FakeCouchbaseV2
-	ns   string
 }
 
-var couchbasesnapshotbackuprunsResource = v2.SchemeGroupVersion.WithResource("couchbasesnapshotbackupruns")
-
-var couchbasesnapshotbackuprunsKind = v2.SchemeGroupVersion.WithKind("CouchbaseSnapshotBackupRun")
-
-// Get takes name of the couchbaseSnapshotBackupRun, and returns the corresponding couchbaseSnapshotBackupRun object, and an error if there is any.
-func (c *FakeCouchbaseSnapshotBackupRuns) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2.CouchbaseSnapshotBackupRun, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(couchbasesnapshotbackuprunsResource, c.ns, name), &v2.CouchbaseSnapshotBackupRun{})
-
-	if obj == nil {
-		return nil, err
+func newFakeCouchbaseSnapshotBackupRuns(fake *FakeCouchbaseV2, namespace string) couchbasev2.CouchbaseSnapshotBackupRunInterface {
+	return &fakeCouchbaseSnapshotBackupRuns{
+		gentype.NewFakeClientWithList[*v2.CouchbaseSnapshotBackupRun, *v2.CouchbaseSnapshotBackupRunList](
+			fake.Fake,
+			namespace,
+			v2.SchemeGroupVersion.WithResource("couchbasesnapshotbackupruns"),
+			v2.SchemeGroupVersion.WithKind("CouchbaseSnapshotBackupRun"),
+			func() *v2.CouchbaseSnapshotBackupRun { return &v2.CouchbaseSnapshotBackupRun{} },
+			func() *v2.CouchbaseSnapshotBackupRunList { return &v2.CouchbaseSnapshotBackupRunList{} },
+			func(dst, src *v2.CouchbaseSnapshotBackupRunList) { dst.ListMeta = src.ListMeta },
+			func(list *v2.CouchbaseSnapshotBackupRunList) []*v2.CouchbaseSnapshotBackupRun {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v2.CouchbaseSnapshotBackupRunList, items []*v2.CouchbaseSnapshotBackupRun) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v2.CouchbaseSnapshotBackupRun), err
-}
-
-// List takes label and field selectors, and returns the list of CouchbaseSnapshotBackupRuns that match those selectors.
-func (c *FakeCouchbaseSnapshotBackupRuns) List(ctx context.Context, opts v1.ListOptions) (result *v2.CouchbaseSnapshotBackupRunList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(couchbasesnapshotbackuprunsResource, couchbasesnapshotbackuprunsKind, c.ns, opts), &v2.CouchbaseSnapshotBackupRunList{})
-
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v2.CouchbaseSnapshotBackupRunList{ListMeta: obj.(*v2.CouchbaseSnapshotBackupRunList).ListMeta}
-	for _, item := range obj.(*v2.CouchbaseSnapshotBackupRunList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested couchbaseSnapshotBackupRuns.
-func (c *FakeCouchbaseSnapshotBackupRuns) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(couchbasesnapshotbackuprunsResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a couchbaseSnapshotBackupRun and creates it.  Returns the server's representation of the couchbaseSnapshotBackupRun, and an error, if there is any.
-func (c *FakeCouchbaseSnapshotBackupRuns) Create(ctx context.Context, couchbaseSnapshotBackupRun *v2.CouchbaseSnapshotBackupRun, opts v1.CreateOptions) (result *v2.CouchbaseSnapshotBackupRun, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(couchbasesnapshotbackuprunsResource, c.ns, couchbaseSnapshotBackupRun), &v2.CouchbaseSnapshotBackupRun{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2.CouchbaseSnapshotBackupRun), err
-}
-
-// Update takes the representation of a couchbaseSnapshotBackupRun and updates it. Returns the server's representation of the couchbaseSnapshotBackupRun, and an error, if there is any.
-func (c *FakeCouchbaseSnapshotBackupRuns) Update(ctx context.Context, couchbaseSnapshotBackupRun *v2.CouchbaseSnapshotBackupRun, opts v1.UpdateOptions) (result *v2.CouchbaseSnapshotBackupRun, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(couchbasesnapshotbackuprunsResource, c.ns, couchbaseSnapshotBackupRun), &v2.CouchbaseSnapshotBackupRun{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2.CouchbaseSnapshotBackupRun), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeCouchbaseSnapshotBackupRuns) UpdateStatus(ctx context.Context, couchbaseSnapshotBackupRun *v2.CouchbaseSnapshotBackupRun, opts v1.UpdateOptions) (*v2.CouchbaseSnapshotBackupRun, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(couchbasesnapshotbackuprunsResource, "status", c.ns, couchbaseSnapshotBackupRun), &v2.CouchbaseSnapshotBackupRun{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2.CouchbaseSnapshotBackupRun), err
-}
-
-// Delete takes name of the couchbaseSnapshotBackupRun and deletes it. Returns an error if one occurs.
-func (c *FakeCouchbaseSnapshotBackupRuns) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(couchbasesnapshotbackuprunsResource, c.ns, name, opts), &v2.CouchbaseSnapshotBackupRun{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeCouchbaseSnapshotBackupRuns) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(couchbasesnapshotbackuprunsResource, c.ns, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v2.CouchbaseSnapshotBackupRunList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched couchbaseSnapshotBackupRun.
-func (c *FakeCouchbaseSnapshotBackupRuns) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseSnapshotBackupRun, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(couchbasesnapshotbackuprunsResource, c.ns, name, pt, data, subresources...), &v2.CouchbaseSnapshotBackupRun{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2.CouchbaseSnapshotBackupRun), err
 }

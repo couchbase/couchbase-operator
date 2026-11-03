@@ -9,9 +9,9 @@ pipeline {
 
   environment {
     GOBIN = "${env.WORKSPACE}/bin"
-    GOVERSION = '1.22.1'
     NODEVERSION = '16.0.0'
-    GOPATH = "${env.WORKSPACE}/gopath"
+    // Default GOPATH (~/go): modules, like the build cache in ~/.cache, survive
+    // cleanWs() when the agent is reused.
     PATH = "${env.GOBIN}:${env.WORKSPACE}/go/bin:${env.WORKSPACE}/node-v${env.NODEVERSION}-linux-x64/bin:${PATH}"
     MAKEFLAGS = "--no-builtin-rules"
   }
@@ -19,13 +19,13 @@ pipeline {
   stages {
     stage('Go Install') {
       steps {
-        sh 'wget -q -O- https://dl.google.com/go/go${GOVERSION}.linux-amd64.tar.gz | tar xz'
+        // Install the Go version go.mod asks for, so the two can't drift.
+        sh '''
+          version=$(awk '/^go /{print $2}' go.mod)
+          wget -q -O- https://dl.google.com/go/go${version}.linux-amd64.tar.gz | tar xz
+        '''
+        // Mark go/ as its own module so ./... patterns skip the toolchain.
         sh 'touch go/go.mod'
-      }
-    }
-    stage('Node.js Install') {
-      steps {
-        sh 'wget -q -O- https://nodejs.org/dist/v${NODEVERSION}/node-v${NODEVERSION}-linux-x64.tar.xz | tar xJ'
       }
     }
     stage('Post Checkout') {
@@ -33,36 +33,42 @@ pipeline {
         sh 'make touch-generated'
       }
     }
-    stage('Go Lint') {
-      steps {
-        sh 'make lint'
-      }
-    }
-    stage('Python Lint') {
-      steps {
-        sh 'python3 -m venv venv'
-        sh '. venv/bin/activate && pip3 install -r scripts/requirements.txt'
-        sh '. venv/bin/activate && make lint-python'
-      }
-    }
-    stage('Build Developer') {
-      steps {
-        sh 'make touch-generated all'
-      }
-    }
-    stage('Build Release') {
-      steps {
-        sh 'make dist-lite'
-      }
-    }
-    stage('Unit Test') {
-      steps {
-        sh 'make test-unit'
-      }
-    }
-    stage('Documentation') {
-      steps {
-        sh 'make docs-lint'
+    stage('Verify') {
+      parallel {
+        stage('Go Lint') {
+          steps {
+            sh 'make lint'
+          }
+        }
+        stage('Python Lint') {
+          steps {
+            sh 'python3 -m venv venv'
+            sh '. venv/bin/activate && pip3 install -r scripts/requirements.txt'
+            sh '. venv/bin/activate && make lint-python'
+          }
+        }
+        stage('Build Developer') {
+          steps {
+            sh 'make all'
+          }
+        }
+        stage('Generated Code') {
+          steps {
+            sh 'make verify-generated'
+          }
+        }
+        stage('Unit Test') {
+          steps {
+            sh 'make test-unit'
+          }
+        }
+        stage('Documentation') {
+          steps {
+            // Only the docs build needs Node, so install it off the critical path.
+            sh 'wget -q -O- https://nodejs.org/dist/v${NODEVERSION}/node-v${NODEVERSION}-linux-x64.tar.xz | tar xJ'
+            sh 'make docs-lint'
+          }
+        }
       }
     }
   }

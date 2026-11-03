@@ -12,123 +12,34 @@
 package fake
 
 import (
-	"context"
-
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned/typed/couchbase/v2"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeCouchbaseScopeGroups implements CouchbaseScopeGroupInterface
-type FakeCouchbaseScopeGroups struct {
+// fakeCouchbaseScopeGroups implements CouchbaseScopeGroupInterface
+type fakeCouchbaseScopeGroups struct {
+	*gentype.FakeClientWithList[*v2.CouchbaseScopeGroup, *v2.CouchbaseScopeGroupList]
 	Fake *FakeCouchbaseV2
-	ns   string
 }
 
-var couchbasescopegroupsResource = v2.SchemeGroupVersion.WithResource("couchbasescopegroups")
-
-var couchbasescopegroupsKind = v2.SchemeGroupVersion.WithKind("CouchbaseScopeGroup")
-
-// Get takes name of the couchbaseScopeGroup, and returns the corresponding couchbaseScopeGroup object, and an error if there is any.
-func (c *FakeCouchbaseScopeGroups) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2.CouchbaseScopeGroup, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(couchbasescopegroupsResource, c.ns, name), &v2.CouchbaseScopeGroup{})
-
-	if obj == nil {
-		return nil, err
+func newFakeCouchbaseScopeGroups(fake *FakeCouchbaseV2, namespace string) couchbasev2.CouchbaseScopeGroupInterface {
+	return &fakeCouchbaseScopeGroups{
+		gentype.NewFakeClientWithList[*v2.CouchbaseScopeGroup, *v2.CouchbaseScopeGroupList](
+			fake.Fake,
+			namespace,
+			v2.SchemeGroupVersion.WithResource("couchbasescopegroups"),
+			v2.SchemeGroupVersion.WithKind("CouchbaseScopeGroup"),
+			func() *v2.CouchbaseScopeGroup { return &v2.CouchbaseScopeGroup{} },
+			func() *v2.CouchbaseScopeGroupList { return &v2.CouchbaseScopeGroupList{} },
+			func(dst, src *v2.CouchbaseScopeGroupList) { dst.ListMeta = src.ListMeta },
+			func(list *v2.CouchbaseScopeGroupList) []*v2.CouchbaseScopeGroup {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v2.CouchbaseScopeGroupList, items []*v2.CouchbaseScopeGroup) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v2.CouchbaseScopeGroup), err
-}
-
-// List takes label and field selectors, and returns the list of CouchbaseScopeGroups that match those selectors.
-func (c *FakeCouchbaseScopeGroups) List(ctx context.Context, opts v1.ListOptions) (result *v2.CouchbaseScopeGroupList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(couchbasescopegroupsResource, couchbasescopegroupsKind, c.ns, opts), &v2.CouchbaseScopeGroupList{})
-
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v2.CouchbaseScopeGroupList{ListMeta: obj.(*v2.CouchbaseScopeGroupList).ListMeta}
-	for _, item := range obj.(*v2.CouchbaseScopeGroupList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested couchbaseScopeGroups.
-func (c *FakeCouchbaseScopeGroups) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(couchbasescopegroupsResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a couchbaseScopeGroup and creates it.  Returns the server's representation of the couchbaseScopeGroup, and an error, if there is any.
-func (c *FakeCouchbaseScopeGroups) Create(ctx context.Context, couchbaseScopeGroup *v2.CouchbaseScopeGroup, opts v1.CreateOptions) (result *v2.CouchbaseScopeGroup, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(couchbasescopegroupsResource, c.ns, couchbaseScopeGroup), &v2.CouchbaseScopeGroup{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2.CouchbaseScopeGroup), err
-}
-
-// Update takes the representation of a couchbaseScopeGroup and updates it. Returns the server's representation of the couchbaseScopeGroup, and an error, if there is any.
-func (c *FakeCouchbaseScopeGroups) Update(ctx context.Context, couchbaseScopeGroup *v2.CouchbaseScopeGroup, opts v1.UpdateOptions) (result *v2.CouchbaseScopeGroup, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(couchbasescopegroupsResource, c.ns, couchbaseScopeGroup), &v2.CouchbaseScopeGroup{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2.CouchbaseScopeGroup), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeCouchbaseScopeGroups) UpdateStatus(ctx context.Context, couchbaseScopeGroup *v2.CouchbaseScopeGroup, opts v1.UpdateOptions) (*v2.CouchbaseScopeGroup, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(couchbasescopegroupsResource, "status", c.ns, couchbaseScopeGroup), &v2.CouchbaseScopeGroup{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2.CouchbaseScopeGroup), err
-}
-
-// Delete takes name of the couchbaseScopeGroup and deletes it. Returns an error if one occurs.
-func (c *FakeCouchbaseScopeGroups) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(couchbasescopegroupsResource, c.ns, name, opts), &v2.CouchbaseScopeGroup{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeCouchbaseScopeGroups) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(couchbasescopegroupsResource, c.ns, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v2.CouchbaseScopeGroupList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched couchbaseScopeGroup.
-func (c *FakeCouchbaseScopeGroups) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseScopeGroup, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(couchbasescopegroupsResource, c.ns, name, pt, data, subresources...), &v2.CouchbaseScopeGroup{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2.CouchbaseScopeGroup), err
 }

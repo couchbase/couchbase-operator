@@ -12,25 +12,54 @@
 package v2
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	apiscouchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	versioned "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	internalinterfaces "github.com/couchbase/couchbase-operator/pkg/generated/informers/externalversions/internalinterfaces"
-	v2 "github.com/couchbase/couchbase-operator/pkg/generated/listers/couchbase/v2"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/generated/listers/couchbase/v2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
 )
 
 // CouchbaseCollectionGroupInformer provides access to a shared informer and lister for
-// CouchbaseCollectionGroups.
+// CouchbaseCollectionGroups. Prefer using the type-safe variant (see [TypedCouchbaseCollectionGroupInformer]).
 type CouchbaseCollectionGroupInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v2.CouchbaseCollectionGroupLister
+	Lister() couchbasev2.CouchbaseCollectionGroupLister
 }
+
+// TypedCouchbaseCollectionGroupInformer provides access to a shared informer and lister for
+// CouchbaseCollectionGroups, including the type-safe TypedInformer variant.
+// It is a superset of CouchbaseCollectionGroupInformer.
+type TypedCouchbaseCollectionGroupInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() CouchbaseCollectionGroupIndexInformer
+	Lister() couchbasev2.CouchbaseCollectionGroupLister
+}
+
+// CouchbaseCollectionGroupIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type CouchbaseCollectionGroupIndexInformer cache.TypedSharedIndexInformer[*apiscouchbasev2.CouchbaseCollectionGroup]
+
+// CouchbaseCollectionGroupHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for CouchbaseCollectionGroup.
+type CouchbaseCollectionGroupHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apiscouchbasev2.CouchbaseCollectionGroup]
+
+// CouchbaseCollectionGroupDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for CouchbaseCollectionGroup.
+type CouchbaseCollectionGroupDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apiscouchbasev2.CouchbaseCollectionGroup]
+
+// CouchbaseCollectionGroupFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for CouchbaseCollectionGroup.
+type CouchbaseCollectionGroupFilteringHandler = cache.TypedFilteringResourceEventHandler[*apiscouchbasev2.CouchbaseCollectionGroup]
+
+// CouchbaseCollectionGroupIndexers is a specialization of [cache.TypedIndexers] for CouchbaseCollectionGroup.
+type CouchbaseCollectionGroupIndexers = cache.TypedIndexers[*apiscouchbasev2.CouchbaseCollectionGroup]
+
+// DeletedCouchbaseCollectionGroup is a specialization of [cache.DeletedObject] for CouchbaseCollectionGroup.
+type DeletedCouchbaseCollectionGroup = cache.DeletedObject[*apiscouchbasev2.CouchbaseCollectionGroup]
 
 type couchbaseCollectionGroupInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -41,43 +70,132 @@ type couchbaseCollectionGroupInformer struct {
 // NewCouchbaseCollectionGroupInformer constructs a new informer for CouchbaseCollectionGroup type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedCouchbaseCollectionGroupInformer]).
 func NewCouchbaseCollectionGroupInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredCouchbaseCollectionGroupInformer(client, namespace, resyncPeriod, indexers, nil)
+	return NewCouchbaseCollectionGroupInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedCouchbaseCollectionGroupInformer constructs a new informer for CouchbaseCollectionGroup type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedCouchbaseCollectionGroupInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers CouchbaseCollectionGroupIndexers) CouchbaseCollectionGroupIndexInformer {
+	return NewTypedCouchbaseCollectionGroupInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredCouchbaseCollectionGroupInformer constructs a new informer for CouchbaseCollectionGroup type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredCouchbaseCollectionGroupInformer]).
 func NewFilteredCouchbaseCollectionGroupInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+	return NewTypedCouchbaseCollectionGroupInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredCouchbaseCollectionGroupInformer constructs a new informer for CouchbaseCollectionGroup type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredCouchbaseCollectionGroupInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers CouchbaseCollectionGroupIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) CouchbaseCollectionGroupIndexInformer {
+	return NewTypedCouchbaseCollectionGroupInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
+}
+
+// NewCouchbaseCollectionGroupInformerWithOptions constructs a new informer for CouchbaseCollectionGroup type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedCouchbaseCollectionGroupInformerWithOptions]).
+func NewCouchbaseCollectionGroupInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedCouchbaseCollectionGroupInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedCouchbaseCollectionGroupInformerWithOptions constructs a new informer for CouchbaseCollectionGroup type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedCouchbaseCollectionGroupInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) CouchbaseCollectionGroupIndexInformer {
+	gvr := schema.GroupVersionResource{Group: "couchbase.com", Version: "v2", Resource: "couchbasecollectiongroups"}
+	identifier := options.InformerName.WithResource(gvr)
+	tweakListOptions := options.TweakListOptions
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseCollectionGroup](cache.NewSharedIndexInformerWithOptions(
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
+			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.CouchbaseV2().CouchbaseCollectionGroups(namespace).List(context.TODO(), options)
+				return client.CouchbaseV2().CouchbaseCollectionGroups(namespace).List(context.Background(), opts)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(opts v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.CouchbaseV2().CouchbaseCollectionGroups(namespace).Watch(context.TODO(), options)
+				return client.CouchbaseV2().CouchbaseCollectionGroups(namespace).Watch(context.Background(), opts)
 			},
+			ListWithContextFunc: func(ctx context.Context, opts v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&opts)
+				}
+				return client.CouchbaseV2().CouchbaseCollectionGroups(namespace).List(ctx, opts)
+			},
+			WatchFuncWithContext: func(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&opts)
+				}
+				return client.CouchbaseV2().CouchbaseCollectionGroups(namespace).Watch(ctx, opts)
+			},
+		}, client),
+		&apiscouchbasev2.CouchbaseCollectionGroup{},
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod: options.ResyncPeriod,
+			Indexers:     options.Indexers,
+			Identifier:   identifier,
 		},
-		&couchbasev2.CouchbaseCollectionGroup{},
-		resyncPeriod,
-		indexers,
-	)
+	))
 }
 
 func (f *couchbaseCollectionGroupInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredCouchbaseCollectionGroupInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewTypedCouchbaseCollectionGroupInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *couchbaseCollectionGroupInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&couchbasev2.CouchbaseCollectionGroup{}, f.defaultInformer)
+	return f.TypedInformer()
 }
 
-func (f *couchbaseCollectionGroupInformer) Lister() v2.CouchbaseCollectionGroupLister {
-	return v2.NewCouchbaseCollectionGroupLister(f.Informer().GetIndexer())
+func (f *couchbaseCollectionGroupInformer) TypedInformer() CouchbaseCollectionGroupIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseCollectionGroup](f.factory.InformerFor(&apiscouchbasev2.CouchbaseCollectionGroup{}, f.defaultInformer))
+}
+
+func (f *couchbaseCollectionGroupInformer) Lister() couchbasev2.CouchbaseCollectionGroupLister {
+	return couchbasev2.NewCouchbaseCollectionGroupLister(f.Informer().GetIndexer())
+}
+
+// ToTypedCouchbaseCollectionGroupInformer converts an untyped informer into a TypedCouchbaseCollectionGroupInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *CouchbaseCollectionGroup. If that is not the case, calling type-safe methods of the returned
+// TypedCouchbaseCollectionGroupInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedCouchbaseCollectionGroupInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedCouchbaseCollectionGroupInformer(informer CouchbaseCollectionGroupInformer) TypedCouchbaseCollectionGroupInformer {
+	if informer, ok := informer.(TypedCouchbaseCollectionGroupInformer); ok {
+		return informer
+	}
+	return &couchbaseCollectionGroupTypedInformerAdapter{informer}
+}
+
+type couchbaseCollectionGroupTypedInformerAdapter struct {
+	CouchbaseCollectionGroupInformer
+}
+
+func (a *couchbaseCollectionGroupTypedInformerAdapter) TypedInformer() CouchbaseCollectionGroupIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseCollectionGroup](a.Informer())
+}
+
+// ToCouchbaseCollectionGroupIndexInformer converts an untyped informer into a CouchbaseCollectionGroupIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *CouchbaseCollectionGroup. If that is not the case, calling type-safe methods of the returned
+// CouchbaseCollectionGroupIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a CouchbaseCollectionGroupIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToCouchbaseCollectionGroupIndexInformer(informer cache.SharedIndexInformer) CouchbaseCollectionGroupIndexInformer {
+	if informer, ok := informer.(CouchbaseCollectionGroupIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseCollectionGroup](informer)
 }

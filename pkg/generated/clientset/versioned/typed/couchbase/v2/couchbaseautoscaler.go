@@ -12,16 +12,15 @@
 package v2
 
 import (
-	"context"
-	"time"
+	context "context"
 
-	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	scheme "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned/scheme"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	rest "k8s.io/client-go/rest"
+	gentype "k8s.io/client-go/gentype"
 )
 
 // CouchbaseAutoscalersGetter has a method to return a CouchbaseAutoscalerInterface.
@@ -32,15 +31,16 @@ type CouchbaseAutoscalersGetter interface {
 
 // CouchbaseAutoscalerInterface has methods to work with CouchbaseAutoscaler resources.
 type CouchbaseAutoscalerInterface interface {
-	Create(ctx context.Context, couchbaseAutoscaler *v2.CouchbaseAutoscaler, opts v1.CreateOptions) (*v2.CouchbaseAutoscaler, error)
-	Update(ctx context.Context, couchbaseAutoscaler *v2.CouchbaseAutoscaler, opts v1.UpdateOptions) (*v2.CouchbaseAutoscaler, error)
-	UpdateStatus(ctx context.Context, couchbaseAutoscaler *v2.CouchbaseAutoscaler, opts v1.UpdateOptions) (*v2.CouchbaseAutoscaler, error)
+	Create(ctx context.Context, couchbaseAutoscaler *couchbasev2.CouchbaseAutoscaler, opts v1.CreateOptions) (*couchbasev2.CouchbaseAutoscaler, error)
+	Update(ctx context.Context, couchbaseAutoscaler *couchbasev2.CouchbaseAutoscaler, opts v1.UpdateOptions) (*couchbasev2.CouchbaseAutoscaler, error)
+	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+	UpdateStatus(ctx context.Context, couchbaseAutoscaler *couchbasev2.CouchbaseAutoscaler, opts v1.UpdateOptions) (*couchbasev2.CouchbaseAutoscaler, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v2.CouchbaseAutoscaler, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v2.CouchbaseAutoscalerList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*couchbasev2.CouchbaseAutoscaler, error)
+	List(ctx context.Context, opts v1.ListOptions) (*couchbasev2.CouchbaseAutoscalerList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseAutoscaler, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *couchbasev2.CouchbaseAutoscaler, err error)
 	GetScale(ctx context.Context, couchbaseAutoscalerName string, options v1.GetOptions) (*autoscalingv1.Scale, error)
 	UpdateScale(ctx context.Context, couchbaseAutoscalerName string, scale *autoscalingv1.Scale, opts v1.UpdateOptions) (*autoscalingv1.Scale, error)
 
@@ -49,153 +49,28 @@ type CouchbaseAutoscalerInterface interface {
 
 // couchbaseAutoscalers implements CouchbaseAutoscalerInterface
 type couchbaseAutoscalers struct {
-	client rest.Interface
-	ns     string
+	*gentype.ClientWithList[*couchbasev2.CouchbaseAutoscaler, *couchbasev2.CouchbaseAutoscalerList]
 }
 
 // newCouchbaseAutoscalers returns a CouchbaseAutoscalers
 func newCouchbaseAutoscalers(c *CouchbaseV2Client, namespace string) *couchbaseAutoscalers {
 	return &couchbaseAutoscalers{
-		client: c.RESTClient(),
-		ns:     namespace,
+		gentype.NewClientWithList[*couchbasev2.CouchbaseAutoscaler, *couchbasev2.CouchbaseAutoscalerList](
+			"couchbaseautoscalers",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			namespace,
+			func() *couchbasev2.CouchbaseAutoscaler { return &couchbasev2.CouchbaseAutoscaler{} },
+			func() *couchbasev2.CouchbaseAutoscalerList { return &couchbasev2.CouchbaseAutoscalerList{} },
+		),
 	}
-}
-
-// Get takes name of the couchbaseAutoscaler, and returns the corresponding couchbaseAutoscaler object, and an error if there is any.
-func (c *couchbaseAutoscalers) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2.CouchbaseAutoscaler, err error) {
-	result = &v2.CouchbaseAutoscaler{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("couchbaseautoscalers").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of CouchbaseAutoscalers that match those selectors.
-func (c *couchbaseAutoscalers) List(ctx context.Context, opts v1.ListOptions) (result *v2.CouchbaseAutoscalerList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v2.CouchbaseAutoscalerList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("couchbaseautoscalers").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested couchbaseAutoscalers.
-func (c *couchbaseAutoscalers) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("couchbaseautoscalers").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
-}
-
-// Create takes the representation of a couchbaseAutoscaler and creates it.  Returns the server's representation of the couchbaseAutoscaler, and an error, if there is any.
-func (c *couchbaseAutoscalers) Create(ctx context.Context, couchbaseAutoscaler *v2.CouchbaseAutoscaler, opts v1.CreateOptions) (result *v2.CouchbaseAutoscaler, err error) {
-	result = &v2.CouchbaseAutoscaler{}
-	err = c.client.Post().
-		Namespace(c.ns).
-		Resource("couchbaseautoscalers").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(couchbaseAutoscaler).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a couchbaseAutoscaler and updates it. Returns the server's representation of the couchbaseAutoscaler, and an error, if there is any.
-func (c *couchbaseAutoscalers) Update(ctx context.Context, couchbaseAutoscaler *v2.CouchbaseAutoscaler, opts v1.UpdateOptions) (result *v2.CouchbaseAutoscaler, err error) {
-	result = &v2.CouchbaseAutoscaler{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("couchbaseautoscalers").
-		Name(couchbaseAutoscaler.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(couchbaseAutoscaler).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *couchbaseAutoscalers) UpdateStatus(ctx context.Context, couchbaseAutoscaler *v2.CouchbaseAutoscaler, opts v1.UpdateOptions) (result *v2.CouchbaseAutoscaler, err error) {
-	result = &v2.CouchbaseAutoscaler{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("couchbaseautoscalers").
-		Name(couchbaseAutoscaler.Name).
-		SubResource("status").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(couchbaseAutoscaler).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the couchbaseAutoscaler and deletes it. Returns an error if one occurs.
-func (c *couchbaseAutoscalers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("couchbaseautoscalers").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *couchbaseAutoscalers) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	var timeout time.Duration
-	if listOpts.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
-	}
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("couchbaseautoscalers").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// Patch applies the patch and returns the patched couchbaseAutoscaler.
-func (c *couchbaseAutoscalers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseAutoscaler, err error) {
-	result = &v2.CouchbaseAutoscaler{}
-	err = c.client.Patch(pt).
-		Namespace(c.ns).
-		Resource("couchbaseautoscalers").
-		Name(name).
-		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
 }
 
 // GetScale takes name of the couchbaseAutoscaler, and returns the corresponding autoscalingv1.Scale object, and an error if there is any.
 func (c *couchbaseAutoscalers) GetScale(ctx context.Context, couchbaseAutoscalerName string, options v1.GetOptions) (result *autoscalingv1.Scale, err error) {
 	result = &autoscalingv1.Scale{}
-	err = c.client.Get().
-		Namespace(c.ns).
+	err = c.GetClient().Get().
+		Namespace(c.GetNamespace()).
 		Resource("couchbaseautoscalers").
 		Name(couchbaseAutoscalerName).
 		SubResource("scale").
@@ -208,8 +83,8 @@ func (c *couchbaseAutoscalers) GetScale(ctx context.Context, couchbaseAutoscaler
 // UpdateScale takes the top resource name and the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
 func (c *couchbaseAutoscalers) UpdateScale(ctx context.Context, couchbaseAutoscalerName string, scale *autoscalingv1.Scale, opts v1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
 	result = &autoscalingv1.Scale{}
-	err = c.client.Put().
-		Namespace(c.ns).
+	err = c.GetClient().Put().
+		Namespace(c.GetNamespace()).
 		Resource("couchbaseautoscalers").
 		Name(couchbaseAutoscalerName).
 		SubResource("scale").

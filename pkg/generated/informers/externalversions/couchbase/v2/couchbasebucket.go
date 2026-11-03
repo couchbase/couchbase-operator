@@ -12,25 +12,54 @@
 package v2
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	apiscouchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	versioned "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	internalinterfaces "github.com/couchbase/couchbase-operator/pkg/generated/informers/externalversions/internalinterfaces"
-	v2 "github.com/couchbase/couchbase-operator/pkg/generated/listers/couchbase/v2"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/generated/listers/couchbase/v2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
 )
 
 // CouchbaseBucketInformer provides access to a shared informer and lister for
-// CouchbaseBuckets.
+// CouchbaseBuckets. Prefer using the type-safe variant (see [TypedCouchbaseBucketInformer]).
 type CouchbaseBucketInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v2.CouchbaseBucketLister
+	Lister() couchbasev2.CouchbaseBucketLister
 }
+
+// TypedCouchbaseBucketInformer provides access to a shared informer and lister for
+// CouchbaseBuckets, including the type-safe TypedInformer variant.
+// It is a superset of CouchbaseBucketInformer.
+type TypedCouchbaseBucketInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() CouchbaseBucketIndexInformer
+	Lister() couchbasev2.CouchbaseBucketLister
+}
+
+// CouchbaseBucketIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type CouchbaseBucketIndexInformer cache.TypedSharedIndexInformer[*apiscouchbasev2.CouchbaseBucket]
+
+// CouchbaseBucketHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for CouchbaseBucket.
+type CouchbaseBucketHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apiscouchbasev2.CouchbaseBucket]
+
+// CouchbaseBucketDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for CouchbaseBucket.
+type CouchbaseBucketDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apiscouchbasev2.CouchbaseBucket]
+
+// CouchbaseBucketFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for CouchbaseBucket.
+type CouchbaseBucketFilteringHandler = cache.TypedFilteringResourceEventHandler[*apiscouchbasev2.CouchbaseBucket]
+
+// CouchbaseBucketIndexers is a specialization of [cache.TypedIndexers] for CouchbaseBucket.
+type CouchbaseBucketIndexers = cache.TypedIndexers[*apiscouchbasev2.CouchbaseBucket]
+
+// DeletedCouchbaseBucket is a specialization of [cache.DeletedObject] for CouchbaseBucket.
+type DeletedCouchbaseBucket = cache.DeletedObject[*apiscouchbasev2.CouchbaseBucket]
 
 type couchbaseBucketInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -41,43 +70,132 @@ type couchbaseBucketInformer struct {
 // NewCouchbaseBucketInformer constructs a new informer for CouchbaseBucket type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedCouchbaseBucketInformer]).
 func NewCouchbaseBucketInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredCouchbaseBucketInformer(client, namespace, resyncPeriod, indexers, nil)
+	return NewCouchbaseBucketInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedCouchbaseBucketInformer constructs a new informer for CouchbaseBucket type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedCouchbaseBucketInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers CouchbaseBucketIndexers) CouchbaseBucketIndexInformer {
+	return NewTypedCouchbaseBucketInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredCouchbaseBucketInformer constructs a new informer for CouchbaseBucket type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredCouchbaseBucketInformer]).
 func NewFilteredCouchbaseBucketInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+	return NewTypedCouchbaseBucketInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredCouchbaseBucketInformer constructs a new informer for CouchbaseBucket type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredCouchbaseBucketInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers CouchbaseBucketIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) CouchbaseBucketIndexInformer {
+	return NewTypedCouchbaseBucketInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
+}
+
+// NewCouchbaseBucketInformerWithOptions constructs a new informer for CouchbaseBucket type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedCouchbaseBucketInformerWithOptions]).
+func NewCouchbaseBucketInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedCouchbaseBucketInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedCouchbaseBucketInformerWithOptions constructs a new informer for CouchbaseBucket type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedCouchbaseBucketInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) CouchbaseBucketIndexInformer {
+	gvr := schema.GroupVersionResource{Group: "couchbase.com", Version: "v2", Resource: "couchbasebuckets"}
+	identifier := options.InformerName.WithResource(gvr)
+	tweakListOptions := options.TweakListOptions
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseBucket](cache.NewSharedIndexInformerWithOptions(
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
+			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.CouchbaseV2().CouchbaseBuckets(namespace).List(context.TODO(), options)
+				return client.CouchbaseV2().CouchbaseBuckets(namespace).List(context.Background(), opts)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(opts v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.CouchbaseV2().CouchbaseBuckets(namespace).Watch(context.TODO(), options)
+				return client.CouchbaseV2().CouchbaseBuckets(namespace).Watch(context.Background(), opts)
 			},
+			ListWithContextFunc: func(ctx context.Context, opts v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&opts)
+				}
+				return client.CouchbaseV2().CouchbaseBuckets(namespace).List(ctx, opts)
+			},
+			WatchFuncWithContext: func(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&opts)
+				}
+				return client.CouchbaseV2().CouchbaseBuckets(namespace).Watch(ctx, opts)
+			},
+		}, client),
+		&apiscouchbasev2.CouchbaseBucket{},
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod: options.ResyncPeriod,
+			Indexers:     options.Indexers,
+			Identifier:   identifier,
 		},
-		&couchbasev2.CouchbaseBucket{},
-		resyncPeriod,
-		indexers,
-	)
+	))
 }
 
 func (f *couchbaseBucketInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredCouchbaseBucketInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewTypedCouchbaseBucketInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *couchbaseBucketInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&couchbasev2.CouchbaseBucket{}, f.defaultInformer)
+	return f.TypedInformer()
 }
 
-func (f *couchbaseBucketInformer) Lister() v2.CouchbaseBucketLister {
-	return v2.NewCouchbaseBucketLister(f.Informer().GetIndexer())
+func (f *couchbaseBucketInformer) TypedInformer() CouchbaseBucketIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseBucket](f.factory.InformerFor(&apiscouchbasev2.CouchbaseBucket{}, f.defaultInformer))
+}
+
+func (f *couchbaseBucketInformer) Lister() couchbasev2.CouchbaseBucketLister {
+	return couchbasev2.NewCouchbaseBucketLister(f.Informer().GetIndexer())
+}
+
+// ToTypedCouchbaseBucketInformer converts an untyped informer into a TypedCouchbaseBucketInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *CouchbaseBucket. If that is not the case, calling type-safe methods of the returned
+// TypedCouchbaseBucketInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedCouchbaseBucketInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedCouchbaseBucketInformer(informer CouchbaseBucketInformer) TypedCouchbaseBucketInformer {
+	if informer, ok := informer.(TypedCouchbaseBucketInformer); ok {
+		return informer
+	}
+	return &couchbaseBucketTypedInformerAdapter{informer}
+}
+
+type couchbaseBucketTypedInformerAdapter struct {
+	CouchbaseBucketInformer
+}
+
+func (a *couchbaseBucketTypedInformerAdapter) TypedInformer() CouchbaseBucketIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseBucket](a.Informer())
+}
+
+// ToCouchbaseBucketIndexInformer converts an untyped informer into a CouchbaseBucketIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *CouchbaseBucket. If that is not the case, calling type-safe methods of the returned
+// CouchbaseBucketIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a CouchbaseBucketIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToCouchbaseBucketIndexInformer(informer cache.SharedIndexInformer) CouchbaseBucketIndexInformer {
+	if informer, ok := informer.(CouchbaseBucketIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apiscouchbasev2.CouchbaseBucket](informer)
 }

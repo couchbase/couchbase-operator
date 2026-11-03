@@ -12,10 +12,10 @@
 package v2
 
 import (
-	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // CouchbaseReplicationLister helps list CouchbaseReplications.
@@ -23,7 +23,7 @@ import (
 type CouchbaseReplicationLister interface {
 	// List lists all CouchbaseReplications in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseReplication, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseReplication, err error)
 	// CouchbaseReplications returns an object that can list and get CouchbaseReplications.
 	CouchbaseReplications(namespace string) CouchbaseReplicationNamespaceLister
 	CouchbaseReplicationListerExpansion
@@ -31,25 +31,17 @@ type CouchbaseReplicationLister interface {
 
 // couchbaseReplicationLister implements the CouchbaseReplicationLister interface.
 type couchbaseReplicationLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*couchbasev2.CouchbaseReplication]
 }
 
 // NewCouchbaseReplicationLister returns a new CouchbaseReplicationLister.
 func NewCouchbaseReplicationLister(indexer cache.Indexer) CouchbaseReplicationLister {
-	return &couchbaseReplicationLister{indexer: indexer}
-}
-
-// List lists all CouchbaseReplications in the indexer.
-func (s *couchbaseReplicationLister) List(selector labels.Selector) (ret []*v2.CouchbaseReplication, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseReplication))
-	})
-	return ret, err
+	return &couchbaseReplicationLister{listers.New[*couchbasev2.CouchbaseReplication](indexer, couchbasev2.Resource("couchbasereplication"))}
 }
 
 // CouchbaseReplications returns an object that can list and get CouchbaseReplications.
 func (s *couchbaseReplicationLister) CouchbaseReplications(namespace string) CouchbaseReplicationNamespaceLister {
-	return couchbaseReplicationNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return couchbaseReplicationNamespaceLister{listers.NewNamespaced[*couchbasev2.CouchbaseReplication](s.ResourceIndexer, namespace)}
 }
 
 // CouchbaseReplicationNamespaceLister helps list and get CouchbaseReplications.
@@ -57,36 +49,15 @@ func (s *couchbaseReplicationLister) CouchbaseReplications(namespace string) Cou
 type CouchbaseReplicationNamespaceLister interface {
 	// List lists all CouchbaseReplications in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v2.CouchbaseReplication, err error)
+	List(selector labels.Selector) (ret []*couchbasev2.CouchbaseReplication, err error)
 	// Get retrieves the CouchbaseReplication from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v2.CouchbaseReplication, error)
+	Get(name string) (*couchbasev2.CouchbaseReplication, error)
 	CouchbaseReplicationNamespaceListerExpansion
 }
 
 // couchbaseReplicationNamespaceLister implements the CouchbaseReplicationNamespaceLister
 // interface.
 type couchbaseReplicationNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all CouchbaseReplications in the indexer for a given namespace.
-func (s couchbaseReplicationNamespaceLister) List(selector labels.Selector) (ret []*v2.CouchbaseReplication, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2.CouchbaseReplication))
-	})
-	return ret, err
-}
-
-// Get retrieves the CouchbaseReplication from the indexer for a given namespace and name.
-func (s couchbaseReplicationNamespaceLister) Get(name string) (*v2.CouchbaseReplication, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v2.Resource("couchbasereplication"), name)
-	}
-	return obj.(*v2.CouchbaseReplication), nil
+	listers.ResourceIndexer[*couchbasev2.CouchbaseReplication]
 }
