@@ -6105,6 +6105,13 @@ type TLSPolicy struct {
 	// domain names (3+ labels), satisfying security policies that prohibit
 	// "short" or unqualified SAN entries.
 	ValidateShortHostnames *bool `json:"-" annotation:"validateShortHostnames"`
+
+	// InternalIdentityPasswordCheck, when true, requires a password alongside the internal client
+	// certificate. The certificate alone no longer authenticates as a cluster administrator.
+	// Only has an effect when clientCertificatePolicy is mandatory. Leaving the
+	// annotation off leaves the server value untouched (default false in 8.0.4, true in 8.5.0+).
+	// Requires Couchbase Server 8.0.4 or greater.
+	InternalIdentityPasswordCheckUnderMtls *bool `json:"-" annotation:"internalIdentityPasswordCheckUnderMtls"`
 }
 
 type PassphraseType string

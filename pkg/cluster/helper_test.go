@@ -144,6 +144,85 @@ func TestGetLowestKnownMemberVersion(t *testing.T) {
 	}
 }
 
+func TestSupportsMaintenanceVersionFeatures(t *testing.T) {
+	t.Parallel()
+
+	testcases := []struct {
+		name           string
+		memberVersions []string
+		external       bool
+		expected       bool
+	}{
+		{
+			name:           "no members",
+			memberVersions: []string{},
+			expected:       false,
+		},
+		{
+			name:           "all equal",
+			memberVersions: []string{"8.0.4", "8.0.4"},
+			expected:       true,
+		},
+		{
+			name:           "all newer",
+			memberVersions: []string{"8.0.5", "8.5.0"},
+			expected:       true,
+		},
+		{
+			name:           "one older maintenance release",
+			memberVersions: []string{"8.0.4", "8.0.3", "8.5.0"},
+			expected:       false,
+		},
+		{
+			name:           "with build numbers",
+			memberVersions: []string{"8.0.4-6243", "8.0.4-6306"},
+			expected:       true,
+		},
+		{
+			name:           "one empty",
+			memberVersions: []string{"8.0.4", ""},
+			expected:       false,
+		},
+		{
+			name:           "one unknown digest",
+			memberVersions: []string{"8.0.4", couchbaseutil.UnknownVersion},
+			expected:       false,
+		},
+		{
+			name:           "one unparsable",
+			memberVersions: []string{"8.0.4", "not-a-version"},
+			expected:       false,
+		},
+		{
+			name:           "external member",
+			memberVersions: []string{"8.0.4"},
+			external:       true,
+			expected:       false,
+		},
+	}
+
+	for _, testcase := range testcases {
+		c := Cluster{
+			cluster: &v2.CouchbaseCluster{},
+			members: couchbaseutil.MemberSet{},
+		}
+
+		for i, version := range testcase.memberVersions {
+			name := fmt.Sprintf("%s-%d", testcase.name, i)
+			c.members.Add(couchbaseutil.NewMember("", "", name, version, "", false, ""))
+		}
+
+		// External members never report a version, so must always be treated as unsupported.
+		if testcase.external {
+			c.members.Add(couchbaseutil.NewExternalMember("external.example.com", "", false))
+		}
+
+		if supported := c.SupportsMaintenanceVersionFeatures("8.0.4"); supported != testcase.expected {
+			t.Errorf("%s: got %v, expected %v", testcase.name, supported, testcase.expected)
+		}
+	}
+}
+
 func TestGetHighestKnownMemberVersion(t *testing.T) {
 	t.Parallel()
 

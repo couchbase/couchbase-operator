@@ -2569,7 +2569,8 @@ type RebalanceProgress struct {
 // We're purposely not modeling the entire payload and just this field
 // since these are critical settings and should be handled with care! So only tinker if you know what you're doing.
 type InternalSettings struct {
-	DataServiceFileBasedRebalanceEnabled *bool `json:"dataServiceFileBasedRebalanceEnabled,omitempty" url:"dataServiceFileBasedRebalanceEnabled,omitempty"`
+	DataServiceFileBasedRebalanceEnabled   *bool `json:"dataServiceFileBasedRebalanceEnabled,omitempty" url:"dataServiceFileBasedRebalanceEnabled,omitempty"`
+	InternalIdentityPasswordCheckUnderMtls *bool `json:"internalIdentityPasswordCheckUnderMtls,omitempty" url:"internalIdentityPasswordCheckUnderMtls,omitempty"`
 }
 
 // RebalanceSettings models /settings/rebalance, which controls how many vBucket moves the cluster

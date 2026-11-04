@@ -206,6 +206,40 @@ func (c *Cluster) SupportsVersionFeatures(version string) bool {
 	return supports
 }
 
+// SupportsMaintenanceVersionFeatures reports whether every member, external ones included, is
+// running at least the given version. Use it for features added in a maintenance release, which
+// SupportsVersionFeatures cannot gate as the compat version is only major.minor.
+//
+// It uses the version each server reported rather than the image tag, so it works with digest
+// images, and it fails closed: an unknown version, which would otherwise resolve to the
+// UnknownVersion sentinel and pass, is reported as unsupported.
+func (c *Cluster) SupportsMaintenanceVersionFeatures(version string) bool {
+	if c.members.Empty() {
+		return false
+	}
+
+	for _, member := range c.members {
+		memberVersion := member.Version()
+
+		if !couchbaseutil.VersionKnown(memberVersion) {
+			c.log.V(1).Info("Member version unknown, treating feature as unsupported", "cluster", c.namespacedName(), "member", member.Name(), "version", version)
+			return false
+		}
+
+		supports, err := couchbaseutil.VersionAfter(memberVersion, version)
+		if err != nil {
+			c.log.Error(err, "Failed to check member version for feature support", "cluster", c.namespacedName(), "member", member.Name(), "version", version)
+			return false
+		}
+
+		if !supports {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (c *Cluster) GetRunningImageForVersion(version string) string {
 	// First check running pods
 	runningPods, _ := c.getClusterPodsByPhase()

@@ -1793,6 +1793,39 @@ func MustVerifyFileBasedRebalanceEnabled(t *testing.T, k8s *types.Cluster, clust
 	}
 }
 
+// MustVerifyInternalIdentityPasswordCheck checks that the internal identity password check, which
+// users set with the cao.couchbase.com/networking.tls.internalIdentityPasswordCheckUnderMtls
+// annotation, has reached the server.  It uses the plain admin port, which client certificate auth
+// does not cover, so it cannot be used with strict node-to-node encryption.
+func MustVerifyInternalIdentityPasswordCheck(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, expectedEnabled bool, timeout time.Duration) {
+	callback := func() error {
+		client, err := CreateAdminConsoleClient(k8s, cluster)
+		if err != nil {
+			return err
+		}
+
+		current := couchbaseutil.InternalSettings{}
+
+		if err := couchbaseutil.GetInternalSettings(&current).On(client.client, client.host); err != nil {
+			return err
+		}
+
+		if current.InternalIdentityPasswordCheckUnderMtls == nil {
+			return fmt.Errorf("expected internalIdentityPasswordCheckUnderMtls=%t, but the server did not report it at all", expectedEnabled)
+		}
+
+		if *current.InternalIdentityPasswordCheckUnderMtls != expectedEnabled {
+			return fmt.Errorf("expected internalIdentityPasswordCheckUnderMtls=%t, got %t", expectedEnabled, *current.InternalIdentityPasswordCheckUnderMtls)
+		}
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
+		Die(t, err)
+	}
+}
+
 // MustVerifyRebalanceSettings checks the cluster's vBucket move concurrency settings on
 // /settings/rebalance.
 func MustVerifyRebalanceSettings(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, expectedMovesPerNode, expectedFileBasedMovesPerNode int, timeout time.Duration) {

@@ -597,6 +597,13 @@ func registerTests() {
 		framework.NewTestDef(TestMandatoryMutualTLSWithSingleSecretMultipleCAsAndKubernetesSecrets).WithTags(TagSuiteP1, TagFeatureTLS, TagSuitePlatform),
 		framework.NewTestDef(TestMandatoryMutualTLSWithMultipleCAsAndCertManagerSecrets).WithTags(TagSuiteP1, TagFeatureTLS),
 		framework.NewTestDef(TestMandatoryMutualTLSWithSingleSecretMultipleCAsAndCertManagerSecrets).WithTags(TagSuiteP1, TagFeatureTLS, TagSuitePlatform),
+
+		framework.NewTestDef(TestMandatoryMutualTLSInternalIdentityPasswordCheck).WithTags(TagSuiteP1, TagFeatureTLS),
+		framework.NewTestDef(TestMandatoryMutualTLSInternalIdentityPasswordCheckScaling).WithTags(TagSuiteP1, TagFeatureTLS),
+		framework.NewTestDef(TestMandatoryMutualTLSInternalIdentityPasswordCheckSwapRebalance).WithTags(TagSuiteP1, TagFeatureTLS),
+		framework.NewTestDef(TestMandatoryMutualTLSInternalIdentityPasswordCheckInPlaceUpgrade).WithTags(TagSuiteP1, TagFeatureTLS),
+		framework.NewTestDef(TestMandatoryMutualTLSInternalIdentityPasswordCheckUpgrade).WithTags(TagSuiteP1, TagFeatureTLS),
+
 		framework.NewTestDef(TestBackupAndRestoreCollectionS3).WithTags(TagSuiteP1, TagFeatureCollections, TagFeatureBackup, TagFeatureBackupCloud),
 		framework.NewTestDef(TestBackupAndRestoreCollectionAzure).WithTags(TagSuiteP1, TagFeatureCollections, TagFeatureBackup, TagFeatureBackupCloud),
 		framework.NewTestDef(TestBackupAndRestoreCollectionGCP).WithTags(TagSuiteP1, TagFeatureCollections, TagFeatureBackup, TagFeatureBackupCloud),

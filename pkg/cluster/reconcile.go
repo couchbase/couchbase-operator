@@ -520,6 +520,55 @@ func (c *Cluster) reconcileClusterSettings() error {
 		return err
 	}
 
+	if err := c.reconcileInternalIdentityPasswordCheck(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// reconcileInternalIdentityPasswordCheck reconciles the cluster wide internal identity password
+// check, which users set with the
+// cao.couchbase.com/networking.tls.internalIdentityPasswordCheckUnderMtls annotation. When enabled,
+// a connection presenting the internal client certificate must also carry valid credentials, so the
+// certificate alone no longer authenticates as a cluster administrator. Only has an effect under
+// mandatory client certificate authentication. Available in Couchbase Server 8.0.4+.
+//
+// An absent annotation leaves the server alone. The server default follows the cluster version
+// (off in 8.0.4, on once every node is on 8.5.0), and an explicitly written value is kept across
+// upgrades, so the operator must not write one the user did not ask for.
+func (c *Cluster) reconcileInternalIdentityPasswordCheck() error {
+	tls := c.cluster.Spec.Networking.TLS
+	if tls == nil || tls.InternalIdentityPasswordCheckUnderMtls == nil {
+		return nil
+	}
+
+	// Every node must be on 8.0.4+, as older nodes do not send the internal password and would be
+	// locked out when the check is on.
+	if !c.SupportsMaintenanceVersionFeatures("8.0.4") {
+		c.log.V(1).Info("Internal identity password check not supported on this version", "cluster", c.namespacedName())
+		return nil
+	}
+
+	current := couchbaseutil.InternalSettings{}
+	if err := couchbaseutil.GetInternalSettings(&current).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	requested := current
+
+	requested.InternalIdentityPasswordCheckUnderMtls = tls.InternalIdentityPasswordCheckUnderMtls
+	if reflect.DeepEqual(current, requested) {
+		return nil
+	}
+
+	if err := couchbaseutil.SetInternalSettings(&requested).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	c.log.V(2).Info("Internal identity password check updated", "cluster", c.namespacedName(), "enabled", *tls.InternalIdentityPasswordCheckUnderMtls)
+	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("internal identity password check", c.cluster))
+
 	return nil
 }
 
@@ -527,7 +576,7 @@ func (c *Cluster) reconcileClusterSettings() error {
 // switch, which users set with the cao.couchbase.com/dataServiceFileBasedRebalanceEnabled
 // annotation. Available in Couchbase Server 8.5.0+.
 //
-// The setting lives on /internalSettings, and InternalSettings struct models only that one key, so the other
+// The setting lives on /internalSettings, and InternalSettings models only the keys the operator manages, so the other
 // internal settings are dropped on read and never sent on write. POST to /internalSettings is a
 // partial update, so this cannot clobber values the operator does not manage.
 func (c *Cluster) reconcileFileBasedRebalanceEnabled() error {

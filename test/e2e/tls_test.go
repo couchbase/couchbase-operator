@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"reflect"
 	"testing"
 	"time"
 
@@ -3052,4 +3053,227 @@ func TestMandatoryMutualTLSNodeClientCertEnableToMandatory(t *testing.T) {
 // certificate policy to mandatory, which goes through enableMutualTLS instead.
 func TestMandatoryMutualTLSNodeClientCertPlainToMandatory(t *testing.T) {
 	testMandatoryMutualTLSNodeClientCertTransition(t, nil)
+}
+
+// internalIdentityPasswordCheckAnnotation sets internalIdentityPasswordCheckUnderMtls on /internalSettings.
+const internalIdentityPasswordCheckAnnotation = annotations.AnnotationPrefix + "networking.tls.internalIdentityPasswordCheckUnderMtls"
+
+// mustCreateInternalIdentityPasswordCheckCluster creates a healthy cluster under mandatory client
+// certificate auth, with the node internal client certificate signed by the cluster CA, which is
+// the setup the internal identity password check was raised for (K8S-4905).  check, when not nil,
+// sets the annotation at creation.  mutate makes any test specific changes before creation.
+//
+// Node-to-node encryption is left off, so the settings can be checked over the plain admin port.
+func mustCreateInternalIdentityPasswordCheckCluster(t *testing.T, kubernetes *types.Cluster, options *e2eutil.ClusterOptions, check *bool, mutate func(*couchbasev2.CouchbaseCluster)) *couchbasev2.CouchbaseCluster {
+	keyEncoding := e2eutil.KeyEncodingPKCS8
+	policy := couchbasev2.ClientCertificatePolicyMandatory
+
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{
+		Source:      e2eutil.TLSSourceCertManagerSecret,
+		KeyEncoding: &keyEncoding,
+	})
+
+	nodeClientSecretName := mustCreateNodeClientCertSecret(t, kubernetes, ctx, keyEncoding)
+
+	cluster := options.WithMutualTLS(ctx, &policy).Generate(kubernetes)
+
+	if cluster.Annotations == nil {
+		cluster.Annotations = map[string]string{}
+	}
+
+	cluster.Annotations[nodeClientSecretAnnotation] = nodeClientSecretName
+
+	if check != nil {
+		cluster.Annotations[internalIdentityPasswordCheckAnnotation] = fmt.Sprintf("%t", *check)
+	}
+
+	if mutate != nil {
+		mutate(cluster)
+	}
+
+	return e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+}
+
+// TestMandatoryMutualTLSInternalIdentityPasswordCheck switches the internal identity password check
+// on for a running cluster under mandatory client certificate auth, scales the cluster up so a node
+// is added with the check enforced, then switches it off again (K8S-4905).
+func TestMandatoryMutualTLSInternalIdentityPasswordCheck(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("8.0.4")
+
+	clusterSize := constants.Size3
+
+	// Switch it on once the cluster is up, rather than at creation, as nothing guarantees it lands
+	// before the initial nodes are added, so the scale up is the only add known to be checked.
+	cluster := mustCreateInternalIdentityPasswordCheckCluster(t, kubernetes, clusterOptions().WithEphemeralTopology(clusterSize), nil, nil)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster,
+		jsonpatch.NewPatchSet().Add("/metadata/annotations", withAnnotation(cluster, internalIdentityPasswordCheckAnnotation, "true")), time.Minute)
+
+	e2eutil.MustVerifyInternalIdentityPasswordCheck(t, kubernetes, cluster, true, time.Minute)
+
+	// Add a node with the check enforced.
+	cluster = e2eutil.MustResizeCluster(t, 0, clusterSize+1, kubernetes, cluster, 15*time.Minute)
+
+	e2eutil.MustVerifyInternalIdentityPasswordCheck(t, kubernetes, cluster, true, time.Minute)
+
+	// Turning it back off must work too, so the annotation is a switch rather than a one way door.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster,
+		jsonpatch.NewPatchSet().Add("/metadata/annotations", withAnnotation(cluster, internalIdentityPasswordCheckAnnotation, "false")), time.Minute)
+
+	e2eutil.MustVerifyInternalIdentityPasswordCheck(t, kubernetes, cluster, false, time.Minute)
+}
+
+// TestMandatoryMutualTLSInternalIdentityPasswordCheckScaling scales a cluster created with the
+// internal identity password check on up by several nodes at once, so they are added together with
+// it enforced, then back down, so nodes are rebalanced out with it enforced.
+func TestMandatoryMutualTLSInternalIdentityPasswordCheckScaling(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("8.0.4")
+
+	clusterSize := constants.Size3
+	check := true
+
+	cluster := mustCreateInternalIdentityPasswordCheckCluster(t, kubernetes, clusterOptions().WithEphemeralTopology(clusterSize), &check, nil)
+
+	e2eutil.MustVerifyInternalIdentityPasswordCheck(t, kubernetes, cluster, true, time.Minute)
+
+	cluster = e2eutil.MustResizeCluster(t, 0, clusterSize+2, kubernetes, cluster, 15*time.Minute)
+
+	e2eutil.MustVerifyInternalIdentityPasswordCheck(t, kubernetes, cluster, true, time.Minute)
+
+	cluster = e2eutil.MustResizeCluster(t, 0, clusterSize, kubernetes, cluster, 15*time.Minute)
+
+	e2eutil.MustVerifyInternalIdentityPasswordCheck(t, kubernetes, cluster, true, time.Minute)
+}
+
+// recreatePodsPatch adds an environment variable to the default server class.  It changes nothing
+// in Couchbase Server, but every pod no longer matches its spec, so the operator replaces each one
+// using the cluster's upgrade process.  This moves every node without needing a second Couchbase
+// Server image, unlike a version upgrade, so the test runs on any image that supports the check.
+func recreatePodsPatch() jsonpatch.PatchSet {
+	return jsonpatch.NewPatchSet().Add("/spec/servers/0/env", []v1.EnvVar{
+		{
+			Name:  "RECREATE_PODS",
+			Value: "true",
+		},
+	})
+}
+
+// TestMandatoryMutualTLSInternalIdentityPasswordCheckSwapRebalance swap rebalances every node with
+// the internal identity password check on, so each replacement node is added with it enforced.
+func TestMandatoryMutualTLSInternalIdentityPasswordCheckSwapRebalance(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("8.0.4")
+
+	check := true
+
+	cluster := mustCreateInternalIdentityPasswordCheckCluster(t, kubernetes, clusterOptions().WithEphemeralTopology(constants.Size3), &check, func(cluster *couchbasev2.CouchbaseCluster) {
+		cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+			UpgradeProcess: couchbasev2.SwapRebalance,
+		}
+	})
+
+	e2eutil.MustVerifyInternalIdentityPasswordCheck(t, kubernetes, cluster, true, time.Minute)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, recreatePodsPatch(), time.Minute)
+
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewUpgradeFinishedEvent(cluster), 30*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+	e2eutil.MustVerifyInternalIdentityPasswordCheck(t, kubernetes, cluster, true, time.Minute)
+}
+
+// TestMandatoryMutualTLSInternalIdentityPasswordCheckInPlaceUpgrade upgrades every node in place with
+// the internal identity password check on, so each recreated node rejoins with it enforced.
+func TestMandatoryMutualTLSInternalIdentityPasswordCheckInPlaceUpgrade(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("8.0.4").InplaceUpgradeable()
+
+	check := true
+
+	// In place upgrades need persistent volumes to recreate the pods on.
+	cluster := mustCreateInternalIdentityPasswordCheckCluster(t, kubernetes, clusterOptions().WithPersistentTopology(constants.Size3), &check, func(cluster *couchbasev2.CouchbaseCluster) {
+		cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+			UpgradeProcess: couchbasev2.InPlaceUpgrade,
+		}
+	})
+
+	e2eutil.MustVerifyInternalIdentityPasswordCheck(t, kubernetes, cluster, true, time.Minute)
+
+	podsBefore := mustGetSortedPodNames(t, kubernetes, cluster)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, recreatePodsPatch(), time.Minute)
+
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewUpgradeFinishedEvent(cluster), 30*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+	e2eutil.MustVerifyInternalIdentityPasswordCheck(t, kubernetes, cluster, true, time.Minute)
+
+	// An in place upgrade recreates each pod under the same name, where a swap rebalance creates new
+	// ones, so the same names prove the operator did not fall back to swap rebalance.
+	if podsAfter := mustGetSortedPodNames(t, kubernetes, cluster); !reflect.DeepEqual(podsBefore, podsAfter) {
+		e2eutil.Die(t, fmt.Errorf("expected an in place upgrade to keep pods %v, got %v", podsBefore, podsAfter))
+	}
+}
+
+// TestMandatoryMutualTLSInternalIdentityPasswordCheckUpgrade switches the internal identity password
+// check on part way through a Couchbase Server upgrade, while the cluster has nodes on both versions,
+// so the remaining upgraded nodes are added with the check enforced.
+//
+// Both versions must support the check.  An upgrade from before 8.0.4 is deliberately not covered,
+// as it depends on a specific older image being available.
+func TestMandatoryMutualTLSInternalIdentityPasswordCheckUpgrade(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).Upgradable().AtLeastUpgradeVersion("8.0.4")
+
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	check := false
+
+	// Cluster settings are only reconciled during an upgrade while the operator waits between
+	// nodes, so the stabilization period is the window the check is switched on in.
+	cluster := mustCreateInternalIdentityPasswordCheckCluster(t, kubernetes, clusterOptionsUpgrade().WithEphemeralTopology(constants.Size3), &check, func(cluster *couchbasev2.CouchbaseCluster) {
+		cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+			StabilizationPeriod: e2espec.NewDurationS(90),
+		}
+	})
+
+	e2eutil.MustVerifyInternalIdentityPasswordCheck(t, kubernetes, cluster, false, time.Minute)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+
+	// The first node has been upgraded and the operator is waiting before the next one.
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionWaitingBetweenUpgrades, v1.ConditionTrue, cluster, 15*time.Minute)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster,
+		jsonpatch.NewPatchSet().Add("/metadata/annotations", withAnnotation(cluster, internalIdentityPasswordCheckAnnotation, "true")), time.Minute)
+
+	// The check must land inside the wait, rather than once the upgrade finishes, or the remaining
+	// nodes would not be added with it enforced.
+	e2eutil.MustVerifyInternalIdentityPasswordCheck(t, kubernetes, cluster, true, time.Minute)
+
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewUpgradeFinishedEvent(cluster), 30*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+	e2eutil.MustVerifyInternalIdentityPasswordCheck(t, kubernetes, cluster, true, time.Minute)
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, upgradeVersion, time.Minute)
 }
