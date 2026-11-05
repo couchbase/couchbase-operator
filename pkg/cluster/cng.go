@@ -43,7 +43,7 @@ func (c *Cluster) reconcileCloudNativeGatewayConfig() error {
 	}
 
 	configMapName := k8sutil.GetCNGConfigMapName(c.cluster)
-	current, exists := c.k8s.ConfigMaps.Get(configMapName)
+	current, cngConfigMapExists := c.k8s.ConfigMaps.Get(configMapName)
 
 	newConfig := CNGConfig{
 		LogLevel:       string(cng.LogLevel),
@@ -76,44 +76,42 @@ func (c *Cluster) reconcileCloudNativeGatewayConfig() error {
 
 	k8sutil.ApplyBaseAnnotations(requestedConfig)
 
-	if exists {
+	if cngConfigMapExists {
 		if reflect.DeepEqual(current.Data, requestedConfig.Data) {
 			return nil
 		}
 
-		c.log.Info("Updating Cloud Native Gateway ConfigMap", "cluster", c.namespacedName(), "name", configMapName)
-
-		_, err := c.k8s.KubeClient.CoreV1().ConfigMaps(c.cluster.Namespace).Update(context.Background(), requestedConfig, metav1.UpdateOptions{})
-
-		if err != nil {
-			return errors.NewStackTracedError(err)
-		}
-
 		var currentConfig CNGConfig
 
-		err = json.Unmarshal([]byte(current.Data[k8sutil.CngConfigFilename]), &currentConfig)
+		if err := json.Unmarshal([]byte(current.Data[k8sutil.CngConfigFilename]), &currentConfig); err != nil {
+			if err := c.updateCloudNativeGatewayConfigMap(requestedConfig); err != nil {
+				return err
+			}
 
-		if err != nil {
 			return fmt.Errorf("unable to check whether Cloud Native Gateway requires a restart, refer to the container logs: %w", err)
 		}
 
 		// If the dapi-proxy-services list has changed or the dapi has been disabled, we need to restart the pods to force the CNG container to restart.
 		// CNG will be updated in the future to be dynamic, in which case this can be removed.
+		// The reschedule annotation must be persisted to the API before the ConfigMap is updated: once the ConfigMap
+		// matches we never come back here, and an annotation only set on the cached pod is lost the next time the
+		// informer sees that pod change (e.g. readiness conditions patched during the first pod's move).
 		if currentConfig.DapiPort != newConfig.DapiPort || !couchbaseutil.DoStringSlicesContainEqualValues(newConfig.DapiProxyServices, currentConfig.DapiProxyServices, ",") {
 			c.log.Info("Adding reschedule annotation to force pod restart due to CNG config changes", "cluster", c.namespacedName())
 
 			for name := range c.members {
 				pod, exists := c.k8s.Pods.Get(name)
-
-				if !exists {
+				if !exists || pod.Annotations[constants.AnnotationReschedule] == "true" {
 					continue
 				}
 
-				pod.Annotations[constants.AnnotationReschedule] = "true"
+				if err := k8sutil.SetPodRescheduleAnnotation(c.k8s, name); err != nil {
+					return err
+				}
 			}
 		}
 
-		return nil
+		return c.updateCloudNativeGatewayConfigMap(requestedConfig)
 	}
 
 	// If we reach here then the CM doesn't exist
@@ -122,6 +120,16 @@ func (c *Cluster) reconcileCloudNativeGatewayConfig() error {
 	_, err = c.k8s.KubeClient.CoreV1().ConfigMaps(c.cluster.Namespace).Create(context.Background(), requestedConfig, metav1.CreateOptions{})
 
 	if err != nil {
+		return errors.NewStackTracedError(err)
+	}
+
+	return nil
+}
+
+func (c *Cluster) updateCloudNativeGatewayConfigMap(requestedConfig *v1.ConfigMap) error {
+	c.log.Info("Updating Cloud Native Gateway ConfigMap", "cluster", c.namespacedName(), "name", requestedConfig.Name)
+
+	if _, err := c.k8s.KubeClient.CoreV1().ConfigMaps(c.cluster.Namespace).Update(context.Background(), requestedConfig, metav1.UpdateOptions{}); err != nil {
 		return errors.NewStackTracedError(err)
 	}
 

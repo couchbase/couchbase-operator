@@ -1234,6 +1234,21 @@ func MustKillMemberWithDefaultGracePeriod(t *testing.T, k8s *types.Cluster, cl *
 	}
 }
 
+// pullSecretReferences returns the cluster's image pull secrets as references for a pod spec,
+// for pods the tests create directly rather than through the Operator.
+func pullSecretReferences(k8s *types.Cluster) []v1.LocalObjectReference {
+	if len(k8s.PullSecrets) == 0 {
+		return nil
+	}
+
+	references := make([]v1.LocalObjectReference, 0, len(k8s.PullSecrets))
+	for _, name := range k8s.PullSecrets {
+		references = append(references, v1.LocalObjectReference{Name: name})
+	}
+
+	return references
+}
+
 func CreateMemberPod(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, m couchbaseutil.Member) (*v1.Pod, error) {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1250,6 +1265,8 @@ func CreateMemberPod(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, m cou
 			Subdomain: cl.Name,
 		},
 	}
+
+	pod.Spec.ImagePullSecrets = append(pod.Spec.ImagePullSecrets, pullSecretReferences(k8s)...)
 
 	for _, config := range cl.Spec.Servers {
 		if config.Name == m.Config() {
@@ -1724,6 +1741,8 @@ func GenerateWorkload(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluste
 		},
 	}
 
+	pod.Spec.ImagePullSecrets = append(pod.Spec.ImagePullSecrets, pullSecretReferences(k8s)...)
+
 	if _, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).Create(context.Background(), pod, metav1.CreateOptions{}); err != nil {
 		return nil, err
 	}
@@ -1796,9 +1815,7 @@ func MustPopulateWithDataSize(t *testing.T, k8s *types.Cluster, couchbase *couch
 		},
 	}
 
-	for _, secret := range k8s.PullSecrets {
-		job.Spec.Template.Spec.ImagePullSecrets = append(job.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
-	}
+	job.Spec.Template.Spec.ImagePullSecrets = append(job.Spec.Template.Spec.ImagePullSecrets, pullSecretReferences(k8s)...)
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()

@@ -2725,6 +2725,11 @@ func SetPodUpgradeTracking(client *client.Client, name, process string) error {
 	return setPodAnnotation(client, name, constants.UpgradeTrackingAnnotation, process)
 }
 
+// SetPodRescheduleAnnotation marks a pod to be moved by the topology reconciler.
+func SetPodRescheduleAnnotation(client *client.Client, name string) error {
+	return setPodAnnotation(client, name, constants.AnnotationReschedule, "true")
+}
+
 // ClearPodUpgradeTracking removes the UpgradeTrackingAnnotation from a pod.
 // Called when the stabilization period expires or is not configured.
 func ClearPodUpgradeTracking(client *client.Client, name string) error {

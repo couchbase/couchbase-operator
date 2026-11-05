@@ -57,6 +57,18 @@ type MemberState struct {
 	ServerRebalanceReasons []string
 }
 
+// settled reports whether no node is still on its way into (or back into) the cluster and the
+// cluster neither needs nor is running a rebalance.
+func (m *MemberState) settled() bool {
+	if m == nil {
+		return true
+	}
+
+	return !m.NeedsRebalance && !m.IsRebalancing &&
+		m.PendingAddNodes.Empty() && m.AddBackNodes.Empty() && m.FailedAddNodes.Empty() &&
+		m.FailedNodes.Empty()
+}
+
 // nodeStatus is an intermediate data structured used to log node status information.
 type nodeStatus struct {
 	name    string
@@ -553,7 +565,7 @@ func (r *ReconcileMachine) handlePodHostname(c *Cluster) error {
 		return err
 	}
 
-	if membersToSwapRebalance.Size() > 0 {
+	if !constrained.Empty() {
 		return r.swapRebalanceMembers(c, constrained)
 	}
 
@@ -2103,6 +2115,33 @@ func (r *ReconcileMachine) handleInPlaceUpgrade(c *Cluster, candidates couchbase
 	return nil
 }
 
+// selectMoveCandidates returns the pods marked for rescheduling that can be moved this cycle,
+// constrained by the upgrade strategy.  It returns an empty set when nothing needs moving, or
+// when every candidate has been held back, e.g. to preserve ready CNG instances while a
+// previously moved pod's CNG sidecar becomes ready, in which case a later reconcile retries.
+func (c *Cluster) selectMoveCandidates() (couchbaseutil.MemberSet, error) {
+	candidates := c.needsMove()
+	if candidates.Empty() {
+		return candidates, nil
+	}
+
+	clusterInfo := &couchbaseutil.TerseClusterInfo{}
+	if err := couchbaseutil.GetTerseClusterInfo(clusterInfo).On(c.api, c.readyMembers()); err != nil {
+		return nil, err
+	}
+
+	constrained, err := c.selectUpgradeCandidates(candidates, clusterInfo.Orchestrator)
+	if err != nil {
+		return nil, err
+	}
+
+	if constrained.Empty() {
+		c.log.V(1).Info("No nodes can be moved this cycle", "cluster", c.namespacedName(), "pending", candidates.Names())
+	}
+
+	return constrained, nil
+}
+
 func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 	// If the cluster needs a rebalance, let's do that first
 	if r.needsRebalance {
@@ -2111,28 +2150,15 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 
 	r.log()
 
-	// Check which pods need moving
-	candidates := c.needsMove()
+	candidates, err := c.selectMoveCandidates()
+	if err != nil {
+		return err
+	}
 
 	if candidates.Empty() {
 		return nil
 	}
 
-	// Get the max upgradeable candidates
-	clusterInfo := &couchbaseutil.TerseClusterInfo{}
-	if err := couchbaseutil.GetTerseClusterInfo(clusterInfo).On(c.api, c.readyMembers()); err != nil {
-		return err
-	}
-
-	orchestratorName := clusterInfo.Orchestrator
-
-	constrained, err := c.selectUpgradeCandidates(candidates, orchestratorName)
-
-	if err != nil {
-		return err
-	}
-
-	candidates = constrained
 	c.log.Info("Moving nodes", "cluster", c.namespacedName(), "candidates", candidates.Names())
 
 	// Is it possible to do InPlaceUpgrade if that's what they asked for?
@@ -3266,6 +3292,10 @@ func migrationCycleStrategy(upgradeProcess couchbasev2.UpgradeProcess, hasStorag
 
 // nolint:gocognit
 func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseutil.MemberSet) error {
+	if members.Empty() {
+		return nil
+	}
+
 	candidatesSlice := make([]couchbaseutil.Member, 0, len(members))
 	toCreate := make([]couchbasev2.ServerConfig, 0, len(members))
 

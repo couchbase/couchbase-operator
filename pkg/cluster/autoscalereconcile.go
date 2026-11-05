@@ -28,24 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// autoscaleSizeApply is a minimal, hand-built Server-Side Apply configuration
-// for setting a single server class's size. Only the fields present here are
-// ever claimed by constants.FieldManagerAutoscaler.
-type autoscaleSizeApply struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata"`
-	Spec              autoscaleSizeApplySpec `json:"spec"`
-}
-
-type autoscaleSizeApplySpec struct {
-	Servers []autoscaleSizeApplyServer `json:"servers"`
-}
-
-type autoscaleSizeApplyServer struct {
-	Name string `json:"name"`
-	Size int    `json:"size"`
-}
-
 // Reconcile Autoscaler ensures all server configs have
 // associated Autoscaler CR. Applies changes when sizing
 // differs.
@@ -213,39 +195,43 @@ func (c *Cluster) autoscalingReady() bool {
 // When size values differ the cluster is put into
 // maintenance mode since scaling will occur as a result.
 func (c *Cluster) applyAutoscaleSize(configName string, requestedSize int) error {
-	apply := autoscaleSizeApply{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: couchbasev2.SchemeGroupVersion.String(),
-			Kind:       couchbasev2.ClusterCRDResourceKind,
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.cluster.GetName(),
-			Namespace: c.cluster.GetNamespace(),
-		},
-		Spec: autoscaleSizeApplySpec{
-			Servers: []autoscaleSizeApplyServer{
-				{
-					Name: configName,
-					Size: requestedSize,
-				},
-			},
-		},
+	index := -1
+
+	for i := range c.cluster.Spec.Servers {
+		if c.cluster.Spec.Servers[i].Name == configName {
+			index = i
+			break
+		}
 	}
 
-	patch, err := json.Marshal(apply)
+	if index < 0 {
+		return fmt.Errorf("failed to update cluster size: %w: server class %s not found", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), configName)
+	}
+
+	// A JSON patch that only replaces this server class's size.  The test operation guards
+	// against the server classes having been reordered or removed since we read the cluster,
+	// in which case the patch is rejected and retried on the next reconcile.
+	// Not using the SSA it requires a full resource that it owned previously otherwise it
+	// will try to remove those fields from the resource.
+	patch, err := json.Marshal([]map[string]interface{}{
+		{
+			"op":    "test",
+			"path":  fmt.Sprintf("/spec/servers/%d/name", index),
+			"value": configName,
+		},
+		{
+			"op":    "replace",
+			"path":  fmt.Sprintf("/spec/servers/%d/size", index),
+			"value": requestedSize,
+		},
+	})
 	if err != nil {
 		return errors.NewStackTracedError(err)
 	}
 
-	// Server-Side Apply: spec.servers is declared listType=map/listMapKey=name,
-	// so this merges by "name" and only claims ownership of "size" within that
-	// entry unlike a full Update(), it never touches any other field on this or other server classes.
-	force := true
-
 	updatedCluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).
-		Patch(context.Background(), c.cluster.Name, types.ApplyPatchType, patch, metav1.PatchOptions{
+		Patch(context.Background(), c.cluster.Name, types.JSONPatchType, patch, metav1.PatchOptions{
 			FieldManager: constants.FieldManagerAutoscaler,
-			Force:        &force,
 		})
 	if err != nil {
 		return fmt.Errorf("failed to update cluster size: %w", errors.NewStackTracedError(err))

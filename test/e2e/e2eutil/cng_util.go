@@ -245,3 +245,56 @@ func mustCheckRespStatusCodeDAPI(t *testing.T, expectedCode int, resp *testDAPIH
 		Die(t, fmt.Errorf("expected a response from the data api"))
 	}
 }
+
+// MustWaitForCloudNativeGatewaySidecarUnready is the counterpart to MustWaitForCloudNativeGatewaySidecarReady.
+// It waits until the CNG container reports not ready on each of the named pods, or on every cluster pod
+// when no names are given.
+func MustWaitForCloudNativeGatewaySidecarUnready(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration, podNames ...string) {
+	selected := make(map[string]struct{}, len(podNames))
+	for _, name := range podNames {
+		selected[name] = struct{}{}
+	}
+
+	err := retryutil.RetryFor(timeout, func() error {
+		pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), ClusterListOpt(couchbase))
+		if err != nil {
+			return err
+		}
+
+		checked := 0
+
+		for _, pod := range pods.Items {
+			if _, ok := selected[pod.Name]; len(selected) > 0 && !ok {
+				continue
+			}
+
+			checked++
+			found := false
+
+			for _, status := range pod.Status.ContainerStatuses {
+				if status.Name != k8sutil.CloudNativeGatewayContainerName {
+					continue
+				}
+
+				if status.Ready {
+					return fmt.Errorf("%s still ready on pod %s", k8sutil.CloudNativeGatewayContainerName, pod.Name)
+				}
+
+				found = true
+			}
+
+			if !found {
+				return fmt.Errorf("unable to find %s container status in pod %s", k8sutil.CloudNativeGatewayContainerName, pod.Name)
+			}
+		}
+
+		if checked < len(selected) {
+			return fmt.Errorf("found %d of %d requested pods", checked, len(selected))
+		}
+
+		return nil
+	})
+	if err != nil {
+		Die(t, err)
+	}
+}

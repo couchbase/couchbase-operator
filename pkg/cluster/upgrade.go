@@ -803,8 +803,9 @@ func (c *Cluster) reportMixedMode() error {
 
 // reportUpgradeComplete is called unconditionally when the reconcile is complete.
 // If there was an unpgrade condition and the cluster no longer needs an upgrade clear
-// the condition and raise any necessary events.
-func (c *Cluster) reportUpgradeComplete() error {
+// the condition and raise any necessary events.  state is the Couchbase membership
+// state the reconcile started with.
+func (c *Cluster) reportUpgradeComplete(state *MemberState) error {
 	upgrading, err := c.isUpgrading()
 	if err != nil {
 		return err
@@ -812,6 +813,15 @@ func (c *Cluster) reportUpgradeComplete() error {
 
 	// Steady state, and the baseline is not ours to write.
 	if !upgrading {
+		return nil
+	}
+
+	// Wait until every pod recreated by the upgrade is back in service. An in-place upgraded pod
+	// already runs the target image, so it is no longer an upgrade candidate, but it isn't serving
+	// until async initialization has run and it has been rebalanced back in: until then it shows
+	// as failed over or pending add back.  The state is from the start of this reconcile, so a
+	// rebalance that completed during it is only seen on the next one.
+	if len(c.getPendingInitPods()) > 0 || !state.settled() {
 		return nil
 	}
 

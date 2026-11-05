@@ -479,14 +479,10 @@ func TestExposedFeatureTrafficPolicyCluster(t *testing.T) {
 	cluster.Spec.Networking.ExposedFeatureTrafficPolicy = &policy
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 10*time.Minute)
-
 	// Check the events match what we expect:
 	// * Cluster created
 	expectedEvents := []eventschema.Validatable{
-		eventschema.Repeat{Times: clusterSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		e2eutil.ClusterCreateSequence(clusterSize),
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
@@ -1492,7 +1488,7 @@ func TestAllowExternallyUnreachablePodsActivatesUnreachablePods(t *testing.T) {
 	e2eutil.MustWaitForPodWithCondition(t, kubernetes, pod2Name, k8sutil.PodReadinessCondition, corev1.ConditionTrue, "", time.Minute)
 
 	// Fetch the pods and add them to the dns forwarding list so we can pass the DNS check.
-	pods := e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize, time.Minute)
+	pods := e2eutil.MustWaitForScheduledClusterPods(t, kubernetes, cluster, clusterSize, time.Minute)
 	e2eutil.MustAddPodsForDNSCheck(t, kubernetes, dns.GetName(), testDomain, pods)
 
 	// Check that the DNS alternate addresses have been added to the cluster.
@@ -1626,7 +1622,7 @@ func TestPodUpgradesWaitForDNSAvailableBeforeEjection(t *testing.T) {
 	cluster = e2eutil.MustNewClusterFromSpecAsync(t, kubernetes, cluster)
 
 	// Once the pods have been created, we can add them to the dns forwarding list. This might take some time to propagate.
-	pods := e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize, 5*time.Minute)
+	pods := e2eutil.MustWaitForScheduledClusterPods(t, kubernetes, cluster, clusterSize, 5*time.Minute)
 	e2eutil.MustAddPodsForDNSCheck(t, kubernetes, dns.GetName(), testDomain, pods)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
@@ -1644,7 +1640,7 @@ func TestPodUpgradesWaitForDNSAvailableBeforeEjection(t *testing.T) {
 
 	// We'll need to wait for the new pods to be created before adding them to the dns forwarding list.
 	for range clusterSize {
-		pods := e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize+1, 2*time.Minute)
+		pods := e2eutil.MustWaitForScheduledClusterPods(t, kubernetes, cluster, clusterSize+1, 2*time.Minute)
 		e2eutil.MustAddPodsForDNSCheck(t, kubernetes, dns.GetName(), testDomain, pods)
 		e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize, 2*time.Minute)
 	}
@@ -1764,7 +1760,7 @@ func TestRescheduleCandidatesAlternateAddressExternalDNSCheck(t *testing.T) {
 	cluster = e2eutil.MustNewClusterFromSpecAsync(t, kubernetes, cluster)
 
 	// Once the pods have been created, we can add them to the dns forwarding list. This might take some time to propagate.
-	pods := e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize, 5*time.Minute)
+	pods := e2eutil.MustWaitForScheduledClusterPods(t, kubernetes, cluster, clusterSize, 5*time.Minute)
 	e2eutil.MustAddPodsForDNSCheck(t, kubernetes, dns.GetName(), testDomain, pods)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
@@ -1780,7 +1776,7 @@ func TestRescheduleCandidatesAlternateAddressExternalDNSCheck(t *testing.T) {
 	e2eutil.MustAddCustomAnnotationAndLabelsSinglePod(t, kubernetes, annotations, nil, pods[0].Name)
 
 	// Wait for the new pod to be added, then add it for the DNS check.
-	pods = e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize+1, 2*time.Minute)
+	pods = e2eutil.MustWaitForScheduledClusterPods(t, kubernetes, cluster, clusterSize+1, 2*time.Minute)
 	e2eutil.MustAddPodsForDNSCheck(t, kubernetes, dns.GetName(), testDomain, pods)
 
 	// Check that the cluster never gets the scaling down condition given 100% of the removal are reschedule members.
@@ -1841,7 +1837,7 @@ func TestRescheduleCandidatesAndScaleDownAlternateAddressExternalDNSCheck(t *tes
 	cluster = e2eutil.MustNewClusterFromSpecAsync(t, kubernetes, cluster)
 
 	// Once the pods have been created, we can add them to the dns forwarding list. This might take some time to propagate.
-	pods := e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize, 5*time.Minute)
+	pods := e2eutil.MustWaitForScheduledClusterPods(t, kubernetes, cluster, clusterSize, 5*time.Minute)
 	e2eutil.MustAddPodsForDNSCheck(t, kubernetes, dns.GetName(), testDomain, pods)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
@@ -1856,7 +1852,7 @@ func TestRescheduleCandidatesAndScaleDownAlternateAddressExternalDNSCheck(t *tes
 	e2eutil.MustAddCustomAnnotationAndLabelsSinglePod(t, kubernetes, annotations, nil, pods[0].Name)
 
 	// Wait for the new pod to be added, then add it for the DNS check.
-	pods = e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize+1, 2*time.Minute)
+	pods = e2eutil.MustWaitForScheduledClusterPods(t, kubernetes, cluster, clusterSize+1, 2*time.Minute)
 	e2eutil.MustAddPodsForDNSCheck(t, kubernetes, dns.GetName(), testDomain, pods)
 
 	// Check that the cluster never gets the scaling down condition given 100% of the removal are reschedule members.

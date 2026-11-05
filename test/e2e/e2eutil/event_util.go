@@ -271,6 +271,33 @@ func ClusterCreateSequence(size int) eventschema.Validatable {
 	}
 }
 
+// ClusterCreateSequenceWithCNG is a common function for generating cluster creation events
+// when Cloud Native Gateway is enabled.  The first pod is CBS-initialized, then the post topology
+// reconcilers run, so the CNG admin user is created (raising UserCreated when RBAC is managed)
+// before the remaining pods are CBS-added.  A rebalance mode write may land either side of it.
+func ClusterCreateSequenceWithCNG(size int) eventschema.Validatable {
+	validators := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited, FuzzyMessage: "file based rebalance"}},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonUserCreated, FuzzyMessage: k8sutil.CngAdminUserNamePrefix}},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited, FuzzyMessage: "file based rebalance"}},
+	}
+
+	if size > 1 {
+		validators = append(validators,
+			eventschema.Repeat{
+				Times:     size - 1,
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+			},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited, FuzzyMessage: "file based rebalance"}},
+		)
+	}
+
+	return eventschema.Sequence{Validators: validators}
+}
+
 // ClusterCreateSequenceWithNetworkChange is a common function for generating cluster creation
 // events, when the first pod's network settings are updated and/or N2N encryption is enabled.
 // The first pod is CBS-initialized, then the post topology reconcilers run, updating its network

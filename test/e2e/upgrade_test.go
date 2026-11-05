@@ -3591,12 +3591,12 @@ func TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverrideAnyCandidate(t *testin
 
 	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
 
-	serverClassSize := constants.Size2
-
-	// Initialise the cluster. This should have 3 service classes: data + index, query and index only,
+	// Initialise the cluster. This should have 3 service classes: data + index, index only and data only,
 	// and the index swap rebalance override enabled.
-	// The names of the services are in order: default (idx + data), index-only, data-only
-	cluster := clusterOptionsUpgrade().WithPersistentTopology(serverClassSize).Generate(kubernetes)
+	// The names of the services are in order: default (idx + data), index-only, data-only.
+	// One node of each mixed and index-only class is enough to pair an index-only candidate with a
+	// non-index one, and two data-only nodes give a group of two non-index candidates.
+	cluster := clusterOptionsUpgrade().WithPersistentTopology(constants.Size1).Generate(kubernetes)
 
 	idxOnly := cluster.Spec.Servers[0].DeepCopy()
 	idxOnly.Name = "index-only"
@@ -3605,6 +3605,7 @@ func TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverrideAnyCandidate(t *testin
 	dataOnly := cluster.Spec.Servers[0].DeepCopy()
 	dataOnly.Name = "data-only"
 	dataOnly.Services = dataOnly.Services[:1] // Only data service
+	dataOnly.Size = constants.Size2
 	cluster.Spec.Servers = append(cluster.Spec.Servers, *dataOnly)
 
 	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
@@ -3625,13 +3626,13 @@ func TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverrideAnyCandidate(t *testin
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Nodes will be created in order of the server classes. Therefore:
-	// 0000 and 0001 = default (idx + data)
-	// 0002 and 0003 = index-only
-	// 0004 and 0005 = data-only
-	// Given maxUpgradable is 2, we want to configure the upgrade order
-	// so two candidate groups will contain one node that has the index service only,
-	// The final 2 candidates should be upgraded via InPlaceUpgrade.
-	upgradeOrderIndexes := []int{3, 0, 2, 4, 1, 5}
+	// 0000 = default (idx + data)
+	// 0001 = index-only
+	// 0002 and 0003 = data-only
+	// Given maxUpgradable is 2, we want to configure the upgrade order so the first candidate
+	// group pairs the index-only node with the idx + data node, and the final 2 candidates
+	// (both data-only) should be upgraded via InPlaceUpgrade.
+	upgradeOrderIndexes := []int{1, 0, 2, 3}
 	upgradeOrder := make([]string, len(upgradeOrderIndexes))
 	for i, index := range upgradeOrderIndexes {
 		upgradeOrder[i] = couchbaseutil.CreateMemberName(cluster.Name, index)
@@ -3650,10 +3651,12 @@ func TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverrideAnyCandidate(t *testin
 
 	// Check the events match what we expect:
 	// - Cluster Created.
-	// - Upgrade Started. MaxUpgradable set to 2, so we should see 3 upgrade sequences in total.
-	// - Reconcile 1: Candidates 3 (index) and 0 (idx + data) = InPlaceUpgrade (0), then SwapRebalance (3).
-	// - Reconcile 2: Candidates 2 (index) and 4 (data) = InPlaceUpgrade (4), then SwapRebalance (2).
-	// - Reconcile 3: Candidates 1 (idx + data) and 5 (data) = InPlaceUpgrade(1), then InPlaceUpgrade(5) (Multiple InPlaceUpgrade only allowed on server group upgrade order type).
+	// - Upgrade Started. MaxUpgradable set to 2, so we should see 2 upgrade sequences in total.
+	// - Reconcile 1: Candidates 1 (index) and 0 (idx + data) = InPlaceUpgrade (0) and SwapRebalance (1).
+	//   Pods are created asynchronously, so 0 is recreated in place while 1's replacement is created,
+	//   and a single rebalance then recovers 0 and swaps out 1. The only member added and removed
+	//   are 1's replacement and 1, which shows 0 was upgraded in place and 1 was swapped.
+	// - Reconcile 2: Candidates 2 (data) and 3 (data) = InPlaceUpgrade(2), then InPlaceUpgrade(3) (Multiple InPlaceUpgrade only allowed on server group upgrade order type).
 	// - Upgrade Finished.
 	inPlaceUpgrade := eventschema.Sequence{Validators: []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
@@ -3661,19 +3664,16 @@ func TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverrideAnyCandidate(t *testin
 	}}
 
 	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(len(cluster.Spec.Servers) * serverClassSize),
+		e2eutil.ClusterCreateSequence(cluster.Spec.TotalSize()),
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
 		// Reconcile 1.
 		eventschema.Sequence{Validators: []eventschema.Validatable{
-			inPlaceUpgrade,
-			e2eutil.SwapRebalanceSequence,
+			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded, FuzzyMessage: couchbaseutil.CreateMemberName(cluster.Name, 4)},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: couchbaseutil.CreateMemberName(cluster.Name, 1)},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 		}},
 		// Reconcile 2.
-		eventschema.Sequence{Validators: []eventschema.Validatable{
-			inPlaceUpgrade,
-			e2eutil.SwapRebalanceSequence,
-		}},
-		// Reconcile 3.
 		eventschema.Repeat{Times: 2, Validator: eventschema.Sequence{Validators: []eventschema.Validatable{
 			inPlaceUpgrade,
 		}}},

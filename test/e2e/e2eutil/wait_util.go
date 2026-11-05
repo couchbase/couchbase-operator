@@ -1824,6 +1824,47 @@ func MustWaitForClusterPods(t *testing.T, k8s *types.Cluster, couchbase *couchba
 	return pods
 }
 
+// MustGetClusterPodUIDs returns the UIDs of the cluster's current pods.
+func MustGetClusterPodUIDs(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) map[string]struct{} {
+	pods, err := k8s.KubeClient.CoreV1().Pods(cluster.Namespace).List(context.Background(), ClusterListOpt(cluster))
+	if err != nil {
+		Die(t, err)
+	}
+
+	uids := make(map[string]struct{}, len(pods.Items))
+	for _, pod := range pods.Items {
+		uids[string(pod.UID)] = struct{}{}
+	}
+
+	return uids
+}
+
+// MustWaitForClusterPodsReplaced waits until the cluster has the expected number of pods and
+// none of them are in the original set, i.e. every pod has been recreated.
+func MustWaitForClusterPodsReplaced(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, original map[string]struct{}, size int, timeout time.Duration) {
+	err := retryutil.RetryFor(timeout, func() error {
+		pods, err := k8s.KubeClient.CoreV1().Pods(cluster.Namespace).List(context.Background(), ClusterListOpt(cluster))
+		if err != nil {
+			return err
+		}
+
+		if len(pods.Items) != size {
+			return fmt.Errorf("expected %d pods, found %d", size, len(pods.Items))
+		}
+
+		for _, pod := range pods.Items {
+			if _, ok := original[string(pod.UID)]; ok {
+				return fmt.Errorf("pod %s has not been restarted", pod.Name)
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		Die(t, err)
+	}
+}
+
 // MustWaitForScheduledClusterPods waits until the cluster has `size` pods and
 // each pod has a host IP. Used before adding external DNS entries, as each entry
 // points to the pod's host IP.

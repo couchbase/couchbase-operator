@@ -67,12 +67,7 @@ func TestCreateCNG(t *testing.T) {
 	// Check the events match what we expect:
 	// * Cluster created
 	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Optional{
-			Validator: eventschema.Event{
-				Reason: k8sutil.EventReasonUserCreated,
-			},
-		},
+		e2eutil.ClusterCreateSequenceWithCNG(clusterSize),
 	}
 	ValidateEvents(t, kubernetesCluster, cluster, expectedEvents)
 }
@@ -369,8 +364,10 @@ func TestCNGDataAPIConfigChangeRestart(t *testing.T) {
 	// Check that the mgmt service is not available
 	e2eutil.MustCheckDAPIMgmtService(t, dClient, http.StatusNotFound)
 
-	// Update the DAPI config to enable the mgmt service
+	// Record the current pods so we can tell when every one of them has been restarted.
+	originalPodUIDs := e2eutil.MustGetClusterPodUIDs(t, k8sCluster, cluster)
 
+	// Update the DAPI config to enable the mgmt service
 	cluster, err := e2eutil.GetCouchbaseCluster(k8sCluster.CRClient, cluster)
 	if err != nil {
 		e2eutil.Die(t, err)
@@ -383,8 +380,10 @@ func TestCNGDataAPIConfigChangeRestart(t *testing.T) {
 		e2eutil.Die(t, err)
 	}
 
-	// Check the update triggers a restart of the pods
+	// Check the update triggers a restart of all the pods.  Pods are moved one at a time and the
+	// cluster can look healthy in between, so wait for every original pod to have been replaced.
 	e2eutil.MustWaitForClusterEvent(t, k8sCluster, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitForClusterPodsReplaced(t, k8sCluster, cluster, originalPodUIDs, clusterSize, 10*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, k8sCluster, cluster, 5*time.Minute)
 	e2eutil.MustWaitForCloudNativeGatewaySidecarReady(t, k8sCluster, cluster, 5*time.Minute)
 	// Check the mgmt service is now available
@@ -463,12 +462,7 @@ func TestCNGServiceTemplate(t *testing.T) {
 	// Check the events match what we expect:
 	// * Cluster created
 	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Optional{
-			Validator: eventschema.Event{
-				Reason: k8sutil.EventReasonUserCreated,
-			},
-		},
+		e2eutil.ClusterCreateSequenceWithCNG(clusterSize),
 	}
 	ValidateEvents(t, kubernetesCluster, cluster, expectedEvents)
 }
@@ -520,12 +514,7 @@ func TestScaleDownMarksPodUnreadyAndRemovedFromCNGEndpointSlices(t *testing.T) {
 	// Check the events match what we expect:
 	// * Cluster created
 	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(serverClassSize * 2),
-		eventschema.Optional{
-			Validator: eventschema.Event{
-				Reason: k8sutil.EventReasonUserCreated,
-			},
-		},
+		e2eutil.ClusterCreateSequenceWithCNG(serverClassSize * 2),
 		e2eutil.ClusterScaleDownSequenceWithMemberNames([]string{ejectMember}),
 		e2eutil.ClusterScaleUpSequenceWithMemberNames([]string{newMember}),
 	}
@@ -604,12 +593,7 @@ func TestPreserveReadyCNGInstancesStopsUpgrade(t *testing.T) {
 
 	// Check the events match what we expect:
 	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Optional{
-			Validator: eventschema.Event{
-				Reason: k8sutil.EventReasonUserCreated,
-			},
-		},
+		e2eutil.ClusterCreateSequenceWithCNG(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
 		eventschema.Repeat{Validator: e2eutil.SwapRebalanceSequence, Times: clusterSize},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
@@ -659,7 +643,11 @@ func TestPreserveReadyCNGInstancesStopsScaleDown(t *testing.T) {
 	sabotageCNGContainerReadiness(kubernetes, ctx, secondMember)
 	sabotageCNGContainerReadiness(kubernetes, ctx, thirdMember)
 
-	// Start the upgrade and wait for the first member to be upgraded and rebalance to complete.
+	// The sabotage only takes effect on its first tick, and the Operator reacts to the scale down
+	// immediately, so make sure the containers are reported unready before requesting it.
+	e2eutil.MustWaitForCloudNativeGatewaySidecarUnready(t, kubernetes, cluster, time.Minute, firstMember, secondMember, thirdMember)
+
+	// Request the scale down.
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/servers/0/size", 3), time.Minute)
 
 	time.Sleep(20 * time.Second)
@@ -671,7 +659,9 @@ func TestPreserveReadyCNGInstancesStopsScaleDown(t *testing.T) {
 	e2eutil.MustNotObserveClusterEventFor(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), time.Minute)
 
 	// Stop sabotaging the readiness of the members to allow the scale down to continue.
+	// Readiness is only restored when the kubelet next syncs the pod status.
 	cancel()
+	e2eutil.MustWaitForCloudNativeGatewaySidecarReady(t, kubernetes, cluster, 2*time.Minute)
 
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionScalingDown, v1.ConditionTrue, cluster, 2*time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 10*time.Minute)
@@ -680,12 +670,7 @@ func TestPreserveReadyCNGInstancesStopsScaleDown(t *testing.T) {
 
 	// Check the events match what we expect:
 	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Optional{
-			Validator: eventschema.Event{
-				Reason: k8sutil.EventReasonUserCreated,
-			},
-		},
+		e2eutil.ClusterCreateSequenceWithCNG(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
@@ -828,12 +813,7 @@ func TestCNGProvidedTLSSecretShadowing(t *testing.T) {
 
 	// Check the events match what we expect:
 	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Optional{
-			Validator: eventschema.Event{
-				Reason: k8sutil.EventReasonUserCreated,
-			},
-		},
+		e2eutil.ClusterCreateSequenceWithCNG(clusterSize),
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)

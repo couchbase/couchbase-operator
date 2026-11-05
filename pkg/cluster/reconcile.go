@@ -222,7 +222,7 @@ func (c *Cluster) reconcile() error {
 		return err
 	}
 
-	if err := c.reportUpgradeComplete(); err != nil {
+	if err := c.reportUpgradeComplete(fsm.couchbase); err != nil {
 		return err
 	}
 

@@ -1406,6 +1406,10 @@ func (c *Cluster) raiseEventCached(event *v1.Event) {
 // getAvailableIndexs will return an array of indexs available to be used for
 // pod names.
 func (c *Cluster) getAvailableIndexes(num int) ([]int, error) {
+	if num <= 0 {
+		return []int{}, nil
+	}
+
 	start, err := c.getPodIndex()
 	if err != nil {
 		return nil, err
