@@ -1216,7 +1216,7 @@ func TestRemoteClusterClientCertificateRoundTrip(t *testing.T) {
 	}
 
 	// Both halves still have to go back out on a write, whatever the read gives us.
-	data, err := urlencoding.Marshal(&RemoteCluster{Certificate: clientCert, Key: "key"})
+	data, err := urlencoding.Marshal(&RemoteCluster{RemoteClusterCredentials: RemoteClusterCredentials{Certificate: clientCert, Key: "key"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1232,5 +1232,36 @@ func TestRemoteClusterClientCertificateRoundTrip(t *testing.T) {
 
 	if values.Get("clientKey") != "key" {
 		t.Errorf("encoded clientKey: got %q, want %q", values.Get("clientKey"), "key")
+	}
+}
+
+// TestRemoteClusterStage checks staged credentials decode and a stage request encodes them.
+func TestRemoteClusterStage(t *testing.T) {
+	t.Parallel()
+
+	var r RemoteCluster
+
+	if err := json.Unmarshal([]byte(`{"username":"u1","stage":{"username":"u2","clientCertificate":"cert"}}`), &r); err != nil {
+		t.Fatal(err)
+	}
+
+	if want := (RemoteClusterCredentials{Username: "u2", Certificate: "cert"}); r.Username != "u1" || r.Stage == nil || *r.Stage != want {
+		t.Fatalf("decoded username %q, stage %+v, want u1, %+v", r.Username, r.Stage, want)
+	}
+
+	for _, creds := range []RemoteClusterCredentials{{Username: "u", Password: "p"}, {Certificate: "cert", Key: "key"}} {
+		body, err := url.ParseQuery(string(StageRemoteClusterCredentials(&RemoteCluster{Name: "west", RemoteClusterCredentials: creds}).Body))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		want := url.Values{"stage": {"true"}, "username": {creds.Username}, "password": {creds.Password}}
+		if creds.Certificate != "" {
+			want["clientCertificate"], want["clientKey"] = []string{creds.Certificate}, []string{creds.Key}
+		}
+
+		if !reflect.DeepEqual(body, want) {
+			t.Errorf("stage body: got %v, want %v", body, want)
+		}
 	}
 }

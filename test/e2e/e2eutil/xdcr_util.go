@@ -18,6 +18,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -628,6 +629,64 @@ func MustSetXDCRReplicationCredentials(t *testing.T, src *types.Cluster, secretN
 	}
 
 	if _, err := src.KubeClient.CoreV1().Secrets(src.Namespace).Update(context.Background(), secret, metav1.UpdateOptions{}); err != nil {
+		Die(t, err)
+	}
+}
+
+// MustWaitForRemoteCluster waits for a remote cluster reference matching ready, and returns it.
+func MustWaitForRemoteCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, ready func(couchbaseutil.RemoteCluster) bool, timeout time.Duration) couchbaseutil.RemoteCluster {
+	client := MustCreateAdminConsoleClient(t, k8s, cluster)
+
+	var found couchbaseutil.RemoteCluster
+
+	err := retryutil.RetryFor(timeout, func() error {
+		var refs couchbaseutil.RemoteClusters
+
+		if err := couchbaseutil.ListRemoteClusters(&refs).On(client.client, client.host); err != nil {
+			return err
+		}
+
+		for _, ref := range refs {
+			if ready(ref) {
+				found = ref
+
+				return nil
+			}
+		}
+
+		return fmt.Errorf("no matching remote cluster reference")
+	})
+	if err != nil {
+		Die(t, err)
+	}
+
+	return found
+}
+
+// MustSaveRemoteCluster saves a remote cluster reference with a password, as the UI does.
+func MustSaveRemoteCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, ref couchbaseutil.RemoteCluster, password string) {
+	client := MustCreateAdminConsoleClient(t, k8s, cluster)
+
+	ref.Password = password
+
+	if err := couchbaseutil.UpdateRemoteCluster(&ref).On(client.client, client.host); err != nil {
+		Die(t, err)
+	}
+}
+
+// MustSetXDCRReplicationClientCertificate sets a remote cluster's client certificate and key.
+func MustSetXDCRReplicationClientCertificate(t *testing.T, src *types.Cluster, target *couchbasev2.CouchbaseCluster, cert, key []byte) {
+	secrets := src.KubeClient.CoreV1().Secrets(src.Namespace)
+
+	secret, err := secrets.Get(context.Background(), fmt.Sprintf("%s-xdcr-tls", target.Name), metav1.GetOptions{})
+	if err != nil {
+		Die(t, err)
+	}
+
+	secret.Data[couchbasev2.RemoteClusterTLSCertificate] = cert
+	secret.Data[couchbasev2.RemoteClusterTLSKey] = key
+
+	if _, err := secrets.Update(context.Background(), secret, metav1.UpdateOptions{}); err != nil {
 		Die(t, err)
 	}
 }

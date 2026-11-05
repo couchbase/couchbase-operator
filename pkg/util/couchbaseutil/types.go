@@ -1517,11 +1517,18 @@ type AutoCompactionSettings struct {
 // RemoteClusters is returned by /pools/default/remoteClusters.
 type RemoteClusters []RemoteCluster
 
-// RemoteClusterStagedCredentials is what a HTTP GET reports about staged credentials, never the
-// password.  Couchbase Server only reports it while something is staged, so its absence means
-// the stage was either promoted or discarded.
-type RemoteClusterStagedCredentials struct {
-	Username string `json:"username"`
+// RemoteClusterCredentials are a username and password, or a client certificate and key.  The
+// API never returns the password or key, so persistence fills them in.
+type RemoteClusterCredentials struct {
+	Username    string `json:"username" url:"username"`
+	Password    string `json:"password" url:"password"`
+	Certificate string `json:"clientCertificate" url:"clientCertificate,omitempty"`
+	Key         string `json:"-" url:"clientKey,omitempty"`
+}
+
+// SameAuth reports whether c and o authenticate the same way, by password or client certificate.
+func (c RemoteClusterCredentials) SameAuth(o RemoteClusterCredentials) bool {
+	return (c.Username == "") == (o.Username == "") && (c.Certificate == "") == (o.Certificate == "")
 }
 
 // RemoteClusterSecurity indicates the authentication method.
@@ -1538,25 +1545,31 @@ const (
 
 // RemoteCluster describes an XDCR remote cluster.
 type RemoteCluster struct {
-	Name       string                `json:"name" url:"name"`
-	Hostname   string                `json:"hostname"  url:"hostname"`
-	Username   string                `json:"username"  url:"username"`
-	Password   string                `json:"password"  url:"password"`
+	Name     string `json:"name" url:"name"`
+	Hostname string `json:"hostname"  url:"hostname"`
+
+	RemoteClusterCredentials `url:""`
+
 	UUID       string                `json:"uuid"  url:"uuid"`
 	Deleted    bool                  `json:"deleted"`
 	SecureType RemoteClusterSecurity `json:"secureType" url:"secureType,omitempty"`
 	Network    string                `json:"network_type" url:"network_type,omitempty"`
 	CA         string                `json:"certificate" url:"certificate,omitempty"`
 
-	// The API returns the client certificate, like the CA above; the key is not, so it is
-	// populated from persistence after a read.
-	Certificate string `json:"clientCertificate" url:"clientCertificate,omitempty"`
-	Key         string `json:"-" url:"clientKey,omitempty"`
+	// Stage is read back only, and only while something is staged.
+	Stage *RemoteClusterCredentials `json:"stage"`
 
-	// Stage is read back only, never sent, so it carries no url tag.  Normalised onto the
-	// requested reference before any comparison, like Network below.
-	Stage *RemoteClusterStagedCredentials `json:"stage"`
+	// ConnectivityStatus is read back only, like Stage.
+	ConnectivityStatus string `json:"connectivityStatus"`
 }
+
+// CredentialsStaged reports whether the reference's own credentials are the staged ones.
+func (r *RemoteCluster) CredentialsStaged() bool {
+	return r.Stage != nil && *r.Stage == r.RemoteClusterCredentials
+}
+
+// RemoteClusterAuthError is the ConnectivityStatus when the target rejects the credentials in use.
+const RemoteClusterAuthError = "RC_AUTH_ERR"
 
 type ReplicationType string
 

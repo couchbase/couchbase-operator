@@ -1007,6 +1007,18 @@ func MustRotateServerCertificate(t *testing.T, ctx *TLSContext, opts *TLSOpts) {
 	mustRotateServerSecret(t, ctx, nil, clusterCert, clusterKey)
 }
 
+// MustCreateClientCertificate returns a client certificate and key for a user, signed by the CA.
+func MustCreateClientCertificate(t *testing.T, ctx *TLSContext, user string) (cert, key []byte) {
+	validFrom := time.Now().In(time.UTC)
+
+	_, key, cert, err := CreateKeyPairReqData(KeyTypeRSA, KeyEncodingPKCS1, CertTypeClient, CreateCertReq(user)).Generate(ctx.CA, validFrom, validFrom.AddDate(10, 0, 0))
+	if err != nil {
+		Die(t, err)
+	}
+
+	return cert, key
+}
+
 // MustRotateClientCertificate generates a new client certificate and updates the existing secret.
 func MustRotateClientCertificate(t *testing.T, ctx *TLSContext) {
 	validFrom := time.Now().In(time.UTC)

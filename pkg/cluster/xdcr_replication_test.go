@@ -11,6 +11,9 @@ licenses/APL2.txt.
 package cluster
 
 import (
+	"errors"
+	"fmt"
+	"net/http"
 	"reflect"
 	"strings"
 	"testing"
@@ -463,175 +466,81 @@ func TestXDCRComputeSettingsPatchExplicitMappingRemoval(t *testing.T) {
 	}
 }
 
-// TestXDCRRemoteClusterUpdatesStaging checks which side of the update/staging split a given
-// desired-vs-actual pair lands on.  A credential-only change is staged; anything else takes the
-// existing update path.
-func TestXDCRRemoteClusterUpdatesStaging(t *testing.T) {
+// TestXDCRRemoteClusterUpdates checks which path a desired-vs-actual pair takes.
+func TestXDCRRemoteClusterUpdates(t *testing.T) {
 	t.Parallel()
 
 	current := couchbaseutil.RemoteCluster{
 		Name:       "west-operator-managed",
 		Hostname:   "couchbases://cb-west.example.com",
-		Username:   "xdcr_user",
-		Password:   "pass1",
 		UUID:       "uuid",
 		SecureType: couchbaseutil.RemoteClusterSecurityTLS,
 		CA:         "ca-cert",
+
+		RemoteClusterCredentials: couchbaseutil.RemoteClusterCredentials{Username: "xdcr_user", Password: "pass1"},
 	}
 
-	// The same reference on client certificate auth - no credentials to rotate.
-	mutualTLS := couchbaseutil.RemoteCluster{
-		Name:        "west-operator-managed",
-		Hostname:    "couchbases://cb-west.example.com",
-		UUID:        "uuid",
-		SecureType:  couchbaseutil.RemoteClusterSecurityTLS,
-		CA:          "ca-cert",
-		Certificate: "client-cert",
-		Key:         "client-key",
-	}
+	// The same reference on client certificate auth.
+	mutualTLS := current
+	mutualTLS.RemoteClusterCredentials = couchbaseutil.RemoteClusterCredentials{Certificate: "client-cert", Key: "client-key"}
 
-	plaintext := couchbaseutil.RemoteCluster{
-		Name:     "west-operator-managed",
-		Hostname: "couchbase://cb-west.example.com",
-		Username: "xdcr_user",
-		Password: "pass1",
-		UUID:     "uuid",
-	}
-
-	// No password recorded in persistence, so there is nothing to update on behalf of.
-	noPassword := couchbaseutil.RemoteCluster{
-		Name:       "west-operator-managed",
-		Hostname:   "couchbases://cb-west.example.com",
-		Username:   "xdcr_user",
-		UUID:       "uuid",
-		SecureType: couchbaseutil.RemoteClusterSecurityTLS,
-		CA:         "ca-cert",
-	}
-
-	with := func(base couchbaseutil.RemoteCluster, mutate func(*couchbaseutil.RemoteCluster)) couchbaseutil.RemoteCluster {
+	with := func(base couchbaseutil.RemoteCluster, mutate func(*couchbaseutil.RemoteCluster)) *couchbaseutil.RemoteCluster {
 		mutate(&base)
 
-		return base
+		return &base
 	}
 
-	// The same reference with a rotation staged on the server, which a HTTP GET reports and the
-	// spec never does.
-	stagePending := with(current, func(r *couchbaseutil.RemoteCluster) {
-		r.Stage = &couchbaseutil.RemoteClusterStagedCredentials{Username: "xdcr_user2"}
+	// Server state a GET reports and the spec never does.
+	staged := with(current, func(r *couchbaseutil.RemoteCluster) {
+		r.Stage = &couchbaseutil.RemoteClusterCredentials{Username: "xdcr_user2"}
 	})
+	lockedOut := with(current, func(r *couchbaseutil.RemoteCluster) { r.ConnectivityStatus = couchbaseutil.RemoteClusterAuthError })
+
+	newCreds := with(current, func(r *couchbaseutil.RemoteCluster) { r.Username, r.Password = "xdcr_user2", "pass2" })
+	newCredsAndHost := with(*newCreds, func(r *couchbaseutil.RemoteCluster) { r.Hostname = "couchbases://cb-west-2.example.com" })
+
+	stagedNew := with(current, func(r *couchbaseutil.RemoteCluster) { r.Stage = &newCreds.RemoteClusterCredentials })
+	stagedNewLockedOut := with(*stagedNew, func(r *couchbaseutil.RemoteCluster) { r.ConnectivityStatus = couchbaseutil.RemoteClusterAuthError })
+
+	newCert := with(mutualTLS, func(r *couchbaseutil.RemoteCluster) { r.Certificate, r.Key = "new-cert", "new-key" })
+	stagedNewCert := with(mutualTLS, func(r *couchbaseutil.RemoteCluster) { r.Stage = &newCert.RemoteClusterCredentials })
 
 	tests := []struct {
-		name            string
-		current         *couchbaseutil.RemoteCluster // defaults to the TLS reference above
-		requested       couchbaseutil.RemoteCluster
-		supportsStaging bool
-		wantUpdate      bool
-		wantStage       bool
+		name       string
+		current    *couchbaseutil.RemoteCluster // defaults to the TLS reference above
+		requested  *couchbaseutil.RemoteCluster
+		below85    bool
+		wantUpdate bool
+		wantRotate bool
 	}{
-		{
-			name:      "no change",
-			requested: current,
-		},
-		{
-			// The server reports a stage, the spec never does.  Without normalising it, a
-			// pending rotation would look like a difference and update every reconcile.
-			name:            "no change, but a stage is pending",
-			current:         &stagePending,
-			requested:       current,
-			supportsStaging: true,
-		},
-		{
-			name:            "credentials changed while a stage is pending",
-			current:         &stagePending,
-			requested:       with(current, func(r *couchbaseutil.RemoteCluster) { r.Username, r.Password = "xdcr_user2", "pass2" }),
-			supportsStaging: true,
-			wantStage:       true,
-		},
-		{
-			name:            "username and password changed",
-			requested:       with(current, func(r *couchbaseutil.RemoteCluster) { r.Username, r.Password = "xdcr_user2", "pass2" }),
-			supportsStaging: true,
-			wantStage:       true,
-		},
-		{
-			name:            "password only changed",
-			requested:       with(current, func(r *couchbaseutil.RemoteCluster) { r.Password = "pass2" }),
-			supportsStaging: true,
-			wantStage:       true,
-		},
-		{
-			name:            "username only changed",
-			requested:       with(current, func(r *couchbaseutil.RemoteCluster) { r.Username = "xdcr_user2" }),
-			supportsStaging: true,
-			wantStage:       true,
-		},
-		{
-			// Split: the hostname is applied on the old credentials, the new ones are staged.
-			name: "hostname and credentials changed together",
-			requested: with(current, func(r *couchbaseutil.RemoteCluster) {
-				r.Hostname, r.Username = "couchbases://cb-west-2.example.com", "xdcr_user2"
-			}),
-			supportsStaging: true,
-			wantUpdate:      true,
-			wantStage:       true,
-		},
-		{
-			// Nothing to update on behalf of, so apply the new credentials as before.
-			name:    "hostname and credentials changed, no recorded password",
-			current: &noPassword,
-			requested: with(noPassword, func(r *couchbaseutil.RemoteCluster) {
-				r.Hostname, r.Password = "couchbases://cb-west-2.example.com", "pass2"
-			}),
-			supportsStaging: true,
-			wantUpdate:      true,
-		},
-		{
-			// A client certificate rotation must not be mistaken for a credential-only change.
-			name:            "client certificate only changed",
-			current:         &mutualTLS,
-			requested:       with(mutualTLS, func(r *couchbaseutil.RemoteCluster) { r.Certificate = "new-client-cert" }),
-			supportsStaging: true,
-			wantUpdate:      true,
-		},
-		{
-			name:            "client key only changed",
-			current:         &mutualTLS,
-			requested:       with(mutualTLS, func(r *couchbaseutil.RemoteCluster) { r.Key = "new-client-key" }),
-			supportsStaging: true,
-			wantUpdate:      true,
-		},
+		{name: "no change", requested: &current},
+		{name: "no change, stage pending", current: staged, requested: &current},
+		// Retrying the credentials it rejects can't help.
+		{name: "no change, locked out", current: lockedOut, requested: &current},
+		{name: "credentials changed, locked out", current: lockedOut, requested: newCreds, wantRotate: true},
+		{name: "credentials changed", requested: newCreds, wantRotate: true},
+		{name: "credentials changed, other password staged", current: staged, requested: newCreds, wantRotate: true},
+		{name: "credentials already staged", current: stagedNew, requested: newCreds},
+		{name: "credentials already staged, locked out", current: stagedNewLockedOut, requested: newCreds, wantRotate: true},
+		{name: "credentials already staged, hostname changed", current: stagedNew, requested: newCredsAndHost, wantRotate: true},
+		{name: "password only changed", requested: with(current, func(r *couchbaseutil.RemoteCluster) { r.Password = "pass2" }), wantRotate: true},
+		{name: "username only changed", requested: with(current, func(r *couchbaseutil.RemoteCluster) { r.Username = "xdcr_user2" }), wantRotate: true},
+		{name: "hostname and credentials changed", requested: newCredsAndHost, wantRotate: true},
+		{name: "hostname only changed", requested: with(current, func(r *couchbaseutil.RemoteCluster) { r.Hostname = "couchbases://cb-west-2.example.com" }), wantUpdate: true},
+		{name: "CA only changed", requested: with(current, func(r *couchbaseutil.RemoteCluster) { r.CA = "new-ca" }), wantUpdate: true},
+		{name: "credentials changed, below 8.5", requested: newCreds, below85: true, wantUpdate: true},
+		{name: "client certificate changed", current: &mutualTLS, requested: newCert, wantRotate: true},
+		{name: "client key changed", current: &mutualTLS, requested: with(mutualTLS, func(r *couchbaseutil.RemoteCluster) { r.Key = "new-key" }), wantRotate: true},
+		{name: "client certificate already staged", current: stagedNewCert, requested: newCert},
+		{name: "client certificate changed, below 8.5", current: &mutualTLS, requested: newCert, below85: true, wantUpdate: true},
+		// Staging can't switch auth: promotion would leave a username and a certificate.
+		{name: "password auth switched to client certificate", requested: &mutualTLS, wantUpdate: true},
+		{name: "client certificate switched to password auth", current: &mutualTLS, requested: &current, wantUpdate: true},
 		{
 			// Staging this would leave a username and a client certificate on one reference.
-			name:            "credentials added to a client certificate reference",
-			current:         &mutualTLS,
-			requested:       with(mutualTLS, func(r *couchbaseutil.RemoteCluster) { r.Username, r.Password = "xdcr_user", "pass1" }),
-			supportsStaging: true,
-			wantUpdate:      true,
-		},
-		{
-			name:            "CA only changed",
-			requested:       with(current, func(r *couchbaseutil.RemoteCluster) { r.CA = "new-ca" }),
-			supportsStaging: true,
-			wantUpdate:      true,
-		},
-		{
-			// Same rotation on a plaintext reference, to prove TLS material isn't what makes it work.
-			name:            "password changed on a plaintext reference",
-			current:         &plaintext,
-			requested:       with(plaintext, func(r *couchbaseutil.RemoteCluster) { r.Password = "pass2" }),
-			supportsStaging: true,
-			wantStage:       true,
-		},
-		{
-			name:            "hostname only changed",
-			requested:       with(current, func(r *couchbaseutil.RemoteCluster) { r.Hostname = "couchbases://cb-west-2.example.com" }),
-			supportsStaging: true,
-			wantUpdate:      true,
-		},
-		{
-			// Below 8.5 there is nothing to stage onto, so credentials are applied as before.
-			name:       "credentials changed, server below 8.5",
-			requested:  with(current, func(r *couchbaseutil.RemoteCluster) { r.Username, r.Password = "xdcr_user2", "pass2" }),
+			name:       "credentials added to a client certificate reference",
+			current:    &mutualTLS,
+			requested:  with(mutualTLS, func(r *couchbaseutil.RemoteCluster) { r.Username, r.Password = "xdcr_user", "pass1" }),
 			wantUpdate: true,
 		},
 	}
@@ -640,41 +549,66 @@ func TestXDCRRemoteClusterUpdatesStaging(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			c := Cluster{
-				cluster: &couchbasev2.CouchbaseCluster{},
-			}
+			c := Cluster{cluster: &couchbasev2.CouchbaseCluster{}}
 
 			actual := current
 			if test.current != nil {
 				actual = *test.current
 			}
 
-			updates, staging := c.remoteClusterUpdates(
+			updates, rotations := c.remoteClusterUpdates(
 				couchbaseutil.RemoteClusters{actual},
-				couchbaseutil.RemoteClusters{test.requested},
-				test.supportsStaging,
+				couchbaseutil.RemoteClusters{*test.requested},
+				!test.below85,
 			)
 
 			if got := len(updates) == 1; got != test.wantUpdate {
 				t.Errorf("update: got %v, want %v", got, test.wantUpdate)
 			}
 
-			if got := len(staging) == 1; got != test.wantStage {
-				t.Errorf("staging: got %v, want %v", got, test.wantStage)
+			if got := len(rotations) == 1; got != test.wantRotate {
+				t.Errorf("rotate: got %v, want %v", got, test.wantRotate)
 			}
+		})
+	}
+}
 
-			// A split change must update on the current credentials, or it restarts the pipelines
-			// it was meant to spare, and stage the requested ones.
-			if len(updates) == 1 && len(staging) == 1 {
-				if updates[0].Username != actual.Username || updates[0].Password != actual.Password {
-					t.Errorf("split update credentials: got %v/%v, want %v/%v",
-						updates[0].Username, updates[0].Password, actual.Username, actual.Password)
-				}
+// TestXDCRIsRemoteAuthError pins what counts as the target rejecting credentials; anything else is
+// logged as an error.
+func TestXDCRIsRemoteAuthError(t *testing.T) {
+	t.Parallel()
 
-				if staging[0].Username != test.requested.Username || staging[0].Password != test.requested.Password {
-					t.Errorf("split staged credentials: got %v/%v, want %v/%v",
-						staging[0].Username, staging[0].Password, test.requested.Username, test.requested.Password)
-				}
+	rejected := couchbaseutil.FailedRequestError{
+		StatusCode: http.StatusBadRequest,
+		Body:       `{"_":"Authentication failed. Verify username and password. Got HTTP status 401 from REST call get to west:18091/pools."}`,
+	}
+
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{name: "target rejected the credentials", err: fmt.Errorf("wrapped: %w", rejected), want: true},
+		{
+			name: "target rejected the client certificate",
+			err: couchbaseutil.FailedRequestError{
+				StatusCode: http.StatusBadRequest,
+				Body:       `{"_":"Invalid remote cluster. cannot use HostName, west:18091, as a https address or a http address. Error when using it as a http address=Received unauthorized error from target. Please double check user credentials."}`,
+			},
+			want: true,
+		},
+		{name: "other validation failure", err: couchbaseutil.FailedRequestError{StatusCode: http.StatusBadRequest, Body: `{"_":"hostname is invalid"}`}},
+		{name: "server busy", err: couchbaseutil.FailedRequestError{StatusCode: http.StatusInternalServerError, Body: "A RPC request is currently underway"}},
+		{name: "network error", err: errors.New("dial tcp: i/o timeout")},
+		{name: "no error"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := isRemoteAuthError(test.err); got != test.want {
+				t.Errorf("got %v, want %v", got, test.want)
 			}
 		})
 	}
