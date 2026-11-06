@@ -527,11 +527,14 @@ func applyIPFamilyConfig(service *v1.Service, cluster *couchbasev2.CouchbaseClus
 	case couchbasev2.IPv6, couchbasev2.IPv6Only:
 		service.Spec.IPFamilies = []v1.IPFamily{v1.IPv6Protocol}
 		service.Spec.IPFamilyPolicy = &[]v1.IPFamilyPolicy{v1.IPFamilyPolicySingleStack}[0]
+	// Only the preferred family is listed: on a dual-stack cluster Kubernetes appends the
+	// secondary family for PreferDualStack, whereas listing it explicitly on a single-stack
+	// cluster is rejected by the API server ("not configured on this cluster").
 	case couchbasev2.IPv4Priority:
-		service.Spec.IPFamilies = []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol}
+		service.Spec.IPFamilies = []v1.IPFamily{v1.IPv4Protocol}
 		service.Spec.IPFamilyPolicy = &[]v1.IPFamilyPolicy{v1.IPFamilyPolicyPreferDualStack}[0]
 	case couchbasev2.IPv6Priority:
-		service.Spec.IPFamilies = []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol}
+		service.Spec.IPFamilies = []v1.IPFamily{v1.IPv6Protocol}
 		service.Spec.IPFamilyPolicy = &[]v1.IPFamilyPolicy{v1.IPFamilyPolicyPreferDualStack}[0]
 	}
 }
@@ -588,6 +591,36 @@ func generateDiscoveryService(cluster *couchbasev2.CouchbaseCluster) *v1.Service
 	applyIPFamilyConfig(service, cluster)
 
 	return service
+}
+
+// preferDualStackSatisfied checks if a PreferDualStack service already has the requested primary
+// IP family, with any additional family having been allocated by Kubernetes.
+func preferDualStackSatisfied(current, requested *v1.Service) bool {
+	if current == nil {
+		return false
+	}
+
+	if requested.Spec.IPFamilyPolicy == nil || *requested.Spec.IPFamilyPolicy != v1.IPFamilyPolicyPreferDualStack {
+		return false
+	}
+
+	if current.Spec.IPFamilyPolicy == nil || *current.Spec.IPFamilyPolicy != v1.IPFamilyPolicyPreferDualStack {
+		return false
+	}
+
+	if len(requested.Spec.IPFamilies) != 1 || len(current.Spec.IPFamilies) == 0 {
+		return false
+	}
+
+	return current.Spec.IPFamilies[0] == requested.Spec.IPFamilies[0]
+}
+
+// adoptAllocatedIPFamilies copies the current IP families onto the requested service when
+// the requested PreferDualStack configuration is already satisfied.
+func adoptAllocatedIPFamilies(current, requested *v1.Service) {
+	if preferDualStackSatisfied(current, requested) {
+		requested.Spec.IPFamilies = append([]v1.IPFamily(nil), current.Spec.IPFamilies...)
+	}
 }
 
 // ipFamiliesRestricted checks if the requested service update would make the current service IP family config more restrictive.
@@ -895,6 +928,10 @@ func reconcileService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, r
 		requested.Spec.IPFamilies = families
 		requested.Spec.IPFamilyPolicy = &[]v1.IPFamilyPolicy{v1.IPFamilyPolicyPreferDualStack}[0]
 	}
+
+	// PreferDualStack services only request their primary family. On a dual-stack cluster
+	// Kubernetes appends the secondary family, so accept it rather than trying to remove it.
+	adoptAllocatedIPFamilies(current, requested)
 
 	requestedJSON, err := json.Marshal(requested)
 	if err != nil {

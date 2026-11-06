@@ -306,3 +306,81 @@ func TestGenerateConsoleServiceType(t *testing.T) {
 		})
 	}
 }
+
+func TestApplyIPFamilyConfigPriority(t *testing.T) {
+	tests := []struct {
+		family couchbasev2.AddressFamily
+		want   v1.IPFamily
+	}{
+		{couchbasev2.IPv4Priority, v1.IPv4Protocol},
+		{couchbasev2.IPv6Priority, v1.IPv6Protocol},
+	}
+
+	for _, test := range tests {
+		family := test.family
+		cluster := &couchbasev2.CouchbaseCluster{}
+		cluster.Spec.Networking.AddressFamily = &family
+
+		service := &v1.Service{}
+		applyIPFamilyConfig(service, cluster)
+
+		// Only the primary family may be requested, single-stack clusters reject the secondary.
+		if len(service.Spec.IPFamilies) != 1 || service.Spec.IPFamilies[0] != test.want {
+			t.Errorf("%s: expected ipFamilies [%s], got %v", family, test.want, service.Spec.IPFamilies)
+		}
+
+		if service.Spec.IPFamilyPolicy == nil || *service.Spec.IPFamilyPolicy != v1.IPFamilyPolicyPreferDualStack {
+			t.Errorf("%s: expected PreferDualStack policy, got %v", family, service.Spec.IPFamilyPolicy)
+		}
+	}
+}
+
+func TestPreferDualStackSatisfied(t *testing.T) {
+	newService := func(policy v1.IPFamilyPolicy, families ...v1.IPFamily) *v1.Service {
+		return &v1.Service{Spec: v1.ServiceSpec{IPFamilyPolicy: &policy, IPFamilies: families}}
+	}
+
+	tests := []struct {
+		name      string
+		current   *v1.Service
+		requested *v1.Service
+		want      bool
+	}{
+		{
+			name:      "secondary family allocated by dual-stack cluster",
+			current:   newService(v1.IPFamilyPolicyPreferDualStack, v1.IPv4Protocol, v1.IPv6Protocol),
+			requested: newService(v1.IPFamilyPolicyPreferDualStack, v1.IPv4Protocol),
+			want:      true,
+		},
+		{
+			name:      "single-stack cluster",
+			current:   newService(v1.IPFamilyPolicyPreferDualStack, v1.IPv4Protocol),
+			requested: newService(v1.IPFamilyPolicyPreferDualStack, v1.IPv4Protocol),
+			want:      true,
+		},
+		{
+			name:      "primary family differs",
+			current:   newService(v1.IPFamilyPolicyPreferDualStack, v1.IPv6Protocol, v1.IPv4Protocol),
+			requested: newService(v1.IPFamilyPolicyPreferDualStack, v1.IPv4Protocol),
+			want:      false,
+		},
+		{
+			name:      "current is single stack",
+			current:   newService(v1.IPFamilyPolicySingleStack, v1.IPv4Protocol),
+			requested: newService(v1.IPFamilyPolicyPreferDualStack, v1.IPv4Protocol),
+			want:      false,
+		},
+		{
+			name:      "requested is single stack",
+			current:   newService(v1.IPFamilyPolicyPreferDualStack, v1.IPv4Protocol, v1.IPv6Protocol),
+			requested: newService(v1.IPFamilyPolicySingleStack, v1.IPv4Protocol),
+			want:      false,
+		},
+	}
+
+	for _, test := range tests {
+		if got := preferDualStackSatisfied(test.current, test.requested); got != test.want {
+			t.Errorf("%s: expected %v, got %v", test.name, test.want, got)
+		}
+	}
+}

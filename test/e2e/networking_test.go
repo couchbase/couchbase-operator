@@ -1096,7 +1096,8 @@ func testNetworkAddressFamilyChangeToOppositePriorityAndNodeToNode(t *testing.T,
 	// Static configuration.
 	clusterSize := 3
 
-	framework.Requires(t, kubernetes).AtLeastVersion("7.0.2")
+	// Switching to the opposite address family requires both families to be available.
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.2").DualStack()
 
 	encryption := nodeToNode != nil
 

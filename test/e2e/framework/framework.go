@@ -1872,6 +1872,36 @@ func (r *TestRequirement) PlatformIs(platform couchbasev2.PlatformType) *TestReq
 	return r
 }
 
+// DualStack skips the test if the Kubernetes cluster is not configured for dual-stack
+// services. This is probed with a dry-run creation of a RequireDualStack service, which
+// the API server rejects on single-stack clusters.
+func (r *TestRequirement) DualStack() *TestRequirement {
+	policy := v1.IPFamilyPolicyRequireDualStack
+
+	service := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "dual-stack-probe-",
+		},
+		Spec: v1.ServiceSpec{
+			ClusterIP:      v1.ClusterIPNone,
+			IPFamilyPolicy: &policy,
+			Ports:          []v1.ServicePort{{Name: "probe", Port: 80}},
+		},
+	}
+
+	opts := metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}}
+
+	if _, err := r.kubernetes.KubeClient.CoreV1().Services(r.kubernetes.Namespace).Create(context.Background(), service, opts); err != nil {
+		if apierrors.IsInvalid(err) {
+			r.t.Skipf("Kubernetes cluster does not support dual-stack services: %v", err)
+		}
+
+		e2eutil.Die(r.t, err)
+	}
+
+	return r
+}
+
 func (r *TestRequirement) InitNodeHostName(requiredNodeCount int) *TestRequirement {
 	client := r.kubernetes.KubeClient
 
