@@ -848,6 +848,12 @@ func TestNegValidationCreateCouchbaseCluster(t *testing.T) {
 			expectedErrors: []string{"cannot set spec.upgrade.upgradeStrategy to ImmediateUpgrade when spec.upgrade.upgradeProcess is set to InPlaceUpgrade"},
 		},
 		{
+			name:             "TestValidateServerVersionDeprecated",
+			mutations:        patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.2.4")},
+			shouldFail:       false,
+			expectedWarnings: []string{"Couchbase Server 7.0, 7.1 and 7.2 are deprecated"},
+		},
+		{
 			name:             "TestValidateDeltaRecoveryDeprecated",
 			mutations:        patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/upgradeProcess", "DeltaRecovery")},
 			shouldFail:       false,

@@ -165,6 +165,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintMemcachedBucketDeprecated,
 		checkServerClassImageDeprecated,
 		checkConstraintAutoFailoverMaxCountDeprecated,
+		checkConstraintServerVersionDeprecated,
 		checkConstraintsDeprecatedNetworkingOptions,
 		checkConstraintDeprecatedAnnotations,
 		checkConstraintDeprecatedRBACRoles,
@@ -7860,6 +7861,21 @@ func checkConstraintAutoFailoverMaxCountDeprecated(_ *types.Validator, cluster *
 	}
 
 	return []string{"spec.cluster.autoFailoverMaxCount is deprecated in Couchbase Server 8.5 and will be removed in a future release"}, nil
+}
+
+// checkConstraintServerVersionDeprecated warns when the cluster runs Couchbase Server 7.0, 7.1
+// or 7.2, which are deprecated and will stop being supported in a future release.
+func checkConstraintServerVersionDeprecated(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+	supported, err := cluster.IsAtLeastVersion("7.6.0")
+	if err != nil {
+		return nil, err
+	}
+
+	if supported {
+		return nil, nil
+	}
+
+	return []string{"Couchbase Server 7.0, 7.1 and 7.2 are deprecated and will not be supported in a future release, please upgrade to 7.6 or later"}, nil
 }
 
 // checkConstraintBucketsMeetMinReplicasCount warns when an existing CouchbaseBucket or

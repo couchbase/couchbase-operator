@@ -2148,6 +2148,53 @@ func TestCheckConstraintAutoFailoverMaxCountDeprecated(t *testing.T) {
 	}
 }
 
+func TestCheckConstraintServerVersionDeprecated(t *testing.T) {
+	testcases := []struct {
+		name        string
+		image       string
+		expectsWarn bool
+		expectsErr  bool
+	}{
+		{name: "7.0 warns", image: "couchbase/server:7.0.4", expectsWarn: true},
+		{name: "7.1 warns", image: "couchbase/server:7.1.6", expectsWarn: true},
+		{name: "7.2 warns", image: "couchbase/server:7.2.4", expectsWarn: true},
+		{name: "7.2 with edition warns", image: "couchbase/server:enterprise-7.2.4", expectsWarn: true},
+		{name: "7.6 is silent", image: "couchbase/server:7.6.0"},
+		{name: "8.0 is silent", image: "couchbase/server:8.0.0"},
+		{name: "unknown digest is silent", image: "couchbase/server@sha256:0000000000000000000000000000000000000000000000000000000000000000"},
+		{name: "no tag errors", image: "couchbase/server", expectsErr: true},
+		{name: "latest tag errors", image: "couchbase/server:latest", expectsErr: true},
+		{name: "short version errors", image: "couchbase/server:7.2", expectsErr: true},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			cluster := &couchbasev2.CouchbaseCluster{
+				Spec: couchbasev2.ClusterSpec{
+					Image: tc.image,
+				},
+			}
+
+			warnings, err := checkConstraintServerVersionDeprecated(nil, cluster)
+			if tc.expectsErr {
+				if err == nil {
+					t.Fatalf("expected error, got none")
+				}
+
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if got := len(warnings) > 0; got != tc.expectsWarn {
+				t.Errorf("expected warning %v, got %v", tc.expectsWarn, warnings)
+			}
+		})
+	}
+}
+
 func TestNamesUniqueSameResourceReachedTwice(t *testing.T) {
 	labels := map[string]string{"cluster": "cb"}
 	selector := &metav1.LabelSelector{MatchLabels: labels}
