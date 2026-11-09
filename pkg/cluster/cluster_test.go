@@ -12,6 +12,7 @@ package cluster
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -335,5 +336,61 @@ func TestCanAddNodeToClusterAllowUnreachable(t *testing.T) {
 
 	if !canAddNode {
 		t.Error("expected the node to be allowed to join when allowExternallyUnreachablePods is set")
+	}
+}
+
+func TestPreserveManualInterventionCondition(t *testing.T) {
+	mir := couchbasev2.ClusterCondition{
+		Type:    couchbasev2.ClusterConditionManualInterventionRequired,
+		Status:  "True",
+		Reason:  "ManualInterventionRequired",
+		Message: "TLS certificate has expired",
+	}
+	available := couchbasev2.ClusterCondition{Type: couchbasev2.ClusterConditionAvailable, Status: "True"}
+
+	stale := mir
+	stale.Message = "stale"
+
+	tests := []struct {
+		name     string
+		current  []couchbasev2.ClusterCondition
+		incoming []couchbasev2.ClusterCondition
+		want     []couchbasev2.ClusterCondition
+	}{
+		{
+			name:     "stale incoming status is missing the condition",
+			current:  []couchbasev2.ClusterCondition{available, mir},
+			incoming: []couchbasev2.ClusterCondition{available},
+			want:     []couchbasev2.ClusterCondition{available, mir},
+		},
+		{
+			name:     "stale incoming status still has a resolved condition",
+			current:  []couchbasev2.ClusterCondition{available},
+			incoming: []couchbasev2.ClusterCondition{mir, available},
+			want:     []couchbasev2.ClusterCondition{available},
+		},
+		{
+			name:     "stale incoming condition is replaced in place",
+			current:  []couchbasev2.ClusterCondition{mir},
+			incoming: []couchbasev2.ClusterCondition{stale, available},
+			want:     []couchbasev2.ClusterCondition{mir, available},
+		},
+		{
+			name:     "neither has the condition",
+			current:  []couchbasev2.ClusterCondition{available},
+			incoming: []couchbasev2.ClusterCondition{available},
+			want:     []couchbasev2.ClusterCondition{available},
+		},
+	}
+
+	for _, test := range tests {
+		current := &couchbasev2.ClusterStatus{Conditions: test.current}
+		incoming := &couchbasev2.ClusterStatus{Conditions: append([]couchbasev2.ClusterCondition(nil), test.incoming...)}
+
+		preserveManualInterventionCondition(current, incoming)
+
+		if !reflect.DeepEqual(incoming.Conditions, test.want) {
+			t.Errorf("%s: expected %+v, got %+v", test.name, test.want, incoming.Conditions)
+		}
 	}
 }

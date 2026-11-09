@@ -885,11 +885,39 @@ func (c *Cluster) Update(cluster *couchbasev2.CouchbaseCluster, operatorStartTim
 		c.cluster.Status.LastUpdateTime = time.Now().Format(time.RFC3339)
 	}
 
+	// The MIR watchdog is the only writer of cluster status outside of the reconcile loop, and the
+	// incoming object comes from the informer cache, which may not yet reflect the watchdog's latest
+	// status write. Status writes go through the /status subresource and don't bump the generation,
+	// so the stale check above won't catch this. Without this, a stale copy would drop (or restore)
+	// the ManualInterventionRequired condition, the reconcile wouldn't be skipped, and its status
+	// write would overwrite the watchdog's. The in-memory condition is always the latest, so keep it.
+	preserveManualInterventionCondition(&c.cluster.Status, &cluster.Status)
+
 	c.cluster = cluster
 
 	c.refreshLogger()
 
 	c.RunReconcile(operatorStartTime)
+}
+
+// preserveManualInterventionCondition makes the incoming status' ManualInterventionRequired
+// condition match the current in-memory status, adding, replacing or removing it as required.
+func preserveManualInterventionCondition(current, incoming *couchbasev2.ClusterStatus) {
+	want := current.GetCondition(couchbasev2.ClusterConditionManualInterventionRequired)
+
+	if have := incoming.GetCondition(couchbasev2.ClusterConditionManualInterventionRequired); have != nil {
+		if want == nil {
+			incoming.ClearCondition(couchbasev2.ClusterConditionManualInterventionRequired)
+		} else {
+			*have = *want
+		}
+
+		return
+	}
+
+	if want != nil {
+		incoming.Conditions = append(incoming.Conditions, *want)
+	}
 }
 
 // refreshLogger updates the cluster-specific logger based on the current cluster specification.
