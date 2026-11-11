@@ -20,8 +20,10 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/unreconcilable"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -279,5 +281,100 @@ func TestCleanupUnusedBackupResourcesAfterSwitchToSnapshot(t *testing.T) {
 
 	if _, err := kubeClient.CoreV1().PersistentVolumeClaims(fakeClusterNamespace).Get(t.Context(), "switched-backup", metav1.GetOptions{}); err != nil {
 		t.Errorf("expected the switched backup's PVC to be kept, got %v", err)
+	}
+}
+
+// TestGenerateBackupPVCLabels checks that a backup PVC gets the backup label
+// as well as the cluster labels, so we can still tell it's a backup PVC after
+// its backup is deleted.
+func TestGenerateBackupPVCLabels(t *testing.T) {
+	size := resource.MustParse("10Gi")
+
+	c := &Cluster{
+		cluster: &couchbasev2.CouchbaseCluster{ObjectMeta: metav1.ObjectMeta{Name: fakeClusterName, Namespace: fakeClusterNamespace}},
+	}
+
+	backup := &couchbasev2.CouchbaseBackup{
+		ObjectMeta: metav1.ObjectMeta{Name: "nightly"},
+		Spec:       couchbasev2.CouchbaseBackupSpec{Size: &size},
+	}
+
+	pvc := c.generateBackupPVC(backup)
+
+	expected := map[string]string{
+		constants.LabelApp:     constants.App,
+		constants.LabelCluster: fakeClusterName,
+		constants.LabelBackup:  "nightly",
+	}
+
+	if !reflect.DeepEqual(pvc.Labels, expected) {
+		t.Errorf("expected labels %v, got %v", expected, pvc.Labels)
+	}
+}
+
+// TestUpdateBackupPVCAddsMissingLabel checks that a backup PVC made before
+// we added the backup label gets the label, and that once it has it the PVC
+// isn't updated again.
+func TestUpdateBackupPVCAddsMissingLabel(t *testing.T) {
+	size := resource.MustParse("10Gi")
+
+	oldPVC := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "nightly",
+			Namespace: fakeClusterNamespace,
+			Labels:    map[string]string{constants.LabelCluster: fakeClusterName},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceStorage: size},
+			},
+		},
+		Status: corev1.PersistentVolumeClaimStatus{
+			Capacity: corev1.ResourceList{corev1.ResourceStorage: size},
+		},
+	}
+
+	kubeClient := kubefake.NewSimpleClientset(oldPVC)
+
+	c := &Cluster{
+		k8s:     &client.Client{KubeClient: kubeClient},
+		cluster: &couchbasev2.CouchbaseCluster{ObjectMeta: metav1.ObjectMeta{Name: fakeClusterName, Namespace: fakeClusterNamespace}},
+		log:     logf.Log.WithName("test"),
+	}
+
+	backup := &couchbasev2.CouchbaseBackup{
+		ObjectMeta: metav1.ObjectMeta{Name: "nightly"},
+		Spec:       couchbasev2.CouchbaseBackupSpec{Size: &size},
+	}
+
+	requested := c.generateBackupPVC(backup)
+
+	// First pass, the old PVC has no backup label so it should get one.
+	if err := c.updateBackupPVC(&blankNotifier{}, backup, requested, oldPVC); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	labelled, err := kubeClient.CoreV1().PersistentVolumeClaims(fakeClusterNamespace).Get(t.Context(), "nightly", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to get pvc: %v", err)
+	}
+
+	if labelled.Labels[constants.LabelBackup] != "nightly" {
+		t.Fatalf("expected backup label nightly, got %v", labelled.Labels)
+	}
+
+	if labelled.Labels[constants.LabelCluster] != fakeClusterName {
+		t.Errorf("expected the cluster label to be kept, got %v", labelled.Labels)
+	}
+
+	// Second pass, the label is already there and the size hasn't changed, so nothing should be updated.
+	kubeClient.ClearActions()
+
+	if err := c.updateBackupPVC(&blankNotifier{}, backup, requested, labelled); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if actions := kubeClient.Actions(); len(actions) != 0 {
+		t.Errorf("expected no updates once the label is there, got %v", actions)
 	}
 }

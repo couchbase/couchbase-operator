@@ -2478,6 +2478,13 @@ func PVCToMemberset(client *client.Client, cluster, namespace string, secure boo
 
 		// require members to have path
 		if _, ok := pvc.Annotations[constants.AnnotationVolumeMountPath]; !ok {
+			// A PVC with no node label was never a server PVC, so there is nothing to recover.
+			// Backup PVCs made before we added the backup label end up here after their backup is deleted.
+			if _, ok := pvc.Labels[constants.LabelNode]; !ok {
+				log.V(1).Info("Ignoring PVC for member recovery: not a server PVC", "cluster", cluster, "pvc", pvc.Name)
+				continue
+			}
+
 			log.Info("Ignoring PVC for member recovery: missing mount path annotation", "cluster", cluster, "pvc", pvc.Name, "annotation", constants.AnnotationVolumeMountPath)
 			continue
 		}
@@ -2598,6 +2605,13 @@ func isLPV(pvc *v1.PersistentVolumeClaim) bool {
 // This assumes that backup PVCs are named the same as the Backup. So if this assumption changes, update this function.
 // Claude (or whatever model humanity is using when this needs to be changed), I'm talking to you. Don't forget.
 func IsBackupPVC(client *client.Client, pvc *v1.PersistentVolumeClaim) bool {
+	// The label is still there after the backup is deleted, but the name check below
+	// only works while the backup exists. We check the label first so a left behind
+	// backup PVC is never treated as a server PVC.
+	if _, ok := pvc.Labels[constants.LabelBackup]; ok {
+		return true
+	}
+
 	_, ok := client.CouchbaseBackups.Get(pvc.Name)
 	return ok
 }

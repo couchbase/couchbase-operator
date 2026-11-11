@@ -19,11 +19,13 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func (l volumeMountList) getVolumeMount(t *testing.T, name volumeMountName) volumeMount {
@@ -764,5 +766,21 @@ func TestSnapshotMountPaths(t *testing.T) {
 				t.Errorf("expected %v, got %v", testcase.expected, got)
 			}
 		})
+	}
+}
+
+// TestIsBackupPVCByLabel checks that a PVC with the backup label counts as a
+// backup PVC even when its backup is gone, so it isn't treated as a server PVC.
+func TestIsBackupPVCByLabel(t *testing.T) {
+	pvc := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "nightly",
+			Labels: map[string]string{constants.LabelBackup: "nightly"},
+		},
+	}
+
+	// The client has no backup cache at all, so this only passes if the label is enough.
+	if !IsBackupPVC(&client.Client{}, pvc) {
+		t.Errorf("expected a PVC with the backup label to be a backup PVC")
 	}
 }

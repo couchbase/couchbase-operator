@@ -723,6 +723,26 @@ func (c *Cluster) updateBackupPVC(notifier backupUpdateNotifier, backup *couchba
 		return nil
 	}
 
+	// PVCs made by older operator versions don't have the backup label, so add it.
+	// We check the resize on the next reconcile, so we don't update the PVC twice in one go.
+	if current.Labels[constants.LabelBackup] != backup.Name {
+		pvc := current.DeepCopy()
+
+		if pvc.Labels == nil {
+			pvc.Labels = map[string]string{}
+		}
+
+		pvc.Labels[constants.LabelBackup] = backup.Name
+
+		if _, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Update(context.Background(), pvc, metav1.UpdateOptions{}); err != nil {
+			return err
+		}
+
+		c.log.Info("Backup PVC labelled", "cluster", c.namespacedName(), "cbbackup", backup.Name)
+
+		return nil
+	}
+
 	currentRequestedSize, ok := current.Spec.Resources.Requests[corev1.ResourceStorage]
 	if !ok {
 		c.log.V(1).Info("Skipping backup volume reconcile, no storage requested", "cluster", c.namespacedName(), "backup", requested.Name)
@@ -805,6 +825,12 @@ func (c *Cluster) deleteBackupResource(resource backupResources) error {
 	}
 
 	c.log.Info("Backup deleted", "cluster", c.cluster.NamespacedName(), "cbbackup", resource.name)
+
+	// The PVC is kept on purpose so the backups on it aren't lost. Log it so users know
+	// to delete it themselves if they don't need it.
+	if resource.pvc != nil {
+		c.log.Info("Backup PVC kept, delete it if the backups on it are no longer needed", "cluster", c.cluster.NamespacedName(), "cbbackup", resource.name, "pvc", resource.pvc.Name)
+	}
 
 	c.raiseEvent(k8sutil.BackupDeleteEvent(resource.name, c.cluster))
 
@@ -1795,10 +1821,15 @@ func (c *Cluster) generateBackupPVC(backup *couchbasev2.CouchbaseBackup) *corev1
 		return nil
 	}
 
+	// The backup label lets us tell a backup PVC apart from a server PVC,
+	// even after the backup is deleted and its PVC is left behind.
+	labels := k8sutil.LabelsForCluster(c.cluster)
+	labels[constants.LabelBackup] = backup.Name
+
 	return &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   backup.Name,
-			Labels: k8sutil.LabelsForCluster(c.cluster),
+			Labels: labels,
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			Resources: corev1.VolumeResourceRequirements{
