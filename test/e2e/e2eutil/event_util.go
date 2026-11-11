@@ -628,9 +628,11 @@ func ServerCrashRecoverySequence() eventschema.Validatable {
 func PodDownWithPVCRecoverySequence(clusterSize, victims int) eventschema.Validatable {
 	events := eventschema.Sequence{}
 
+	// With every pod gone the operator recreates all members at once, so none
+	// are reported down.
 	if victims == clusterSize {
-		events.Validators = append(events.Validators, eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered}})
-		victims--
+		events.Validators = append(events.Validators, eventschema.Repeat{Times: victims, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered}})
+		victims = 0
 	}
 
 	events.Validators = append(events.Validators, eventschema.Sequence{
@@ -725,16 +727,17 @@ func PodDownWithPVCRecoverySequenceWithEphemeral(t *testing.T, clusterSize, pers
 	// In CBS7 a forced failover ejects the member due to metadata inconsistencies,
 	// so it behaves differently.
 	if version.GreaterEqualString("7.0.0") {
+		// With every pod gone the operator recreates all persistent members at once,
+		// so only the ephemeral members are reported down.
 		return eventschema.Sequence{
 			Validators: []eventschema.Validatable{
-				eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered},
 				eventschema.Repeat{
-					Times:     clusterSize - 1,
-					Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+					Times:     persistentVictims,
+					Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered},
 				},
 				eventschema.Repeat{
-					Times:     persistentVictims - 1,
-					Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered},
+					Times:     ephemeralVictims,
+					Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
 				},
 				eventschema.Repeat{
 					Times:     ephemeralVictims,

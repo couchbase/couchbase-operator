@@ -236,7 +236,7 @@ func TestIndexerSettings(t *testing.T) {
 		Name:     "idx_only",
 		Services: couchbasev2.ServiceList{couchbasev2.IndexService},
 	}
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/servers/-", indexService), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/servers/-", e2eutil.ServerConfigWithPullSecrets(kubernetes, indexService)), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
@@ -891,7 +891,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		Name:     "test_config_2",
 		Services: couchbasev2.ServiceList{couchbasev2.QueryService},
 	}
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/servers/-", newService), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/servers/-", e2eutil.ServerConfigWithPullSecrets(kubernetes, newService)), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
@@ -901,7 +901,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		Name:     "test_config_3",
 		Services: couchbasev2.ServiceList{couchbasev2.IndexService},
 	}
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/servers/-", newService), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/servers/-", e2eutil.ServerConfigWithPullSecrets(kubernetes, newService)), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
@@ -911,7 +911,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		Name:     "test_config_4",
 		Services: couchbasev2.ServiceList{couchbasev2.SearchService},
 	}
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/servers/-", newService), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/servers/-", e2eutil.ServerConfigWithPullSecrets(kubernetes, newService)), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
@@ -1428,7 +1428,8 @@ func TestAppTelemetrySettingsClusterDefault(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).AtLeastVersion("8.0.0")
+	// TODO: Remove BeforeVersion once MB-69077 (app telemetry enabled by default) lands in 8.5.0.
+	framework.Requires(t, kubernetes).AtLeastVersion("8.0.0").BeforeVersion("8.5.0")
 
 	clusterSize := 3
 

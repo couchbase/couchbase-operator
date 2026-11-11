@@ -742,14 +742,15 @@ func TestScopesAndCollectionsCascadingScopeDeletion(t *testing.T) {
 // TestScopeOverflow checks for the behaviour of Couchbase being consistent over time.
 // The docs say 1000, reality says 1200.  This just checks our understanding is correct
 // we're not lying in our docs, and there is at least a cluster condition raised as
-// computing this in the DAC is too computationally intensive.
+// computing this in the DAC is too computationally intensive.  Couchbase Server 8.5.0
+// raised the limit to 10200, which is too slow to reach in a test, so only run below it.
 func TestScopeOverflow(t *testing.T) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket()
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").BeforeVersion("8.5.0").CouchbaseBucket()
 
 	clusterSize := 1
 	scopeGroupName := "brain"
@@ -782,14 +783,15 @@ func TestScopeOverflow(t *testing.T) {
 // TestCollectionOverflow checks for the behaviour of Couchbase being consistent over time.
 // The docs say 1000, reality says 1200.  This just checks our understanding is correct
 // we're not lying in our docs, and there is at least a cluster condition raised as
-// computing this in the DAC is too computationally intensive.
+// computing this in the DAC is too computationally intensive.  Couchbase Server 8.5.0
+// raised the limit to 10200, which is too slow to reach in a test, so only run below it.
 func TestCollectionOverflow(t *testing.T) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket()
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").BeforeVersion("8.5.0").CouchbaseBucket()
 
 	clusterSize := 1
 	scopeName := "pinky"

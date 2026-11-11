@@ -818,7 +818,7 @@ func MustDeleteBucket(t *testing.T, k8s *types.Cluster, bucket metav1.Object) {
 }
 
 func AddServices(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, newService couchbasev2.ServerConfig, timeout time.Duration) (*couchbasev2.CouchbaseCluster, error) {
-	settings := append(cl.Spec.Servers, newService)
+	settings := append(cl.Spec.Servers, ServerConfigWithPullSecrets(k8s, newService))
 	return patchCluster(k8s, cl, jsonpatch.NewPatchSet().Replace("/spec/servers", settings), timeout)
 }
 
@@ -1247,6 +1247,23 @@ func pullSecretReferences(k8s *types.Cluster) []v1.LocalObjectReference {
 	}
 
 	return references
+}
+
+// ServerConfigWithPullSecrets returns the server class with the cluster's image pull secrets
+// applied, for server classes added after creation that e2espec.ApplyImagePullSecret never saw.
+func ServerConfigWithPullSecrets(k8s *types.Cluster, config couchbasev2.ServerConfig) couchbasev2.ServerConfig {
+	references := pullSecretReferences(k8s)
+	if references == nil {
+		return config
+	}
+
+	if config.Pod == nil {
+		config.Pod = &couchbasev2.PodTemplate{}
+	}
+
+	config.Pod.Spec.ImagePullSecrets = references
+
+	return config
 }
 
 func CreateMemberPod(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, m couchbaseutil.Member) (*v1.Pod, error) {

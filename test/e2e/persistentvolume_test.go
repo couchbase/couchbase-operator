@@ -300,7 +300,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, 0, false)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, 1, false)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, 2, false)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberDownEvent(cluster, 1), 5*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.MemberRecoveredEvent(cluster, 2), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the results are as expected:
@@ -360,7 +360,7 @@ func TestPersistentVolumeKillAllPodsTLS(t *testing.T) {
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, 0, false)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, 1, false)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, 2, false)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberDownEvent(cluster, 1), 5*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.MemberRecoveredEvent(cluster, 2), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the results are as expected:
@@ -464,7 +464,7 @@ func TestPersistentVolumeKillAllPodsAndOperator(t *testing.T) {
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, 0, false)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, 1, false)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, 2, false)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberDownEvent(cluster, 1), 10*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.MemberRecoveredEvent(cluster, 2), 10*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
 	// Check the results are as expected:

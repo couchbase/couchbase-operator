@@ -469,7 +469,7 @@ func TestAutoscaleEnabledAllowsStatefulTLS(t *testing.T) {
 	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleUpEvent(cluster, configName, 2, 3), 2*time.Minute)
 
 	// Wait for rebalance after scale up
-	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
 
 	// expected events for scaling up
 	expectedEvents := []eventschema.Validatable{

@@ -1145,7 +1145,17 @@ func (b *Bucket) FormEncode(update bool, duringMigration bool) []byte {
 			}
 
 			if b.AutoCompactionSettings.Settings != nil {
-				for key, value := range encodeBucketAutoCompactionSettings(*b.AutoCompactionSettings.Settings) {
+				settings := encodeBucketAutoCompactionSettings(*b.AutoCompactionSettings.Settings)
+
+				// magmaFragmentationPercentage only applies to magma buckets. Couchbase Server
+				// 8.5.0+ validates it with KV, which rejects it on couchstore buckets even when
+				// "undefined". Given it only applies to magma, we'll just remove it from all
+				// bucket requests regardless of server version.
+				if b.BucketStorageBackend == CouchbaseStorageBackendCouchstore {
+					delete(settings, "magmaFragmentationPercentage")
+				}
+
+				for key, value := range settings {
 					data.Set(key, value)
 				}
 			}

@@ -1901,7 +1901,8 @@ func (r *TestRequirement) PlatformIs(platform couchbasev2.PlatformType) *TestReq
 
 // DualStack skips the test if the Kubernetes cluster is not configured for dual-stack
 // services. This is probed with a dry-run creation of a RequireDualStack service, which
-// the API server rejects on single-stack clusters.
+// the API server rejects on single-stack clusters. The service must not be headless, as
+// headless services need no cluster IPs so are accepted on single-stack clusters too.
 func (r *TestRequirement) DualStack() *TestRequirement {
 	policy := v1.IPFamilyPolicyRequireDualStack
 
@@ -1910,7 +1911,6 @@ func (r *TestRequirement) DualStack() *TestRequirement {
 			GenerateName: "dual-stack-probe-",
 		},
 		Spec: v1.ServiceSpec{
-			ClusterIP:      v1.ClusterIPNone,
 			IPFamilyPolicy: &policy,
 			Ports:          []v1.ServicePort{{Name: "probe", Port: 80}},
 		},
