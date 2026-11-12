@@ -20,6 +20,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // TestDetectZoneChange covers the swap-vs-in-place decision. Under an override every server class
@@ -174,5 +175,61 @@ func TestSortCandidatesByUpgradeOrder(t *testing.T) {
 
 	if want := []string{"cb-0002", "cb-0003"}; !slices.Equal(names(got), want) {
 		t.Errorf("filter: got %v, want %v", names(got), want)
+	}
+}
+
+// TestPVCNeedsJoinedNote checks that we add the joined note to a PVC only when its pod
+// has joined the cluster, and that we don't add it again if the PVC already has it.
+func TestPVCNeedsJoinedNote(t *testing.T) {
+	joined := map[string]string{constants.PodInitializedAnnotation: "true"}
+
+	cases := []struct {
+		name string
+		pvc  *v1.PersistentVolumeClaim
+		pod  *v1.Pod
+		want bool
+	}{
+		{
+			name: "pod has joined so the PVC gets the note",
+			pvc:  &v1.PersistentVolumeClaim{},
+			pod:  &v1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: joined}},
+			want: true,
+		},
+		{
+			name: "PVC already has the note",
+			pvc: &v1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{constants.PVCJoinedAnnotation: "true"}}},
+			pod:  &v1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: joined}},
+			want: false,
+		},
+		{
+			name: "no pod",
+			pvc:  &v1.PersistentVolumeClaim{},
+			pod:  nil,
+			want: false,
+		},
+		{
+			name: "pod is being deleted",
+			pvc:  &v1.PersistentVolumeClaim{},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{
+				Annotations:       joined,
+				DeletionTimestamp: &metav1.Time{Time: metav1.Now().Time},
+			}},
+			want: false,
+		},
+		{
+			name: "pod has not joined yet",
+			pvc:  &v1.PersistentVolumeClaim{},
+			pod:  &v1.Pod{},
+			want: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := pvcNeedsJoinedNote(tc.pvc, tc.pod); got != tc.want {
+				t.Errorf("pvcNeedsJoinedNote = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }

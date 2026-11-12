@@ -440,4 +440,9 @@ const (
 
 	// KMIPClientSecretKeyKey is the key in the KMIP client secret that contains the client private key.
 	KMIPClientSecretKeyKey = "tls.key"
+
+	// PVCJoinedAnnotation is put on a member's PVCs once the member has joined
+	// the cluster. It means the PVCs hold data, so we must never delete them when
+	// a pod times out.
+	PVCJoinedAnnotation = "pvc.couchbase.com/joined"
 )

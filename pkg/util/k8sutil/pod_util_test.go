@@ -24,6 +24,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func (l volumeMountList) getVolumeMount(t *testing.T, name volumeMountName) volumeMount {
@@ -675,4 +676,42 @@ func assertCommonProbeSettings(t *testing.T, probe *v1.Probe) {
 
 func boolPtr(b bool) *bool {
 	return &b
+}
+
+// TestHasJoinedNote checks that a member counts as joined when at least one of its
+// PVCs has the joined note, and doesn't count as joined when none of them do.
+func TestHasJoinedNote(t *testing.T) {
+	withNote := &v1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+		Annotations: map[string]string{constants.PVCJoinedAnnotation: "true"}}}
+	withoutNote := &v1.PersistentVolumeClaim{}
+
+	cases := []struct {
+		name string
+		pvcs []*v1.PersistentVolumeClaim
+		want bool
+	}{
+		{
+			name: "no PVCs",
+			pvcs: nil,
+			want: false,
+		},
+		{
+			name: "PVCs without the note",
+			pvcs: []*v1.PersistentVolumeClaim{withoutNote, withoutNote},
+			want: false,
+		},
+		{
+			name: "one of the PVCs has the note",
+			pvcs: []*v1.PersistentVolumeClaim{withoutNote, withNote},
+			want: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := hasJoinedNote(tc.pvcs); got != tc.want {
+				t.Errorf("hasJoinedNote = %v, want %v", got, tc.want)
+			}
+		})
+	}
 }

@@ -464,6 +464,58 @@ func (c *Cluster) updateMemberVersion(member couchbaseutil.Member, version strin
 	return nil
 }
 
+// pvcNeedsJoinedNote returns true if we should add the joined note to the PVC.
+// We add it only when the PVC doesn't have it yet and its pod has joined the cluster.
+func pvcNeedsJoinedNote(pvc *v1.PersistentVolumeClaim, pod *v1.Pod) bool {
+	if _, ok := pvc.Annotations[constants.PVCJoinedAnnotation]; ok {
+		return false
+	}
+
+	if pod == nil || pod.DeletionTimestamp != nil {
+		return false
+	}
+
+	// A pod only gets the initialized annotation once it has joined the cluster.
+	_, ok := pod.Annotations[constants.PodInitializedAnnotation]
+
+	return ok
+}
+
+// reconcilePVCJoined puts the joined note on the PVCs of every member that
+// has joined the cluster. If that member's pod gets stuck later and times out,
+// the note tells us to keep its PVCs so it can come back with its data. PVCs made
+// before we added the note get it here too, as long as their pod is up.
+func (c *Cluster) reconcilePVCJoined() error {
+	for _, pvc := range c.k8s.PersistentVolumeClaims.List() {
+		name, ok := pvc.Labels[constants.LabelNode]
+		if !ok {
+			continue
+		}
+
+		pod, _ := c.k8s.Pods.Get(name)
+		if !pvcNeedsJoinedNote(pvc, pod) {
+			continue
+		}
+
+		// Copy the PVC first so we don't change the one in the cache.
+		updated := pvc.DeepCopy()
+		if updated.Annotations == nil {
+			updated.Annotations = map[string]string{}
+		}
+
+		updated.Annotations[constants.PVCJoinedAnnotation] = "true"
+
+		if _, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Update(context.Background(),
+			updated, metav1.UpdateOptions{}); err != nil {
+			return err
+		}
+
+		log.Info("Marked PVC as joined", "cluster", c.namespacedName(), "pvc", pvc.Name, "member", name)
+	}
+
+	return nil
+}
+
 // reconcilePodServerVersions rebuilds the digest cache from running pods and fills in
 // missing member versions.
 func (c *Cluster) reconcilePodServerVersions() error {

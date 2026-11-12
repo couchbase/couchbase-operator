@@ -957,6 +957,22 @@ func listMemberPVCS(client *client.Client, memberName string) (pvcs []*v1.Persis
 	return
 }
 
+// MemberHasJoined returns true if any of the member's PVCs has the joined note.
+func MemberHasJoined(client *client.Client, memberName string) bool {
+	return hasJoinedNote(listMemberPVCS(client, memberName))
+}
+
+// hasJoinedNote returns true if any of the PVCs has the joined note.
+func hasJoinedNote(pvcs []*v1.PersistentVolumeClaim) bool {
+	for _, pvc := range pvcs {
+		if _, ok := pvc.Annotations[constants.PVCJoinedAnnotation]; ok {
+			return true
+		}
+	}
+
+	return false
+}
+
 // MemberHasLogVolumes gets volumes for the named members and returns true
 // if it has a log-only volume.
 func MemberHasLogVolumes(client *client.Client, name string) bool {

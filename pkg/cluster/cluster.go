@@ -602,7 +602,15 @@ func (c *Cluster) handlePendingPods(pods []*v1.Pod) {
 		if podAge > c.config.PodCreateTimeout {
 			log.Info("Pod creation timeout exceeded", "cluster", c.namespacedName(), "pod", pod.Name)
 
-			if rerr := c.removePod(pod.Name, true); rerr != nil {
+			// A member that joined the cluster before still has its data on its PVCs, so only
+			// remove the pod and keep the PVCs for the next try. A new member has nothing on
+			// its PVCs yet, so they go with the pod.
+			removeVolumes := !k8sutil.MemberHasJoined(c.k8s, pod.Name)
+			if !removeVolumes {
+				log.Info("Keeping PVCs of timed out pod, the member joined the cluster before", "cluster", c.namespacedName(), "pod", pod.Name)
+			}
+
+			if rerr := c.removePod(pod.Name, removeVolumes); rerr != nil {
 				log.Error(rerr, "Failed to delete pod", "cluster", c.namespacedName(), "pod", pod.Name)
 				continue
 			}
