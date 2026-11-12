@@ -242,6 +242,7 @@ func (c *Cluster) reconcile() error {
 		(*Cluster).reconcileAdminPassword,
 		(*Cluster).reconcileTLSPreTopologyChange,
 		(*Cluster).reconcilePVCImages,
+		(*Cluster).reconcilePVCJoined,
 	}
 
 	if err := preTopologyReconcilers.run(c); err != nil {

@@ -1894,10 +1894,18 @@ func (c *Cluster) handleTimedOutPendingPod(pod *v1.Pod) {
 		}
 	}
 
+	// A member that joined the cluster before still has its data on its PVCs, so only
+	// remove the pod and keep the PVCs for the next try. A new member has nothing on
+	// its PVCs yet, so they go with the pod.
+	removeVolumes := !k8sutil.MemberHasJoined(c.k8s, pod.Name)
+	if !removeVolumes {
+		c.log.Info("Keeping PVCs of timed out pod, the member joined the cluster before", "cluster", c.namespacedName(), "pod", pod.Name)
+	}
+
 	// Remove the pod first. If this fails, the condition remains set so the next
 	// cycle retries the removal. Clearing the condition before removal would
 	// expose the pod to handleUnclusteredNodes which would attempt to CBS-add it.
-	if err := c.removePod(pod.Name, true); err != nil {
+	if err := c.removePod(pod.Name, removeVolumes); err != nil {
 		c.log.Error(err, "Failed to remove timed-out pending pod", "cluster", c.namespacedName(), "pod", pod.Name)
 		return
 	}

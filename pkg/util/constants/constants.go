@@ -298,6 +298,11 @@ const (
 	// PodRecoveryAttemptsAnnotation tracks the number of recovery attempts for a pod via its PVC.
 	// Used to implement max retry logic before falling back to swap rebalance.
 	PodRecoveryAttemptsAnnotation = "pvc.couchbase.com/recovery-attempts"
+
+	// PVCJoinedAnnotation is put on a member's PVCs once the member has joined
+	// the cluster. It means the PVCs hold data, so we must never delete them when
+	// a pod times out.
+	PVCJoinedAnnotation = "pvc.couchbase.com/joined"
 )
 
 const (

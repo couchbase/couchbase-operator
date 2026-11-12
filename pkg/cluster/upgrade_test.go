@@ -144,6 +144,62 @@ func TestPvcImageToStamp(t *testing.T) {
 	}
 }
 
+// TestPVCNeedsJoinedNote checks that we add the joined note to a PVC only when its pod
+// has joined the cluster, and that we don't add it again if the PVC already has it.
+func TestPVCNeedsJoinedNote(t *testing.T) {
+	joined := map[string]string{constants.PodInitializedAnnotation: "true"}
+
+	cases := []struct {
+		name string
+		pvc  *v1.PersistentVolumeClaim
+		pod  *v1.Pod
+		want bool
+	}{
+		{
+			name: "pod has joined so the PVC gets the note",
+			pvc:  &v1.PersistentVolumeClaim{},
+			pod:  &v1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: joined}},
+			want: true,
+		},
+		{
+			name: "PVC already has the note",
+			pvc: &v1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{constants.PVCJoinedAnnotation: "true"}}},
+			pod:  &v1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: joined}},
+			want: false,
+		},
+		{
+			name: "no pod",
+			pvc:  &v1.PersistentVolumeClaim{},
+			pod:  nil,
+			want: false,
+		},
+		{
+			name: "pod is being deleted",
+			pvc:  &v1.PersistentVolumeClaim{},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{
+				Annotations:       joined,
+				DeletionTimestamp: &metav1.Time{Time: metav1.Now().Time},
+			}},
+			want: false,
+		},
+		{
+			name: "pod has not joined yet",
+			pvc:  &v1.PersistentVolumeClaim{},
+			pod:  &v1.Pod{},
+			want: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := pvcNeedsJoinedNote(tc.pvc, tc.pod); got != tc.want {
+				t.Errorf("pvcNeedsJoinedNote = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 // TestMigrationCycleStrategy covers how we cycle a node to finish a bucket migration.
 // Two things come out of it, whether we fail the node over in place instead of
 // swap rebalancing it, and whether that node needs full recovery.

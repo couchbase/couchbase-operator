@@ -784,3 +784,41 @@ func TestIsBackupPVCByLabel(t *testing.T) {
 		t.Errorf("expected a PVC with the backup label to be a backup PVC")
 	}
 }
+
+// TestHasJoinedNote checks that a member counts as joined when at least one of its
+// PVCs has the joined note, and doesn't count as joined when none of them do.
+func TestHasJoinedNote(t *testing.T) {
+	withNote := &v1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+		Annotations: map[string]string{constants.PVCJoinedAnnotation: "true"}}}
+	withoutNote := &v1.PersistentVolumeClaim{}
+
+	cases := []struct {
+		name string
+		pvcs []*v1.PersistentVolumeClaim
+		want bool
+	}{
+		{
+			name: "no PVCs",
+			pvcs: nil,
+			want: false,
+		},
+		{
+			name: "PVCs without the note",
+			pvcs: []*v1.PersistentVolumeClaim{withoutNote, withoutNote},
+			want: false,
+		},
+		{
+			name: "one of the PVCs has the note",
+			pvcs: []*v1.PersistentVolumeClaim{withoutNote, withNote},
+			want: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := hasJoinedNote(tc.pvcs); got != tc.want {
+				t.Errorf("hasJoinedNote = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
