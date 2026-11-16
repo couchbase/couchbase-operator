@@ -2,6 +2,8 @@ module github.com/couchbase/couchbase-operator
 
 go 1.26.5
 
+godebug multipathtcp=0
+
 require (
 	cloud.google.com/go/storage v1.38.0
 	dario.cat/mergo v1.0.0
