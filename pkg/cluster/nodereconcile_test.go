@@ -11,9 +11,19 @@ licenses/APL2.txt.
 package cluster
 
 import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/metrics"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/go-logr/logr"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // TestClampRollbackBatch pins which end of the bucket replica range each rollback method
@@ -140,6 +150,155 @@ func TestClampRollbackBatch(t *testing.T) {
 				test.haveBuckets, test.dataNodes, test.callableMembers)
 			if batch != test.expected {
 				t.Errorf("expected batch %d, got %d", test.expected, batch)
+			}
+		})
+	}
+}
+
+// fakeCouchbase acts as the server in the failover tests.
+// Each read of the node state gives the next entry in the list.
+// When the list runs out, it keeps giving the last entry.
+type fakeCouchbase struct {
+	hostname       string
+	states         []fakeNodeState
+	poolsCalls     int
+	failoverStatus int
+	failoverCalls  int // How many failover requests were sent.
+}
+
+// fakeNodeState is what the server reports for the node at one point in time.
+type fakeNodeState struct {
+	membership string // Either active or inactiveFailed.
+	rebalance  string // Either running or none.
+}
+
+// Do answers the two calls the failover code makes, reading the node
+// state and asking for a failover. Any other call gets not found.
+func (f *fakeCouchbase) Do(req *http.Request) (*http.Response, error) {
+	switch {
+	case req.Method == http.MethodGet && req.URL.Path == "/pools/default":
+		state := f.states[min(f.poolsCalls, len(f.states)-1)]
+		f.poolsCalls++
+
+		body := fmt.Sprintf(`{"rebalanceStatus":%q,"nodes":[{"hostname":%q,"clusterMembership":%q,"status":"healthy"}]}`,
+			state.rebalance, f.hostname, state.membership)
+
+		return fakeResponse(req, http.StatusOK, body), nil
+	case req.Method == http.MethodPost && req.URL.Path == "/controller/failOver":
+		f.failoverCalls++
+
+		// Any status other than OK acts like the server is still
+		// busy with an earlier failover.
+		if f.failoverStatus != http.StatusOK {
+			return fakeResponse(req, f.failoverStatus, "Cannot failover during rebalance"), nil
+		}
+
+		return fakeResponse(req, http.StatusOK, ""), nil
+	}
+
+	return fakeResponse(req, http.StatusNotFound, ""), nil
+}
+
+func (f *fakeCouchbase) CloseIdleConnections() {}
+
+func fakeResponse(req *http.Request, status int, body string) *http.Response {
+	return &http.Response{
+		Status:     http.StatusText(status),
+		StatusCode: status,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(body)),
+		Request:    req,
+	}
+}
+
+// TestFailoverNodeForInPlaceUpgrade checks the hard failover used by an
+// in place upgrade for nodes without the data service.
+func TestFailoverNodeForInPlaceUpgrade(t *testing.T) {
+	// The REST client counts every request, so the metrics have to exist.
+	metrics.InitMetrics()
+
+	tests := []struct {
+		name           string
+		states         []fakeNodeState
+		failoverStatus int
+		failoverCalls  int
+		expectErr      error
+	}{
+		{
+			name:           "node already failed over skips the failover",
+			states:         []fakeNodeState{{"inactiveFailed", "none"}},
+			failoverStatus: http.StatusOK,
+			failoverCalls:  0,
+		},
+		{
+			name:           "failover request succeeds",
+			states:         []fakeNodeState{{"active", "none"}},
+			failoverStatus: http.StatusOK,
+			failoverCalls:  1,
+		},
+		{
+			name:           "failover request is rejected but the server finishes it",
+			states:         []fakeNodeState{{"active", "running"}, {"inactiveFailed", "none"}},
+			failoverStatus: http.StatusServiceUnavailable,
+			failoverCalls:  1,
+		},
+		{
+			name:           "failover request is rejected and nothing is running",
+			states:         []fakeNodeState{{"active", "none"}},
+			failoverStatus: http.StatusServiceUnavailable,
+			failoverCalls:  1,
+			expectErr:      ErrHardFailoverFailed,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			candidate := couchbaseutil.NewMember("default", "cb", "cb-0000", "8.0.2", "analytics", false, "")
+
+			fake := &fakeCouchbase{
+				hostname:       string(candidate.GetHostName()),
+				states:         test.states,
+				failoverStatus: test.failoverStatus,
+			}
+
+			api := couchbaseutil.New(context.Background(), "default/cb", "Administrator", "password", logr.Discard())
+			api.Client = fake
+
+			c := &Cluster{
+				cluster: &couchbasev2.CouchbaseCluster{
+					ObjectMeta: metav1.ObjectMeta{Name: "cb", Namespace: "default"},
+					Spec: couchbasev2.ClusterSpec{
+						Servers: []couchbasev2.ServerConfig{
+							{Name: "analytics", Services: couchbasev2.ServiceList{couchbasev2.AnalyticsService}},
+						},
+					},
+				},
+				api:             api,
+				log:             logr.Discard(),
+				callableMembers: couchbaseutil.NewMemberSet(candidate),
+			}
+
+			r := &ReconcileMachine{}
+
+			done, err := r.failoverNodeForInPlaceUpgrade(candidate, c)
+
+			if test.expectErr != nil {
+				if !errors.Is(err, test.expectErr) {
+					t.Fatalf("expected error %v, got %v", test.expectErr, err)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+
+				if !done {
+					t.Errorf("expected the node to be ready for recreate")
+				}
+			}
+
+			// The request must only be sent once, a retry would hit the running failover.
+			if fake.failoverCalls != test.failoverCalls {
+				t.Errorf("expected %d failover requests, got %d", test.failoverCalls, fake.failoverCalls)
 			}
 		})
 	}

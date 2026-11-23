@@ -37,7 +37,11 @@ var ErrFailoverSuccessCounterNotIncremented = fmt.Errorf("failover success count
 var ErrUnexpectedCounterChange = fmt.Errorf("unexpected counter change")
 var ErrNodeNotInCluster = fmt.Errorf("node not in the cluster: ")
 var ErrNodeNotActive = fmt.Errorf("node not active: ")
+var ErrHardFailoverFailed = fmt.Errorf("hard failover did not complete: ")
 var ErrSwapRebalanceSetupFailed = fmt.Errorf("swap rebalance setup failed")
+
+// nodeFailedOver is the membership the server reports for a failed over node.
+const nodeFailedOver = "inactiveFailed"
 
 // This is a temporary measure to maintain the interface.  This is all smell code
 // and will probably get killed off fairly soon.
@@ -1917,6 +1921,18 @@ func (r *ReconcileMachine) gracefullyFailoverNode(candidate couchbaseutil.Member
 
 // failoverNodeForDeltaRecovery will gracefully failover data nodes and hardfailover other nodes.
 func (r *ReconcileMachine) failoverNodeForInPlaceUpgrade(candidate couchbaseutil.Member, c *Cluster) (bool, error) {
+	// Nothing to do if the node is already failed over.
+	membership, err := c.nodeMembership(candidate)
+	if err != nil {
+		return false, err
+	}
+
+	if membership == nodeFailedOver {
+		c.log.Info("Node already failed over, carrying on with the upgrade", "cluster", c.namespacedName(), "name", candidate.Name())
+
+		return true, nil
+	}
+
 	serverClass := c.cluster.Spec.GetServerConfigByName(candidate.Config())
 	services := serverClass.Services
 	dataNode := false
@@ -1942,11 +1958,64 @@ func (r *ReconcileMachine) failoverNodeForInPlaceUpgrade(candidate couchbaseutil
 
 	otpNodeList := couchbaseutil.OTPNodeList{candidate.GetOTPNode()}
 
-	if err := couchbaseutil.Failover(otpNodeList, false).RetryFor(1*time.Minute).On(c.api, candidate); err != nil {
-		return false, err
+	// Send once and don't retry. The server only replies when the failover is
+	// done, and a second request while it runs is rejected.
+	if err := couchbaseutil.Failover(otpNodeList, false).On(c.api, candidate); err != nil {
+		c.log.Info("Hard failover request did not finish, waiting for the server to complete it",
+			"cluster", c.namespacedName(), "name", candidate.Name(), "reason", err.Error())
+
+		if waitErr := c.waitForHardFailover(candidate); waitErr != nil {
+			return false, fmt.Errorf("%w, request error: %w", waitErr, err)
+		}
 	}
 
 	return true, nil
+}
+
+// nodeMembership returns the state the server has for a node, such as
+// active or inactiveFailed.
+func (c *Cluster) nodeMembership(member couchbaseutil.Member) (string, error) {
+	info := &couchbaseutil.ClusterInfo{}
+	if err := couchbaseutil.GetPoolsDefault(info).On(c.api, c.readyMembers()); err != nil {
+		return "", err
+	}
+
+	for _, node := range info.Nodes {
+		if node.HostName == member.GetHostName() {
+			return node.Membership, nil
+		}
+	}
+
+	return "", fmt.Errorf("%w%s", ErrNodeNotInCluster, member.Name())
+}
+
+// waitForHardFailover waits up to 30 minutes for the node to be failed over,
+// the same as a graceful failover. It stops early if nothing is running on
+// the server and the node is still active.
+func (c *Cluster) waitForHardFailover(member couchbaseutil.Member) error {
+	return retryutil.RetryUntilErrorOrSuccess(30*time.Minute, 5*time.Second, func() (error, bool) {
+		info := &couchbaseutil.ClusterInfo{}
+		if err := couchbaseutil.GetPoolsDefault(info).On(c.api, c.readyMembers()); err != nil {
+			// The cluster can be slow to answer during a failover, keep trying.
+			return nil, false
+		}
+
+		for _, node := range info.Nodes {
+			if node.HostName != member.GetHostName() {
+				continue
+			}
+
+			if node.Membership == nodeFailedOver {
+				return nil, true
+			}
+
+			if info.RebalanceStatus == couchbaseutil.RebalanceStatusNone {
+				return fmt.Errorf("%w%s", ErrHardFailoverFailed, member.Name()), false
+			}
+		}
+
+		return nil, false
+	})
 }
 
 func (r *ReconcileMachine) recreateNode(c *Cluster, candidate couchbaseutil.Member, canDeltaRecover bool) error {
