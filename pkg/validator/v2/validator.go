@@ -26,6 +26,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/earutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	"github.com/couchbase/couchbase-operator/pkg/util/tlsutil"
@@ -5987,10 +5988,6 @@ func CheckConstraintsEncryptionKey(v *types.Validator, key *couchbasev2.Couchbas
 			if err := validateAWSKeyARN(key.Spec.AWSKey.KeyARN); err != nil {
 				errs = append(errs, err)
 			}
-
-			if err := validateAWSKeyCredentialsSecret(v, key, key.Spec.AWSKey.CredentialsSecret); err != nil {
-				errs = append(errs, err)
-			}
 		}
 	}
 
@@ -5999,6 +5996,12 @@ func CheckConstraintsEncryptionKey(v *types.Validator, key *couchbasev2.Couchbas
 			errs = append(errs, err)
 		}
 	}
+
+	// Every Secret value the key type reads must exist (earutil.CredentialsFor).
+	errs = append(errs, validateKeyCredentials(v, key)...)
+
+	// Every cluster that selects the key must run a release that supports its type.
+	errs = append(errs, checkKeyTypeServerVersion(v, key)...)
 
 	errs = append(errs, checkEncryptionKeyUsage(v, key)...)
 
@@ -6104,6 +6107,25 @@ func checkEncryptionKeyUsage(v *types.Validator, key *couchbasev2.CouchbaseEncry
 	return errs
 }
 
+// clusterSelectsKey reports whether the cluster's encryption at rest selector picks
+// the key. It does not check whether the cluster manages encryption at rest.
+func clusterSelectsKey(cluster *couchbasev2.CouchbaseCluster, key *couchbasev2.CouchbaseEncryptionKey) (bool, error) {
+	if cluster.Spec.Security.EncryptionAtRest == nil {
+		return false, nil
+	}
+
+	if cluster.Spec.Security.EncryptionAtRest.Selector == nil {
+		return true, nil
+	}
+
+	selector, err := metav1.LabelSelectorAsSelector(cluster.Spec.Security.EncryptionAtRest.Selector)
+	if err != nil {
+		return false, err
+	}
+
+	return selector.Matches(labels.Set(key.Labels)), nil
+}
+
 func checkEncryptionKeyUsageForCluster(v *types.Validator, key *couchbasev2.CouchbaseEncryptionKey, cluster *couchbasev2.CouchbaseCluster) []error {
 	usage := key.GetUsage()
 
@@ -6116,46 +6138,24 @@ func checkEncryptionKeyUsageForCluster(v *types.Validator, key *couchbasev2.Couc
 		return nil
 	}
 
-	selector := labels.Everything()
-
-	if cluster.Spec.Security.EncryptionAtRest.Selector != nil {
-		var err error
-		selector, err = metav1.LabelSelectorAsSelector(cluster.Spec.Security.EncryptionAtRest.Selector)
-
-		if err != nil {
-			return []error{err}
-		}
-	}
-
-	if !selector.Matches(labels.Set(key.Labels)) {
+	if selected, err := clusterSelectsKey(cluster, key); err != nil {
+		return []error{err}
+	} else if !selected {
 		return nil
 	}
 
 	errs := []error{}
-	checkUsageConf := func(config *couchbasev2.EncryptionAtRestUsageConfiguration, usage bool, usageType string) error {
-		if config == nil {
-			return nil
+
+	for _, settingsType := range earutil.SettingsTypes {
+		config := settingsType.SettingsFor(earConf)
+		if config == nil || !config.Enabled || config.KeyName != key.Name {
+			continue
 		}
 
-		if config.Enabled && config.KeyName == key.Name {
-			if usage == false {
-				errs = append(errs, fmt.Errorf("spec.usage.%s is false but encryption key %s is used for %s encryption on cluster %s", usageType, key.Name, usageType, cluster.Name))
-			}
+		if !settingsType.KeyAllows(usage) {
+			errs = append(errs, fmt.Errorf("spec.usage.%s is false but encryption key %s is used for %s encryption on cluster %s",
+				settingsType.Name, key.Name, settingsType.Name, cluster.Name))
 		}
-
-		return nil
-	}
-
-	if err := checkUsageConf(earConf.Configuration, usage.Configuration, "configuration"); err != nil {
-		errs = append(errs, err)
-	}
-
-	if err := checkUsageConf(earConf.Audit, usage.Audit, "audit"); err != nil {
-		errs = append(errs, err)
-	}
-
-	if err := checkUsageConf(earConf.Log, usage.Log, "log"); err != nil {
-		errs = append(errs, err)
 	}
 
 	errs = append(errs, checkUsageBuckets(v, key, cluster)...)
@@ -6206,26 +6206,55 @@ func checkEncryptionKeyUsageForClusterKeys(v *types.Validator, key *couchbasev2.
 	return errs
 }
 
-func validateAWSKeyCredentialsSecret(v *types.Validator, key *couchbasev2.CouchbaseEncryptionKey, credentialsSecret string) error {
-	if credentialsSecret == "" {
-		return nil
+// validateKeyCredentials checks that every Secret, and every data key in it,
+// that the encryption key reads exists. Each missing Secret is reported once.
+func validateKeyCredentials(v *types.Validator, key *couchbasev2.CouchbaseEncryptionKey) []error {
+	creds := earutil.CredentialsFor(key)
+
+	type reference struct {
+		secretName string
+		dataKey    string
+		specField  string
 	}
 
-	secret, found, err := v.Abstraction.GetSecret(key.Namespace, credentialsSecret)
+	references := make([]reference, 0, len(creds.Files)+len(creds.Values))
 
-	if err != nil {
-		return err
+	for _, f := range creds.Files {
+		references = append(references, reference{secretName: f.SecretName, dataKey: f.DataKey, specField: f.SpecField})
 	}
 
-	if !found {
-		return fmt.Errorf("secret %s referenced by spec.awsKey.credentialsSecret must exist", credentialsSecret)
+	for _, value := range creds.Values {
+		references = append(references, reference{secretName: value.SecretName, dataKey: value.DataKey, specField: value.SpecField})
 	}
 
-	if secret.Data[constants.AWSCredentialsSecretKey] == nil {
-		return fmt.Errorf("spec.awsKey.credentialsSecret must contain %s", constants.AWSCredentialsSecretKey)
+	var errs []error
+
+	missingSecrets := map[string]bool{}
+
+	for _, ref := range references {
+		if missingSecrets[ref.secretName] {
+			continue
+		}
+
+		secret, found, err := v.Abstraction.GetSecret(key.Namespace, ref.secretName)
+		if err != nil {
+			return append(errs, err)
+		}
+
+		if !found {
+			missingSecrets[ref.secretName] = true
+
+			errs = append(errs, fmt.Errorf("secret %s referenced by %s must exist", ref.secretName, ref.specField))
+
+			continue
+		}
+
+		if secret.Data[ref.dataKey] == nil {
+			errs = append(errs, fmt.Errorf("%s must contain %s", ref.specField, ref.dataKey))
+		}
 	}
 
-	return nil
+	return errs
 }
 
 func validateAWSKeyARN(keyARN string) error {
@@ -6246,29 +6275,32 @@ func validateKMIPKey(v *types.Validator, key *couchbasev2.CouchbaseEncryptionKey
 		return fmt.Errorf("spec.kmipKey.clientSecret is required when spec.keyType is KMIP")
 	}
 
-	secret, found, err := v.Abstraction.GetSecret(key.Namespace, key.Spec.KMIPKey.ClientSecret)
+	return validateTLSClient(v, key.Namespace, earutil.KMIPTLSClient(key.Spec.KMIPKey), "spec.kmipKey")
+}
+
+// validateTLSClient checks that the client private key decrypts with the
+// passphrase. That the Secret and its data keys exist is checked by
+// validateKeyCredentials, so this returns nil when any of them is missing.
+// specPrefix is the path of the key type's settings, for example "spec.kmipKey".
+func validateTLSClient(v *types.Validator, namespace string, tlsClient earutil.TLSClient, specPrefix string) error {
+	secret, found, err := v.Abstraction.GetSecret(namespace, tlsClient.ClientSecret)
 	if err != nil {
 		return err
 	}
 
 	if !found {
-		return fmt.Errorf("secret %s referenced by spec.kmipKey.clientSecret must exist", key.Spec.KMIPKey.ClientSecret)
+		return nil
 	}
 
-	if secret.Data[constants.KMIPClientSecretCertKey] == nil {
-		return fmt.Errorf("spec.kmipKey.clientSecret must contain %s", constants.KMIPClientSecretCertKey)
+	privateKey := secret.Data[constants.KMIPClientSecretKeyKey]
+	passphrase := secret.Data[constants.KMIPClientSecretPassphraseKey]
+
+	if privateKey == nil || passphrase == nil {
+		return nil
 	}
 
-	if secret.Data[constants.KMIPClientSecretKeyKey] == nil {
-		return fmt.Errorf("spec.kmipKey.clientSecret must contain %s", constants.KMIPClientSecretKeyKey)
-	}
-
-	if secret.Data[constants.KMIPClientSecretPassphraseKey] == nil {
-		return fmt.Errorf("spec.kmipKey.clientSecret must contain %s", constants.KMIPClientSecretPassphraseKey)
-	}
-
-	if err := util_x509.ValidateKMIPKeyAndPassphrase(secret.Data[constants.KMIPClientSecretKeyKey], secret.Data[constants.KMIPClientSecretPassphraseKey]); err != nil {
-		return fmt.Errorf("spec.kmipKey.clientSecret must contain a valid key and passphrase: %w", err)
+	if err := util_x509.ValidateKMIPKeyAndPassphrase(privateKey, passphrase); err != nil {
+		return fmt.Errorf("%s.clientSecret must contain a valid key and passphrase: %w", specPrefix, err)
 	}
 
 	return nil
@@ -8188,10 +8220,10 @@ func checkConstraintEncryptionKeys(v *types.Validator, cluster *couchbasev2.Couc
 		return nil, nil
 	}
 
-	if encryptionAtRestSupported, err := cluster.IsAtLeastVersion("8.0.0"); err != nil {
+	if encryptionAtRestSupported, err := cluster.IsAtLeastVersion(constants.MinimumVersionForEncryptionAtRest); err != nil {
 		return nil, err
 	} else if !encryptionAtRestSupported {
-		return nil, fmt.Errorf("encryption at rest requires Couchbase Server version 8.0.0 or later")
+		return nil, fmt.Errorf("encryption at rest requires Couchbase Server version %s or later", constants.MinimumVersionForEncryptionAtRest)
 	}
 
 	encryptionAtRest := cluster.Spec.Security.EncryptionAtRest
@@ -8212,20 +8244,20 @@ func checkConstraintEncryptionKeys(v *types.Validator, cluster *couchbasev2.Couc
 
 	var errs []error
 
-	// Check configuration encryption
-	if err := validateEncryptionSettings(keyMap, encryptionAtRest.Configuration, constants.EncryptionAtRestUsageConfiguration); err != nil {
-		errs = append(errs, fmt.Errorf("configuration encryption key validation failed: %w", err))
+	// Check each kind of encrypted system data (configuration, audit, log)
+	for _, settingsType := range earutil.SettingsTypes {
+		if err := validateEncryptionSettings(keyMap, settingsType.SettingsFor(encryptionAtRest), settingsType); err != nil {
+			errs = append(errs, fmt.Errorf("%s encryption key validation failed: %w", settingsType.Name, err))
+		}
 	}
 
-	// Check audit encryption
-	if err := validateEncryptionSettings(keyMap, encryptionAtRest.Audit, constants.EncryptionAtRestUsageAudit); err != nil {
-		errs = append(errs, fmt.Errorf("audit encryption key validation failed: %w", err))
+	// Check the cluster's image supports every key type it selects
+	versionErrs, err := checkEncryptionServerVersion(cluster, keyMap)
+	if err != nil {
+		return nil, err
 	}
 
-	// Check log encryption
-	if err := validateEncryptionSettings(keyMap, encryptionAtRest.Log, constants.EncryptionAtRestUsageLog); err != nil {
-		errs = append(errs, fmt.Errorf("log encryption key validation failed: %w", err))
-	}
+	errs = append(errs, versionErrs...)
 
 	// Currently, encryption at rest of logs will break fluent-bit log streaming.
 	loggingEnabled := cluster.Spec.Logging.Server != nil && cluster.Spec.Logging.Server.Enabled
@@ -8256,8 +8288,77 @@ func checkConstraintEncryptionKeys(v *types.Validator, cluster *couchbasev2.Couc
 	return warnings, nil
 }
 
+// checkEncryptionServerVersion checks that the cluster's image is recent enough for
+// every encryption key it selects. During an upgrade the image is already the new
+// one, so this passes, and the reconciler waits for every node to be upgraded
+// before it creates keys of the newer types.
+func checkEncryptionServerVersion(cluster *couchbasev2.CouchbaseCluster, keyMap map[string]*couchbasev2.CouchbaseEncryptionKey) ([]error, error) {
+	var errs []error
+
+	keyNames := make([]string, 0, len(keyMap))
+	for name := range keyMap {
+		keyNames = append(keyNames, name)
+	}
+
+	slices.Sort(keyNames)
+
+	for _, name := range keyNames {
+		key := keyMap[name]
+		minimum := earutil.MinimumServerVersionForKeyType(key.Spec.KeyType)
+
+		supported, err := cluster.IsAtLeastVersion(minimum)
+		if err != nil {
+			return nil, err
+		}
+
+		if !supported {
+			errs = append(errs, fmt.Errorf("encryption key %s has spec.keyType %s, which requires Couchbase Server %s or later", key.Name, key.Spec.KeyType, minimum))
+		}
+	}
+
+	return errs, nil
+}
+
+// checkKeyTypeServerVersion rejects an encryption key whose type needs a newer
+// Couchbase Server than the image of any cluster that selects it.
+func checkKeyTypeServerVersion(v *types.Validator, key *couchbasev2.CouchbaseEncryptionKey) []error {
+	minimum := earutil.MinimumServerVersionForKeyType(key.Spec.KeyType)
+
+	clusters, err := v.Abstraction.GetCouchbaseClusters(key.Namespace)
+	if err != nil {
+		return []error{err}
+	}
+
+	var errs []error
+
+	for i := range clusters.Items {
+		cluster := &clusters.Items[i]
+
+		if !cluster.IsEncryptionAtRestManaged() {
+			continue
+		}
+
+		if selected, err := clusterSelectsKey(cluster, key); err != nil {
+			return append(errs, err)
+		} else if !selected {
+			continue
+		}
+
+		supported, err := cluster.IsAtLeastVersion(minimum)
+		if err != nil {
+			return append(errs, err)
+		}
+
+		if !supported {
+			errs = append(errs, fmt.Errorf("spec.keyType %s requires Couchbase Server %s or later, but cluster %s is older", key.Spec.KeyType, minimum, cluster.Name))
+		}
+	}
+
+	return errs
+}
+
 // validateEncryptionKey validates that an encryption key exists in the map and has the appropriate usage setting.
-func validateEncryptionSettings(keyMap map[string]*couchbasev2.CouchbaseEncryptionKey, config *couchbasev2.EncryptionAtRestUsageConfiguration, usageType string) error {
+func validateEncryptionSettings(keyMap map[string]*couchbasev2.CouchbaseEncryptionKey, config *couchbasev2.EncryptionAtRestUsageConfiguration, settingsType earutil.SettingsType) error {
 	// Check if configuration is nil or not enabled
 	if config == nil || !config.Enabled {
 		return nil
@@ -8290,24 +8391,9 @@ func validateEncryptionSettings(keyMap map[string]*couchbasev2.CouchbaseEncrypti
 		return fmt.Errorf("encryption key %s does not exist or is not selected by the encryption at rest selector", config.KeyName)
 	}
 
-	// Check the appropriate usage setting based on the usage type
-	usage := encryptionKey.Spec.Usage
-
-	switch usageType {
-	case constants.EncryptionAtRestUsageConfiguration:
-		if !usage.Configuration {
-			return fmt.Errorf("encryption key %s does not have configuration usage enabled", config.KeyName)
-		}
-	case constants.EncryptionAtRestUsageAudit:
-		if !usage.Audit {
-			return fmt.Errorf("encryption key %s does not have audit usage enabled", config.KeyName)
-		}
-	case constants.EncryptionAtRestUsageLog:
-		if !usage.Log {
-			return fmt.Errorf("encryption key %s does not have log usage enabled", config.KeyName)
-		}
-	default:
-		return fmt.Errorf("invalid usage type: %s", usageType)
+	// Check the key's usage permits this kind of system data
+	if !settingsType.KeyAllows(encryptionKey.GetUsage()) {
+		return fmt.Errorf("encryption key %s does not have %s usage enabled", config.KeyName, settingsType.Name)
 	}
 
 	return nil
@@ -8503,7 +8589,7 @@ func CheckDeleteConstraintsEncryptionKey(v *types.Validator, key *couchbasev2.Co
 	var errs []error
 
 	for _, cluster := range clusters.Items {
-		if encryptionAtRestSupported, err := cluster.IsAtLeastVersion("8.0.0"); err != nil {
+		if encryptionAtRestSupported, err := cluster.IsAtLeastVersion(constants.MinimumVersionForEncryptionAtRest); err != nil {
 			return err
 		} else if !encryptionAtRestSupported {
 			continue
@@ -8514,27 +8600,16 @@ func CheckDeleteConstraintsEncryptionKey(v *types.Validator, key *couchbasev2.Co
 		}
 
 		// If the encryption key is not selected by the cluster then we can skip the checks
-		if cluster.Spec.Security.EncryptionAtRest.Selector != nil {
-			encryptionKeySelector, err := metav1.LabelSelectorAsSelector(cluster.Spec.Security.EncryptionAtRest.Selector)
-			if err != nil {
-				return err
+		if selected, err := clusterSelectsKey(&cluster, key); err != nil {
+			return err
+		} else if !selected {
+			continue
+		}
+
+		for _, settingsType := range earutil.SettingsTypes {
+			if config := settingsType.SettingsFor(cluster.Spec.Security.EncryptionAtRest); config != nil && config.KeyName == key.Name {
+				errs = append(errs, fmt.Errorf("encryption key %s is currently being used for %s encryption on cluster %s", key.Name, settingsType.Name, cluster.Name))
 			}
-
-			if !encryptionKeySelector.Matches(labels.Set(key.Labels)) {
-				continue
-			}
-		}
-
-		if cluster.Spec.Security.EncryptionAtRest.Configuration != nil && cluster.Spec.Security.EncryptionAtRest.Configuration.KeyName == key.Name {
-			errs = append(errs, fmt.Errorf("encryption key %s is currently being used for configuration encryption on cluster %s", key.Name, cluster.Name))
-		}
-
-		if cluster.Spec.Security.EncryptionAtRest.Audit != nil && cluster.Spec.Security.EncryptionAtRest.Audit.KeyName == key.Name {
-			errs = append(errs, fmt.Errorf("encryption key %s is currently being used for audit encryption on cluster %s", key.Name, cluster.Name))
-		}
-
-		if cluster.Spec.Security.EncryptionAtRest.Log != nil && cluster.Spec.Security.EncryptionAtRest.Log.KeyName == key.Name {
-			errs = append(errs, fmt.Errorf("encryption key %s is currently being used for log encryption on cluster %s", key.Name, cluster.Name))
 		}
 
 		if !cluster.Spec.Buckets.Managed {

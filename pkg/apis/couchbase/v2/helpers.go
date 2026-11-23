@@ -2109,7 +2109,7 @@ func (c *CouchbaseCluster) GetSpecFromAnnotation() *ClusterSpec {
 }
 
 func (c *CouchbaseCluster) IsEncryptionAtRestManaged() bool {
-	isEncryptionAtRestSupported, err := c.IsAtLeastVersion("8.0.0")
+	isEncryptionAtRestSupported, err := c.IsAtLeastVersion(constants.MinimumVersionForEncryptionAtRest)
 	if err != nil {
 		return false
 	}

@@ -297,6 +297,10 @@ const (
 	// encrypts, which is the only way the operator can know a key is safe to delete. The Usage field of
 	// spec.usage.buckets is gated on this version, even though older servers accept it.
 	MinimumVersionForEncryptionKeyUsedBy = "8.5.0"
+
+	// MinimumVersionForEncryptionAtRest is the first Couchbase Server version with encryption at rest,
+	// and so the minimum for every encryption key type and settings type that existed when it shipped.
+	MinimumVersionForEncryptionAtRest = "8.0.0"
 )
 
 const (

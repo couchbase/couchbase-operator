@@ -326,7 +326,7 @@ func (c *Cluster) GetEncryptionKeyFinalizer() string {
 }
 
 func (c *Cluster) IsEncryptionAtRestManaged() bool {
-	return c.SupportsVersionFeatures("8.0.0") && c.cluster.IsEncryptionAtRestManaged()
+	return c.SupportsVersionFeatures(constants.MinimumVersionForEncryptionAtRest) && c.cluster.IsEncryptionAtRestManaged()
 }
 
 // DisableAutoFailover will disable auto-failover if it is currently enabled, and return a function that can be called to restore the previous setting.

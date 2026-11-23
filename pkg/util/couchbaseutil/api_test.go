@@ -146,7 +146,7 @@ func TestUpdateConfigurationEncryptionSettings(t *testing.T) {
 		EncryptionKeyID:     &keyID,
 	}
 
-	if err := UpdateConfigurationEncryptionSettings(&settings).On(client, defaultHost); err != nil {
+	if err := UpdateEncryptionAtRestSettingsFor("config", &settings).On(client, defaultHost); err != nil {
 		t.Fatal(err)
 	}
 }

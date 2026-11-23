@@ -2818,6 +2818,24 @@ type KMIPKeyData struct {
 	KeyPassphrase string `json:"keyPassphrase,omitempty"`
 }
 
+// TLSClientData holds the client TLS values the server needs for a key type
+// that reaches an external key server over TLS. Key types copy these into
+// their own request fields.
+type TLSClientData struct {
+	CASelection   CASelection
+	KeyPath       string
+	CertPath      string
+	KeyPassphrase string
+}
+
+// CopyWriteOnlyFields copies values that the server accepts but never returns
+// from k onto actual, so that comparing the two ignores them.
+func (k *EncryptionKey) CopyWriteOnlyFields(actual *EncryptionKey) {
+	if k.KMIP != nil && actual.KMIP != nil {
+		actual.KMIP.KeyPassphrase = k.KMIP.KeyPassphrase
+	}
+}
+
 type EncryptionMethod string
 
 const (

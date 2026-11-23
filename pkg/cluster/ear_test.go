@@ -21,6 +21,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/earutil"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -302,62 +303,102 @@ func failedRequestError(statusCode int, body string) error {
 
 func TestIsCredentialFilePendingError(t *testing.T) {
 	credentialsFileBody := `{"errors":{"data":{"credentialsFile":"The value must be a valid file"}}}`
+	// Assumes the server words KMIP path errors the same way as the AWS one.
+	keyPathBody := `{"errors":{"data":{"keyPath":"The value must be a valid file"}}}`
+	certPathBody := `{"errors":{"data":{"certPath":"The value must be a valid file"}}}`
+
+	awsFields := []string{earutil.ServerFieldAWSCredentialsFile}
+	kmipFields := []string{earutil.ServerFieldTLSClientCertPath, earutil.ServerFieldTLSClientKeyPath}
 
 	cases := []struct {
-		name string
-		err  error
-		want bool
+		name   string
+		err    error
+		fields []string
+		want   bool
 	}{
 		{
-			name: "nil error",
-			err:  nil,
-			want: false,
+			name:   "nil error",
+			err:    nil,
+			fields: awsFields,
+			want:   false,
 		},
 		{
-			name: "plain non-request error",
-			err:  errors.New("connection refused"),
-			want: false,
+			name:   "plain non-request error",
+			err:    errors.New("connection refused"),
+			fields: awsFields,
+			want:   false,
 		},
 		{
-			name: "401 unauthorized credentialsFile body",
-			err:  failedRequestError(http.StatusUnauthorized, credentialsFileBody),
-			want: false,
+			name:   "401 unauthorized credentialsFile body",
+			err:    failedRequestError(http.StatusUnauthorized, credentialsFileBody),
+			fields: awsFields,
+			want:   false,
 		},
 		{
-			name: "500 server error",
-			err:  failedRequestError(http.StatusInternalServerError, "internal"),
-			want: false,
+			name:   "500 server error",
+			err:    failedRequestError(http.StatusInternalServerError, "internal"),
+			fields: awsFields,
+			want:   false,
 		},
 		{
-			name: "400 unrelated body",
-			err:  failedRequestError(http.StatusBadRequest, `{"errors":{"data":{"keyARN":"invalid"}}}`),
-			want: false,
+			name:   "400 unrelated body",
+			err:    failedRequestError(http.StatusBadRequest, `{"errors":{"data":{"keyARN":"invalid"}}}`),
+			fields: awsFields,
+			want:   false,
 		},
 		{
-			name: "400 partial body credentialsFile only",
-			err:  failedRequestError(http.StatusBadRequest, `{"credentialsFile":"something else"}`),
-			want: false,
+			name:   "400 partial body credentialsFile only",
+			err:    failedRequestError(http.StatusBadRequest, `{"credentialsFile":"something else"}`),
+			fields: awsFields,
+			want:   false,
 		},
 		{
-			name: "400 partial body wrong message only",
-			err:  failedRequestError(http.StatusBadRequest, `{"someOther":"must be a valid file"}`),
-			want: false,
+			name:   "400 partial body wrong message only",
+			err:    failedRequestError(http.StatusBadRequest, `{"someOther":"must be a valid file"}`),
+			fields: awsFields,
+			want:   false,
 		},
 		{
-			name: "400 credentialsFile + must be a valid file",
-			err:  failedRequestError(http.StatusBadRequest, credentialsFileBody),
-			want: true,
+			name:   "400 credentialsFile + must be a valid file",
+			err:    failedRequestError(http.StatusBadRequest, credentialsFileBody),
+			fields: awsFields,
+			want:   true,
 		},
 		{
-			name: "wrapped 400 credentialsFile",
-			err:  fmt.Errorf("post failed: %w", failedRequestError(http.StatusBadRequest, credentialsFileBody)),
-			want: true,
+			name:   "wrapped 400 credentialsFile",
+			err:    fmt.Errorf("post failed: %w", failedRequestError(http.StatusBadRequest, credentialsFileBody)),
+			fields: awsFields,
+			want:   true,
+		},
+		{
+			name:   "400 KMIP keyPath + must be a valid file",
+			err:    failedRequestError(http.StatusBadRequest, keyPathBody),
+			fields: kmipFields,
+			want:   true,
+		},
+		{
+			name:   "400 KMIP certPath + must be a valid file",
+			err:    failedRequestError(http.StatusBadRequest, certPathBody),
+			fields: kmipFields,
+			want:   true,
+		},
+		{
+			name:   "400 KMIP keyPath body for an AWS key",
+			err:    failedRequestError(http.StatusBadRequest, keyPathBody),
+			fields: awsFields,
+			want:   false,
+		},
+		{
+			name:   "400 credentialsFile body for a key with no credential files",
+			err:    failedRequestError(http.StatusBadRequest, credentialsFileBody),
+			fields: nil,
+			want:   false,
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, isCredentialFilePendingError(tc.err))
+			assert.Equal(t, tc.want, isCredentialFilePendingError(tc.err, tc.fields))
 		})
 	}
 }
@@ -496,9 +537,9 @@ func TestGetUsageList(t *testing.T) {
 			want: []string{
 				couchbaseutil.EncryptionKeyUsageBucketEncryptionAll,
 				couchbaseutil.EncryptionKeyUsageConfigEncryption,
-				couchbaseutil.EncryptionKeyUsageKEKEncryption,
-				couchbaseutil.EncryptionKeyUsageLogsEncryption,
 				couchbaseutil.EncryptionKeyUsageAuditEncryption,
+				couchbaseutil.EncryptionKeyUsageLogsEncryption,
+				couchbaseutil.EncryptionKeyUsageKEKEncryption,
 			},
 		},
 		{
@@ -545,4 +586,47 @@ func TestGetUsageList(t *testing.T) {
 			assert.Equal(t, tc.want, c.getUsageList(key))
 		})
 	}
+}
+
+func TestCASelection(t *testing.T) {
+	cases := []struct {
+		system, couchbase bool
+		want              couchbaseutil.CASelection
+	}{
+		{system: true, couchbase: true, want: couchbaseutil.CASelectionBoth},
+		{system: true, couchbase: false, want: couchbaseutil.CASelectionSystem},
+		{system: false, couchbase: true, want: couchbaseutil.CASelectionCouchbase},
+		{system: false, couchbase: false, want: couchbaseutil.CASelectionSkip},
+	}
+
+	for _, tc := range cases {
+		t.Run(fmt.Sprintf("system=%v couchbase=%v", tc.system, tc.couchbase), func(t *testing.T) {
+			tlsClient := earutil.TLSClient{
+				VerifyWithSystemCA:    tc.system,
+				VerifyWithCouchbaseCA: tc.couchbase,
+			}
+
+			assert.Equal(t, tc.want, caSelection(tlsClient))
+		})
+	}
+}
+
+func TestSupportsVersion(t *testing.T) {
+	// No api client, so the version check falls back to the spec image.
+	c := &Cluster{
+		cluster: &couchbasev2.CouchbaseCluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: "default"},
+			Spec:       couchbasev2.ClusterSpec{Image: "couchbase/server:8.0.0"},
+		},
+	}
+
+	cache := map[string]bool{}
+
+	assert.True(t, c.supportsVersion("8.0.0", cache))
+	assert.False(t, c.supportsVersion("8.5.0", cache))
+	assert.Equal(t, map[string]bool{"8.0.0": true, "8.5.0": false}, cache)
+
+	// A cached answer is used as is.
+	cache["8.5.0"] = true
+	assert.True(t, c.supportsVersion("8.5.0", cache))
 }
