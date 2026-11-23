@@ -36,6 +36,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// nodeClientCertMinVersion is the first release with node internal client certificates.
+const nodeClientCertMinVersion = "7.6.0"
+
 // tlsCache allows semi-atomic views of TLS updates.  Essentially weird things
 // happen if we read from the main caches and things change as we go through
 // the reconcile process.  By having an atomic cache that exists for the duration
@@ -803,6 +806,8 @@ func (c *Cluster) cleanCAs() error {
 		return err
 	}
 
+	keepGenerated := c.generatedCAInUse()
+
 	// For each CA, if it doesn't have a corresponding CA defined in the
 	// cache, then it needs deleting from Couchbase.
 	for _, serverCA := range serverCAs {
@@ -815,6 +820,12 @@ func (c *Cluster) cleanCAs() error {
 			continue
 		}
 
+		// Server won't delete it while in use, so don't fail the reconcile on it.
+		if keepGenerated && serverCA.Type == couchbaseutil.TrustedCAGenerated {
+			c.raiseEventCached(k8sutil.GeneratedCAKeptEvent(c.cluster, serverCA.Subject))
+			continue
+		}
+
 		c.log.Info("Removing CA", "cluster", c.namespacedName(), "id", serverCA.ID, "subject", serverCA.Subject)
 
 		if err := couchbaseutil.DeleteCA(serverCA.ID).On(c.api, c.members); err != nil {
@@ -823,6 +834,30 @@ func (c *Cluster) cleanCAs() error {
 	}
 
 	return nil
+}
+
+// generatedCAInUse reports whether the server still needs its generated CA to verify the nodes'
+// generated client certificates, which it checks under mandatory mTLS with All or Strict N2N.
+func (c *Cluster) generatedCAInUse() bool {
+	if !c.cluster.IsMutualTLSEnabled() {
+		return false
+	}
+
+	tls := c.cluster.Spec.Networking.TLS
+
+	if *tls.ClientCertificatePolicy != couchbasev2.ClientCertificatePolicyMandatory || tls.NodeToNodeEncryption == nil {
+		return false
+	}
+
+	if *tls.NodeToNodeEncryption != couchbasev2.NodeToNodeAll && *tls.NodeToNodeEncryption != couchbasev2.NodeToNodeStrict {
+		return false
+	}
+
+	if tls.SecretSource != nil && tls.SecretSource.NodeClientSecretName != "" {
+		return false
+	}
+
+	return c.SupportsVersionFeatures(nodeClientCertMinVersion)
 }
 
 // reloadNodeClientCerts uploads the user-supplied internal client certificate to each node
@@ -839,7 +874,7 @@ func (c *Cluster) reloadNodeClientCerts() error {
 		return nil
 	}
 
-	if !c.SupportsVersionFeatures("7.6.0") {
+	if !c.SupportsVersionFeatures(nodeClientCertMinVersion) {
 		return nil
 	}
 

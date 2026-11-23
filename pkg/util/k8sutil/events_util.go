@@ -75,6 +75,7 @@ const (
 	EventReasonTLSInvalid       = "TLSInvalid"
 	EventReasonClientTLSUpdated = "ClientTLSUpdated"
 	EventReasonClientTLSInvalid = "ClientTLSInvalid"
+	EventReasonGeneratedCAKept  = "GeneratedCAKept"
 
 	// XDCR lifecycle.
 	EventReasonRemoteClusterAdded   = "RemoteClusterAdded"
@@ -613,6 +614,15 @@ func ClientTLSInvalidEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonClientTLSInvalid
 	event.Message = EventReasonTLSInvalidMessage
+
+	return event
+}
+
+func GeneratedCAKeptEvent(cl *couchbasev2.CouchbaseCluster, subject string) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeWarning
+	event.Reason = EventReasonGeneratedCAKept
+	event.Message = fmt.Sprintf("Generated CA %s kept, node client certificates still use it; set spec.networking.tls.secretSource.nodeClientSecretName to remove it", subject)
 
 	return event
 }

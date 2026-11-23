@@ -2925,14 +2925,8 @@ func mustCreateNodeClientCertSecret(t *testing.T, kubernetes *types.Cluster, ctx
 	return name
 }
 
-// TestMandatoryMutualTLSNodeClientCert verifies the nodeClientSecretName fix (K8S-4770).
-// Under mandatory client-certificate auth + strict node-to-node encryption, Couchbase Server
-// (7.6+) pins its auto-generated CA via each node's generated internal client certificate, so
-// the operator's cleanCAs would otherwise loop forever on a 400 "CA is in use by node".  Supplying
-// a user-CA-signed internal client cert (referenced by the
-// cao.couchbase.com/networking.tls.secretSource.nodeClientSecretName annotation) re-signs the
-// node's client identity with our CA so the auto-generated CA goes unused and cleanCAs can remove
-// it.  Without the fix this test times out waiting for a healthy status.
+// TestMandatoryMutualTLSNodeClientCert checks that, with mandatory mTLS and strict N2N, a user
+// supplied node client certificate lets the operator remove the generated CA (K8S-4770).
 func TestMandatoryMutualTLSNodeClientCert(t *testing.T) {
 	f := framework.Global
 
@@ -2946,8 +2940,7 @@ func TestMandatoryMutualTLSNodeClientCert(t *testing.T) {
 	policy := couchbasev2.ClientCertificatePolicyMandatory
 	strict := couchbasev2.NodeToNodeStrict
 
-	// Shadowed (cert-manager) source so the cluster genuinely uses secretSource TLS, which is
-	// what the nodeClientSecretName annotation hangs off.
+	// nodeClientSecretName lives under secretSource.
 	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{
 		Source:      e2eutil.TLSSourceCertManagerSecret,
 		KeyEncoding: &keyEncoding,
@@ -2955,20 +2948,59 @@ func TestMandatoryMutualTLSNodeClientCert(t *testing.T) {
 
 	nodeClientSecretName := mustCreateNodeClientCertSecret(t, kubernetes, ctx, keyEncoding)
 
-	// Mandatory mTLS + strict N2N is the combination that arms the deadlock; the annotation
-	// points the operator at the node client certificate.
+	// Uses the spec field; the transition tests use the annotation.
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(ctx, &policy).Generate(kubernetes)
 	cluster.Spec.Networking.TLS.NodeToNodeEncryption = &strict
-
-	if cluster.Annotations == nil {
-		cluster.Annotations = map[string]string{}
-	}
-	cluster.Annotations[nodeClientSecretAnnotation] = nodeClientSecretName
-
+	cluster.Spec.Networking.TLS.SecretSource.NodeClientSecretName = nodeClientSecretName
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
-	// With the fix the cluster reaches a healthy, error-free status (cleanCAs removes the
-	// auto-generated CA); without it, cleanCAs loops on the 400 and this never succeeds.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+
+	// Healthy alone passes even when the CA is kept (K8S-5015).
+	mustNotKeepGeneratedCA(t, kubernetes, cluster)
+}
+
+// mustNotKeepGeneratedCA fails if the operator kept the generated CA.
+func mustNotKeepGeneratedCA(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster) {
+	events, err := e2eutil.GetCouchbaseEvents(kubernetes.KubeClient, cluster)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	for _, event := range events {
+		if event.Reason == k8sutil.EventReasonGeneratedCAKept {
+			e2eutil.Die(t, fmt.Errorf("generated CA kept: %s", event.Message))
+		}
+	}
+}
+
+// TestMandatoryMutualTLSStrictGeneratedCAKept checks that, with mandatory mTLS, strict N2N and no
+// node client certificate, the operator keeps the generated CA and the cluster still settles (K8S-5015).
+func TestMandatoryMutualTLSStrictGeneratedCAKept(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.6.0")
+
+	clusterSize := constants.Size3
+	keyEncoding := e2eutil.KeyEncodingPKCS8
+	policy := couchbasev2.ClientCertificatePolicyMandatory
+	strict := couchbasev2.NodeToNodeStrict
+
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{
+		Source:      e2eutil.TLSSourceCertManagerSecret,
+		KeyEncoding: &keyEncoding,
+	})
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(ctx, &policy).Generate(kubernetes)
+	cluster.Spec.Networking.TLS.NodeToNodeEncryption = &strict
+	// Data only: on 7.6 the index service can't rebalance without a node client certificate.
+	cluster.Spec.Servers[0].Services = []couchbasev2.Service{couchbasev2.DataService}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	e2eutil.MustObserveClusterEventIgnoringMessage(t, kubernetes, cluster, k8sutil.GeneratedCAKeptEvent(cluster, ""), 10*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 }
 

@@ -274,6 +274,7 @@ The following is an example resource, depicting the overall structure and any de
       - ""
       <<couchbaseclusters-spec-networking-tls-secretsource,secretSource>>:
         <<couchbaseclusters-spec-networking-tls-secretsource-clientsecretname,clientSecretName>>: ""
+        <<couchbaseclusters-spec-networking-tls-secretsource-nodeclientsecretname,nodeClientSecretName>>: ""
         <<couchbaseclusters-spec-networking-tls-secretsource-serversecretname,serverSecretName>>: ""
       <<couchbaseclusters-spec-networking-tls-static,static>>:
         <<couchbaseclusters-spec-networking-tls-static-operatorsecret,operatorSecret>>: ""
@@ -4153,6 +4154,25 @@ ClientSecretName specifies the secret name, in the same namespace as the cluster
 the contains client TLS data.
 The secret is expected to contain "tls.crt" and
 "tls.key" as per the Kubernetes.io/tls secret type.
+
+=== couchbaseclusters.spec.networking.tls.secretSource.nodeClientSecretName
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+NodeClientSecretName specifies the secret name, in the same namespace as the cluster,
+that contains the client certificate each node presents to other nodes, as "tls.crt"
+and "tls.key".
+The certificate must allow client authentication, chain to a trusted
+CA and have a SAN email of the form "<name>@internal.couchbase.com".
+Needed to remove the auto-generated CA under mandatory client certificates with All
+or Strict node-to-node encryption.
+Requires Couchbase Server 7.6 or greater.
+The cao.couchbase.com/networking.tls.secretSource.nodeClientSecretName annotation
+overrides this field.
 
 === couchbaseclusters.spec.networking.tls.secretSource.serverSecretName
 

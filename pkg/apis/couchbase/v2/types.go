@@ -6300,18 +6300,14 @@ type TLSSecretSource struct {
 	ClientSecretName string `json:"clientSecretName,omitempty"`
 
 	// NodeClientSecretName specifies the secret name, in the same namespace as the cluster,
-	// that contains the internal client certificate each Couchbase node presents when it
-	// acts as a client for node-to-node communication.  The secret is expected to contain
-	// "tls.crt" and "tls.key" as per the kubernetes.io/tls secret type.  The certificate
-	// must be valid for client authentication (clientAuth extended key usage) and chain to
-	// a trusted CA.
-	// When set, the Operator uploads this certificate to each node (inbox
-	// "client_chain.pem"/"client_pkey.key") and reloads it, so the node's internal client
-	// identity is signed by your CA rather than the server's auto-generated CA.  This lets
-	// the auto-generated CA be removed from the trust pool under mandatory client
-	// certificate authentication with strict node-to-node encryption.  Requires Couchbase
-	// Server 7.6 or greater. Configured via the annotation cao.couchbase.com/networking.tls.secretSource.nodeClientSecretName only; not exposed in the CRD.
-	NodeClientSecretName string `json:"-" annotation:"nodeClientSecretName"`
+	// that contains the client certificate each node presents to other nodes, as "tls.crt"
+	// and "tls.key".  The certificate must allow client authentication, chain to a trusted
+	// CA and have a SAN email of the form "<name>@internal.couchbase.com".
+	// Needed to remove the auto-generated CA under mandatory client certificates with All
+	// or Strict node-to-node encryption.  Requires Couchbase Server 7.6 or greater.
+	// The cao.couchbase.com/networking.tls.secretSource.nodeClientSecretName annotation
+	// overrides this field.
+	NodeClientSecretName string `json:"nodeClientSecretName,omitempty" annotation:"nodeClientSecretName"`
 }
 
 // ClientCertificatePolicy defines the type of TLS policy to apply.  The default
