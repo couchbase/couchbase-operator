@@ -137,6 +137,7 @@ const (
 	EventReasonEncryptionKeyUpdated            = "EncryptionKeyUpdated"
 	EventReasonEncryptionKeyDeleted            = "EncryptionKeyDeleted"
 	EventReasonEncryptionKeyPendingPropagation = "EncryptionKeyPendingPropagation"
+	EventReasonBucketEncryptionPending         = "BucketEncryptionPending"
 
 	// Services mismatch.
 	EventReasonServicesMismatch = "ServicesMismatch"
@@ -829,6 +830,15 @@ func EncryptionKeyPendingPropagationEvent(cl *couchbasev2.CouchbaseCluster, name
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonEncryptionKeyPendingPropagation
 	event.Message = fmt.Sprintf("Encryption key `%s` reconciliation deferred: %s", name, reason)
+
+	return event
+}
+
+func BucketEncryptionPendingEvent(cl *couchbasev2.CouchbaseCluster, bucketName, keyName, reason string) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonBucketEncryptionPending
+	event.Message = fmt.Sprintf("Bucket `%s` is waiting for encryption key `%s`, %s", bucketName, keyName, reason)
 
 	return event
 }

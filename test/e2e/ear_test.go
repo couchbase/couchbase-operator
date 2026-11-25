@@ -1347,3 +1347,133 @@ func TestBucketSpecificEncryptionKeyUsage(t *testing.T) {
 			[]string{scopedUsage}, 5*time.Minute)
 	})
 }
+
+// TestBucketWaitsForNewEncryptionKey creates a bucket and the encryption key it
+// names together. The bucket must not be created until the key is on the server,
+// and is then created encrypted, so it is never edited from unencrypted to
+// encrypted. The operator is paused while both are created, so its first
+// reconcile sees the bucket before the key is provisioned.
+func TestBucketWaitsForNewEncryptionKey(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("8.0.0")
+
+	clusterSize := 1
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Security.EncryptionAtRest = &couchbasev2.EncryptionAtRestSpec{
+		Managed: true,
+	}
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
+
+	keyName := "master-key-babyyy"
+	mustCreateEncryptedBucketEncryptionKey(t, kubernetes, keyName)
+
+	bucket := e2espec.DefaultBucket()
+	bucket.Name = "hell-in-a-bucket"
+	bucket.Spec.Replicas = 0
+	bucket.Spec.EncryptionAtRest = &couchbasev2.BucketEncryptionAtRestConfiguration{
+		KeyName: keyName,
+	}
+
+	createdBucket := e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/paused", false), time.Minute)
+
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, createdBucket, 2*time.Minute)
+
+	keyID := e2eutil.MustGetEncryptionKeyID(t, kubernetes, cluster, keyName)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, createdBucket.GetName(), jsonpatch.NewPatchSet().Test("/EncryptionAtRestKeyID", &keyID), time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Bucket held back, waiting for its key
+	// * Encryption key created
+	// * Bucket created, already encrypted, so never edited
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketEncryptionPending, FuzzyMessage: createdBucket.GetName()},
+		eventschema.Event{Reason: k8sutil.EventReasonEncryptionKeyCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+	}
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestBucketKeepsEncryptionWhileNewKeyIsProvisioned moves an encrypted bucket to
+// a new encryption key created at the same time. The bucket must keep its old
+// key until the new one is on the server, and is then moved straight to it, so
+// it is never switched to unencrypted in between. The operator is paused while
+// the key is created and the bucket changed, so its first reconcile sees the
+// change before the key is provisioned.
+func TestBucketKeepsEncryptionWhileNewKeyIsProvisioned(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("8.0.0")
+
+	clusterSize := 1
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Security.EncryptionAtRest = &couchbasev2.EncryptionAtRestSpec{
+		Managed: true,
+	}
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	oldKeyName := "old-bucket-key"
+	oldKey := mustCreateEncryptedBucketEncryptionKey(t, kubernetes, oldKeyName)
+
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewEncryptionKeyCreatedEvent(cluster, oldKey.Name), 2*time.Minute)
+
+	bucket := e2espec.DefaultBucket()
+	bucket.Name = "rekeyed-bucket"
+	bucket.Spec.Replicas = 0
+	bucket.Spec.EncryptionAtRest = &couchbasev2.BucketEncryptionAtRestConfiguration{
+		KeyName: oldKeyName,
+	}
+
+	createdBucket := e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, createdBucket, 2*time.Minute)
+
+	oldKeyID := e2eutil.MustGetEncryptionKeyID(t, kubernetes, cluster, oldKeyName)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, createdBucket.GetName(), jsonpatch.NewPatchSet().Test("/EncryptionAtRestKeyID", &oldKeyID), time.Minute)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
+
+	newKeyName := "new-bucket-key"
+	mustCreateEncryptedBucketEncryptionKey(t, kubernetes, newKeyName)
+
+	createdBucket = e2eutil.MustPatchBucket(t, kubernetes, createdBucket, jsonpatch.NewPatchSet().Replace("/spec/encryptionAtRest/keyName", newKeyName), time.Minute)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/paused", false), time.Minute)
+
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewEncryptionKeyCreatedEvent(cluster, newKeyName), 2*time.Minute)
+
+	newKeyID := e2eutil.MustGetEncryptionKeyID(t, kubernetes, cluster, newKeyName)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, createdBucket.GetName(), jsonpatch.NewPatchSet().Test("/EncryptionAtRestKeyID", &newKeyID), 2*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Old encryption key created
+	// * Bucket created, encrypted with the old key
+	// * Bucket kept on the old key, waiting for the new one
+	// * New encryption key created
+	// * Bucket edited once, straight to the new key
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonEncryptionKeyCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketEncryptionPending, FuzzyMessage: createdBucket.GetName()},
+		eventschema.Event{Reason: k8sutil.EventReasonEncryptionKeyCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketEdited},
+	}
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}

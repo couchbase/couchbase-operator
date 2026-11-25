@@ -728,28 +728,36 @@ type bucketUpdate struct {
 
 // inspectBuckets compares Kubernetes buckets with Couchbase buckets and returns lists
 // of buckets to create, update or remove and the requested set for status updates.
+// It also returns the requested buckets held back from creation because they are
+// waiting for an encryption key.
 //
 //nolint:gocognit,gocyclo
-func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []bucketUpdate, []couchbaseutil.Bucket, []couchbaseutil.Bucket, []couchbaseutil.Bucket, error) {
+func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []bucketUpdate, []couchbaseutil.Bucket, []couchbaseutil.Bucket, []couchbaseutil.Bucket, map[string]struct{}, error) {
 	unfilteredRequested, err := c.gatherBuckets()
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, err
 	}
 
 	actual := couchbaseutil.BucketList{}
 	if err := couchbaseutil.ListBuckets(&actual).On(c.api, c.readyMembers()); err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, err
 	}
 
 	isOver71, err := c.IsAtLeastVersion("7.1.0")
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, err
 	}
 
 	targetVersion80, err := c.IsAtLeastVersion("8.0.0")
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, err
 	}
+
+	// Buckets naming an encryption key the operator is still provisioning. They
+	// keep their current encryption, or are not created yet, rather than being
+	// left unencrypted until the key is ready.
+	waits := c.bucketsWaitingForEncryptionKey()
+	waitingToCreate := map[string]struct{}{}
 
 	requested := []couchbaseutil.Bucket{}
 	for _, bucket := range unfilteredRequested {
@@ -786,6 +794,26 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []bucketUpdate, []co
 				// If the bucket is a sample bucket, we don't update it until this field is false or removed to avoid unnecessary updates.
 				if found = r.SampleBucket; found {
 					continue
+				}
+
+				if wait, waiting := waits[r.BucketName]; waiting {
+					// Recreating with the new type would delete the bucket, and the new one
+					// could not be encrypted, so neither happens until the key is ready.
+					if a.BucketType != r.BucketType {
+						c.raiseBucketEncryptionPending(r.BucketName, "not recreated", wait)
+
+						found = true
+
+						break
+					}
+
+					if !reflect.DeepEqual(r.EncryptionAtRestKeyID, a.EncryptionAtRestKeyID) ||
+						!reflect.DeepEqual(r.EncryptionAtRestDekLifetime, a.EncryptionAtRestDekLifetime) ||
+						!reflect.DeepEqual(r.EncryptionAtRestDekRotationInterval, a.EncryptionAtRestDekRotationInterval) {
+						c.raiseBucketEncryptionPending(r.BucketName, "encryption left unchanged", wait)
+					}
+
+					keepBucketEncryption(&r, &a)
 				}
 
 				doCrossClusterVersioningChecks(&r, &a, c.cluster)
@@ -859,6 +887,16 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []bucketUpdate, []co
 		}
 
 		if !found {
+			// A key that names the bucket in its usage cannot be created before the
+			// bucket, so that bucket is created now and encrypted once the key is ready.
+			if wait, waiting := waits[r.BucketName]; waiting && !wait.keyNamesBucket {
+				c.raiseBucketEncryptionPending(r.BucketName, "not created", wait)
+
+				waitingToCreate[r.BucketName] = struct{}{}
+
+				continue
+			}
+
 			if !atLeast80 {
 				// Dac should prevent this from getting through but we're adding some extra protection.
 				r.NumVBuckets = nil
@@ -890,7 +928,7 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []bucketUpdate, []co
 		}
 	}
 
-	return create, update, updateDuringMigration, remove, requested, nil
+	return create, update, updateDuringMigration, remove, requested, waitingToCreate, nil
 }
 
 func isStorageBackendExplicitlySet(c *Cluster, r *couchbaseutil.Bucket) bool {
@@ -1165,7 +1203,7 @@ func (c *Cluster) reconcileBuckets() error {
 		return nil
 	}
 
-	create, updates, updateDuringMigration, remove, requested, err := c.inspectBuckets()
+	create, updates, updateDuringMigration, remove, requested, waitingToCreate, err := c.inspectBuckets()
 	if err != nil {
 		return err
 	}
@@ -1229,9 +1267,18 @@ func (c *Cluster) reconcileBuckets() error {
 		return err
 	}
 
+	c.updateBucketStatuses(requested, waitingToCreate)
+
+	return nil
+}
+
+// updateBucketStatuses records the requested buckets in the cluster status. Buckets
+// held back from creation, waiting for an encryption key, are not on the server,
+// so they only keep a status they already had.
+func (c *Cluster) updateBucketStatuses(requested []couchbaseutil.Bucket, waitingToCreate map[string]struct{}) {
 	// To avoid API updates, we record the name of each bucket on the system (this will
 	// be lexically sorted), and we add buckets to the status in a deterministic order.
-	names := make([]string, len(requested))
+	names := make([]string, 0, len(requested))
 	statuses := map[string]couchbasev2.BucketStatus{}
 
 	// Snapshot the existing status so that failed-validation buckets keep
@@ -1242,8 +1289,19 @@ func (c *Cluster) reconcileBuckets() error {
 		existingStatuses[s.BucketName] = s
 	}
 
-	for i, bucket := range requested {
-		names[i] = bucket.BucketName
+	for _, bucket := range requested {
+		// A bucket waiting for its encryption key before it is created is not on
+		// the server, so it has no status until it is.
+		if _, waiting := waitingToCreate[bucket.BucketName]; waiting {
+			if existing, ok := existingStatuses[bucket.BucketName]; ok {
+				names = append(names, bucket.BucketName)
+				statuses[bucket.BucketName] = existing
+			}
+
+			continue
+		}
+
+		names = append(names, bucket.BucketName)
 
 		if c.unreconcilable.IsSkipped(unreconcilable.KindBucketName, bucket.BucketName) {
 			if existing, ok := existingStatuses[bucket.BucketName]; ok {
@@ -1263,8 +1321,6 @@ func (c *Cluster) reconcileBuckets() error {
 	for _, name := range names {
 		c.cluster.Status.Buckets = append(c.cluster.Status.Buckets, statuses[name])
 	}
-
-	return nil
 }
 
 func bucketToClusterStatus(b couchbaseutil.Bucket) couchbasev2.BucketStatus {
